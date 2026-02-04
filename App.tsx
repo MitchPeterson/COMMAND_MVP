@@ -52,18 +52,13 @@ import {
   CreditCard,
   Wallet,
   GraduationCap,
-  Baby,
-  Gift,
-  Plane,
   ShoppingCart,
   Utensils,
-  Fuel,
   Tv,
   Sparkles,
   Target,
   PiggyBank,
   TrendingDown,
-  BarChart3,
   LucideIcon
 } from 'lucide-react';
 
@@ -3071,13 +3066,6 @@ const CommandApp: React.FC = () => {
       </div>
     );
   };
-
-  const PlaceholderView: React.FC<{ title: string; description: string }> = ({ title, description }) => (
-    <div className="space-y-6">
-      <div><h1 className="text-2xl font-bold text-gray-900 mb-1">{title}</h1><p className="text-gray-600">{description}</p></div>
-      <div className="bg-white border border-gray-200 rounded-xl p-12 text-center"><div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4"><Wrench className="w-8 h-8 text-gray-400" /></div><h2 className="text-lg font-semibold text-gray-900 mb-2">Coming Soon</h2><p className="text-gray-500 max-w-md mx-auto">This section is under development.</p></div>
-    </div>
-  );
 
   const renderView = (): React.ReactNode => {
     switch (activeView) {

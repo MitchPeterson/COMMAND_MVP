@@ -3,7 +3,6 @@ import {
   Home, 
   Shield, 
   FileText, 
-  DollarSign, 
   Wrench, 
   Settings, 
   ChevronRight, 
@@ -14,7 +13,6 @@ import {
   User, 
   Menu, 
   X, 
-  Heart, 
   Calendar, 
   Users, 
   TrendingUp,
@@ -22,8 +20,28 @@ import {
   CheckCircle,
   AlertCircle,
   ChevronUp,
+  Car,
+  Building,
+  Umbrella,
+  Heart,
+  UserCheck,
+  CreditCard,
+  Bell,
+  Lock,
+  Mail,
+  Phone,
+  MapPin,
+  Edit3,
+  Plus,
+  ExternalLink,
+  AlertTriangle,
+  DollarSign,
+  FileCheck,
   LucideIcon
 } from 'lucide-react';
+
+// Logo path from public folder
+const commandLogo = '/Command_Logo.png';
 
 // Type definitions
 interface Recommendation {
@@ -80,6 +98,23 @@ interface TimelineEvent {
   status?: 'warning' | 'info' | 'success' | 'critical';
 }
 
+interface InsurancePolicy {
+  id: string;
+  type: 'home' | 'auto' | 'umbrella' | 'life' | 'health';
+  name: string;
+  carrier: string;
+  policyNumber: string;
+  premium: number;
+  premiumFrequency: 'monthly' | 'quarterly' | 'annual';
+  deductible: number;
+  coverage: string;
+  renewalDate: string;
+  status: 'active' | 'expiring-soon' | 'action-needed' | 'expired';
+  icon: LucideIcon;
+  details: Record<string, string>;
+  recommendations?: string[];
+}
+
 const CommandApp: React.FC = () => {
   const [activeView, setActiveView] = useState<string>('dashboard');
   const [selectedPriority, setSelectedPriority] = useState<Priority | null>(null);
@@ -87,6 +122,7 @@ const CommandApp: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [dismissedPriorities, setDismissedPriorities] = useState<number[]>([]);
   const [showDismissed, setShowDismissed] = useState<boolean>(false);
+  const [selectedPolicy, setSelectedPolicy] = useState<InsurancePolicy | null>(null);
 
   const toggleSection = (id: string): void => {
     setExpandedSections(prev => ({
@@ -104,6 +140,124 @@ const CommandApp: React.FC = () => {
     e.stopPropagation();
     setDismissedPriorities(prev => prev.filter(pId => pId !== id));
   };
+
+  // Insurance Policies Data
+  const insurancePolicies: InsurancePolicy[] = [
+    {
+      id: 'home-1',
+      type: 'home',
+      name: 'Homeowners Insurance',
+      carrier: 'State Farm',
+      policyNumber: 'HO-2847591',
+      premium: 2400,
+      premiumFrequency: 'annual',
+      deductible: 1000,
+      coverage: '$750,000 dwelling',
+      renewalDate: 'Jun 15, 2026',
+      status: 'active',
+      icon: Building,
+      details: {
+        'Dwelling Coverage': '$750,000',
+        'Personal Property': '$375,000',
+        'Liability': '$300,000',
+        'Medical Payments': '$5,000',
+        'Loss of Use': '$150,000'
+      },
+      recommendations: ['Consider increasing liability to $500K given net worth']
+    },
+    {
+      id: 'auto-1',
+      type: 'auto',
+      name: 'Auto Insurance',
+      carrier: 'State Farm',
+      policyNumber: 'AU-9384756',
+      premium: 2400,
+      premiumFrequency: 'annual',
+      deductible: 250,
+      coverage: '100/300/100',
+      renewalDate: 'Feb 2, 2026',
+      status: 'expiring-soon',
+      icon: Car,
+      details: {
+        'Bodily Injury': '$100,000/$300,000',
+        'Property Damage': '$100,000',
+        'Collision Deductible': '$250',
+        'Comprehensive Deductible': '$250',
+        'Uninsured Motorist': '$100,000/$300,000',
+        'Vehicles Covered': '2021 Tesla Model Y, 2023 BMW X5'
+      },
+      recommendations: [
+        'Increase deductible to $500 to save ~$240/year',
+        'Shop competing carriers - potential savings of $450/year',
+        'Bundle with home for additional 10% discount'
+      ]
+    },
+    {
+      id: 'umbrella-1',
+      type: 'umbrella',
+      name: 'Umbrella Policy',
+      carrier: 'State Farm',
+      policyNumber: 'UM-1928374',
+      premium: 350,
+      premiumFrequency: 'annual',
+      deductible: 0,
+      coverage: '$1,000,000',
+      renewalDate: 'Jun 15, 2026',
+      status: 'action-needed',
+      icon: Umbrella,
+      details: {
+        'Coverage Limit': '$1,000,000',
+        'Underlying Auto Required': '$300,000 liability',
+        'Underlying Home Required': '$300,000 liability'
+      },
+      recommendations: [
+        'URGENT: Increase to $2M-$3M to match net worth of $2.8M',
+        'Current coverage leaves $1.8M+ exposed in worst-case scenario'
+      ]
+    },
+    {
+      id: 'life-1',
+      type: 'life',
+      name: 'Term Life Insurance',
+      carrier: 'Northwestern Mutual',
+      policyNumber: 'LF-7462951',
+      premium: 85,
+      premiumFrequency: 'monthly',
+      deductible: 0,
+      coverage: '$1,500,000',
+      renewalDate: 'Dec 1, 2035',
+      status: 'active',
+      icon: Heart,
+      details: {
+        'Death Benefit': '$1,500,000',
+        'Term Length': '20 years',
+        'Term Expires': 'December 2035',
+        'Insured': 'Adam Bailey',
+        'Beneficiary': 'Sarah Bailey (spouse)'
+      }
+    },
+    {
+      id: 'life-2',
+      type: 'life',
+      name: 'Term Life Insurance (Spouse)',
+      carrier: 'Northwestern Mutual',
+      policyNumber: 'LF-7462952',
+      premium: 65,
+      premiumFrequency: 'monthly',
+      deductible: 0,
+      coverage: '$750,000',
+      renewalDate: 'Dec 1, 2035',
+      status: 'active',
+      icon: Heart,
+      details: {
+        'Death Benefit': '$750,000',
+        'Term Length': '20 years',
+        'Term Expires': 'December 2035',
+        'Insured': 'Sarah Bailey',
+        'Beneficiary': 'Adam Bailey (spouse)'
+      }
+    }
+  ];
 
   const priorities: Priority[] = [
     {
@@ -273,14 +427,14 @@ const CommandApp: React.FC = () => {
     {
       id: 'insurance',
       icon: Shield,
-      title: 'Insurance & Risk',
+      title: 'Insurance',
       score: 6.5,
       status: 'needs-attention',
-      summary: 'You have 4 active policies with annual premiums of $5,850. Auto renewal is due in 12 days. We\'ve identified $450 in potential savings through rate shopping and $240 through deductible optimization.',
+      summary: 'You have 5 active policies with annual premiums of $5,850. Auto renewal is due in 12 days.',
       keyMetrics: [
         { label: 'Total Annual Premium', value: '$5,850', status: 'neutral' },
         { label: 'Potential Savings', value: '$690/year', status: 'good' },
-        { label: 'Policies Up to Date', value: '3 of 4', status: 'warning' }
+        { label: 'Policies Up to Date', value: '3 of 5', status: 'warning' }
       ],
       items: [
         { label: 'Auto Insurance', value: 'Renewal due Feb 2', status: 'warning' },
@@ -292,10 +446,10 @@ const CommandApp: React.FC = () => {
     {
       id: 'legal',
       icon: FileText,
-      title: 'Legal & Estate',
+      title: 'Legal',
       score: 4.0,
       status: 'critical',
-      summary: 'Your estate documents are 6 years old. With $2.8M net worth, you should have a revocable living trust in place. Healthcare Directive and Power of Attorney need updating to reflect current family situation.',
+      summary: 'Your estate documents are 6 years old. With $2.8M net worth, you should have a revocable living trust in place.',
       keyMetrics: [
         { label: 'Documents Current', value: '0 of 4', status: 'critical' },
         { label: 'Trust Established', value: 'No', status: 'critical' },
@@ -311,10 +465,10 @@ const CommandApp: React.FC = () => {
     {
       id: 'home',
       icon: Wrench,
-      title: 'Home & Assets',
+      title: 'Home',
       score: 7.5,
       status: 'good',
-      summary: 'Most systems are in good condition. HVAC is 14 years old and approaching replacement. Roof was replaced 3 years ago and is in excellent condition. Water heater will need attention in 2-3 years.',
+      summary: 'Most systems are in good condition. HVAC is 14 years old and approaching replacement.',
       keyMetrics: [
         { label: 'Systems Monitored', value: '6 major', status: 'good' },
         { label: 'Immediate Attention', value: '0 items', status: 'good' },
@@ -328,50 +482,12 @@ const CommandApp: React.FC = () => {
       ]
     },
     {
-      id: 'financial',
-      icon: DollarSign,
-      title: 'Finances',
-      score: 8.0,
-      status: 'good',
-      summary: 'Strong emergency fund ($15K = 3 months expenses), healthy retirement contributions (18% of income). Net worth $2.8M with good debt-to-income ratio. Consider increasing 529 contributions as children approach college age.',
-      keyMetrics: [
-        { label: 'Net Worth', value: '$2.8M', status: 'good' },
-        { label: 'Emergency Fund', value: '3 months', status: 'good' },
-        { label: 'Retirement on Track', value: 'Yes', status: 'good' }
-      ],
-      items: [
-        { label: 'Emergency Fund', value: '$15,000 (3 months expenses)', status: 'good' },
-        { label: 'Retirement Savings', value: '18% of income', status: 'good' },
-        { label: '529 College Savings', value: 'Consider increasing contributions', status: 'info' },
-        { label: 'Debt Management', value: 'Mortgage only, healthy ratio', status: 'good' }
-      ]
-    },
-    {
-      id: 'healthcare',
-      icon: Heart,
-      title: 'Healthcare',
-      score: 7.0,
-      status: 'good',
-      summary: 'Family is enrolled in comprehensive employer health plan. All routine checkups are current. Consider HSA contributions for tax advantages. Dental and vision coverage active.',
-      keyMetrics: [
-        { label: 'Coverage Active', value: 'Yes', status: 'good' },
-        { label: 'Deductible Progress', value: '$800 of $3,000', status: 'neutral' },
-        { label: 'HSA Balance', value: '$4,200', status: 'info' }
-      ],
-      items: [
-        { label: 'Health Insurance', value: 'Employer plan, comprehensive', status: 'good' },
-        { label: 'Annual Checkups', value: 'All family members current', status: 'good' },
-        { label: 'HSA Contributions', value: 'Consider maximizing', status: 'info' },
-        { label: 'Dental & Vision', value: 'Active coverage', status: 'good' }
-      ]
-    },
-    {
       id: 'taxes',
       icon: Calendar,
       title: 'Taxes',
       score: 7.5,
       status: 'good',
-      summary: 'Working with CPA for annual filing. Estimated quarterly payments current. Consider tax-loss harvesting in investment accounts. Review charitable giving strategy for deduction optimization.',
+      summary: 'Working with CPA for annual filing. Estimated quarterly payments current.',
       keyMetrics: [
         { label: '2025 Return', value: 'Filed on time', status: 'good' },
         { label: 'Quarterly Estimates', value: 'Current', status: 'good' },
@@ -390,7 +506,7 @@ const CommandApp: React.FC = () => {
       title: 'Family',
       score: 8.5,
       status: 'good',
-      summary: 'School registrations current for both children. Emergency contacts up to date. Family calendar synchronized. Consider updating beneficiary designations after recent life changes.',
+      summary: 'School registrations current for both children. Emergency contacts up to date.',
       keyMetrics: [
         { label: 'School Admin', value: 'Current', status: 'good' },
         { label: 'Emergency Contacts', value: 'Updated', status: 'good' },
@@ -401,25 +517,6 @@ const CommandApp: React.FC = () => {
         { label: 'Emergency Contacts', value: 'Updated December 2025', status: 'good' },
         { label: 'Family Calendar', value: 'Shared and synchronized', status: 'good' },
         { label: 'Beneficiary Designations', value: 'Review after income change', status: 'info' }
-      ]
-    },
-    {
-      id: 'advisory',
-      icon: TrendingUp,
-      title: 'Advisory',
-      score: 6.0,
-      status: 'needs-attention',
-      summary: 'You work with 4 advisors (CPA, financial advisor, insurance agent, attorney). No centralized system for coordinating advice. Consider scheduling annual alignment meeting with key advisors.',
-      keyMetrics: [
-        { label: 'Active Advisors', value: '4 professionals', status: 'neutral' },
-        { label: 'Last Coordination', value: 'Never', status: 'warning' },
-        { label: 'Advice Conflicts', value: '0 identified', status: 'good' }
-      ],
-      items: [
-        { label: 'CPA', value: 'Annual relationship, good', status: 'good' },
-        { label: 'Financial Advisor', value: 'Quarterly meetings', status: 'good' },
-        { label: 'Insurance Agent', value: 'Ad-hoc contact only', status: 'info' },
-        { label: 'Estate Attorney', value: 'No contact since 2019', status: 'warning' }
       ]
     }
   ];
@@ -446,48 +543,24 @@ const CommandApp: React.FC = () => {
     return 'border-red-500';
   };
 
-  // Logo Component
-  const CommandLogo: React.FC<{ className?: string }> = ({ className = "w-8 h-8" }) => (
-    <svg viewBox="0 0 100 100" className={className}>
-      {/* Center hub */}
-      <circle cx="50" cy="50" r="12" fill="#C9A24D" />
-      <circle cx="50" cy="50" r="8" fill="#F5C842" />
-      
-      {/* Outer ring */}
-      <circle cx="50" cy="50" r="38" fill="none" stroke="#C9A24D" strokeWidth="4" />
-      
-      {/* Spokes and nodes */}
-      {[0, 45, 90, 135, 180, 225, 270, 315].map((angle, i) => {
-        const rad = (angle * Math.PI) / 180;
-        const x = 50 + 38 * Math.cos(rad);
-        const y = 50 + 38 * Math.sin(rad);
-        return (
-          <g key={i}>
-            <line x1="50" y1="50" x2={x} y2={y} stroke="#1C1D20" strokeWidth="2" />
-            <circle cx={x} cy={y} r="7" fill="#C9A24D" />
-            <circle cx={x} cy={y} r="4" fill="#F5C842" />
-          </g>
-        );
-      })}
-    </svg>
-  );
-
   const Header: React.FC = () => (
     <header className="bg-white border-b border-gray-200 sticky top-0 z-30 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <div className="flex items-center gap-2">
-            <CommandLogo className="w-9 h-9" />
-            <span className="font-bold text-xl tracking-tight">COMMAND</span>
-          </div>
+          <button 
+            onClick={() => { setActiveView('dashboard'); setSelectedPriority(null); setSelectedPolicy(null); }}
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+          >
+            <img src={commandLogo} alt="Command" className="h-10 w-auto" />
+          </button>
 
           <nav className="hidden lg:flex items-center gap-1">
             {[
-              { id: 'dashboard', label: 'Dashboard', icon: Home },
               { id: 'insurance', label: 'Insurance', icon: Shield },
               { id: 'legal', label: 'Legal', icon: FileText },
-              { id: 'home', label: 'Home', icon: Wrench },
-              { id: 'financial', label: 'Financial', icon: DollarSign }
+              { id: 'home', label: 'Home', icon: Home },
+              { id: 'taxes', label: 'Tax', icon: Calendar },
+              { id: 'family', label: 'Family', icon: Users }
             ].map(section => {
               const Icon = section.icon;
               return (
@@ -496,8 +569,9 @@ const CommandApp: React.FC = () => {
                   onClick={() => {
                     setActiveView(section.id);
                     setSelectedPriority(null);
+                    setSelectedPolicy(null);
                   }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm ${
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
                     activeView === section.id ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >
@@ -509,12 +583,16 @@ const CommandApp: React.FC = () => {
           </nav>
 
           <div className="hidden lg:flex items-center gap-3">
-            <button onClick={() => setActiveView('settings')} className="p-2 hover:bg-gray-100 rounded-lg">
-              <Settings className="w-5 h-5 text-gray-600" />
-            </button>
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-600 to-yellow-500 flex items-center justify-center">
+            <button 
+              onClick={() => setActiveView('profile')} 
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+                activeView === 'profile' 
+                  ? 'bg-gray-900 ring-2 ring-command-gold' 
+                  : 'bg-gradient-to-br from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400'
+              }`}
+            >
               <User className="w-5 h-5 text-white" />
-            </div>
+            </button>
           </div>
 
           <button className="lg:hidden" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
@@ -522,6 +600,42 @@ const CommandApp: React.FC = () => {
           </button>
         </div>
       </div>
+      
+      {/* Mobile Menu */}
+      {mobileMenuOpen && (
+        <div className="lg:hidden bg-white border-t border-gray-200 py-2">
+          <div className="px-4 space-y-1">
+            {[
+              { id: 'dashboard', label: 'Dashboard', icon: Home },
+              { id: 'insurance', label: 'Insurance', icon: Shield },
+              { id: 'legal', label: 'Legal', icon: FileText },
+              { id: 'home', label: 'Home', icon: Wrench },
+              { id: 'taxes', label: 'Tax', icon: Calendar },
+              { id: 'family', label: 'Family', icon: Users },
+              { id: 'profile', label: 'Profile', icon: User }
+            ].map(section => {
+              const Icon = section.icon;
+              return (
+                <button
+                  key={section.id}
+                  onClick={() => {
+                    setActiveView(section.id);
+                    setSelectedPriority(null);
+                    setSelectedPolicy(null);
+                    setMobileMenuOpen(false);
+                  }}
+                  className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg font-medium text-sm ${
+                    activeView === section.id ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  <Icon className="w-5 h-5" />
+                  {section.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </header>
   );
 
@@ -537,7 +651,7 @@ const CommandApp: React.FC = () => {
           <Icon className="w-4 h-4 text-white" />
         </div>
         <span className={`text-xs text-gray-300 text-center leading-tight ${compact ? 'hidden sm:block' : ''}`}>
-          {section.title.split(' ')[0]}
+          {section.title}
         </span>
         <span className={`text-sm font-bold ${getScoreColor(section.score)}`}>
           {section.score}
@@ -546,13 +660,13 @@ const CommandApp: React.FC = () => {
     );
   };
 
-  const PriorityCard: React.FC<{ priority: Priority; onClick: () => void; isDismissed?: boolean; onDismiss?: (e: React.MouseEvent) => void; onRestore?: (e: React.MouseEvent) => void }> = ({ 
-    priority, 
-    onClick, 
-    isDismissed = false,
-    onDismiss,
-    onRestore 
-  }) => (
+  const PriorityCard: React.FC<{ 
+    priority: Priority; 
+    onClick: () => void; 
+    isDismissed?: boolean; 
+    onDismiss?: (e: React.MouseEvent) => void; 
+    onRestore?: (e: React.MouseEvent) => void 
+  }> = ({ priority, onClick, isDismissed = false, onDismiss, onRestore }) => (
     <div 
       onClick={onClick}
       className={`bg-white border rounded-xl p-5 hover:shadow-lg transition-all cursor-pointer ${
@@ -604,7 +718,8 @@ const CommandApp: React.FC = () => {
             {isDismissed && onRestore && (
               <button
                 onClick={onRestore}
-                className="text-xs text-command-gold hover:text-yellow-600 flex items-center gap-1 transition-colors"
+                className="text-xs hover:text-yellow-600 flex items-center gap-1 transition-colors"
+                style={{ color: '#C9A24D' }}
               >
                 <CheckCircle className="w-3.5 h-3.5" />
                 Restore
@@ -741,79 +856,583 @@ const CommandApp: React.FC = () => {
     </div>
   );
 
-  const SectionCard: React.FC<{ section: HouseholdSection }> = ({ section }) => {
-    const isExpanded = expandedSections[section.id];
-    
+  // Insurance Section View
+  const InsuranceView: React.FC = () => {
+    if (selectedPolicy) {
+      return <PolicyDetailView policy={selectedPolicy} />;
+    }
+
+    const totalAnnualPremium = insurancePolicies.reduce((sum, p) => {
+      const annual = p.premiumFrequency === 'monthly' ? p.premium * 12 : 
+                     p.premiumFrequency === 'quarterly' ? p.premium * 4 : p.premium;
+      return sum + annual;
+    }, 0);
+
+    const policiesNeedingAttention = insurancePolicies.filter(p => 
+      p.status === 'expiring-soon' || p.status === 'action-needed'
+    ).length;
+
+    const policyTypes = [
+      { type: 'home', label: 'Home', icon: Building },
+      { type: 'auto', label: 'Auto', icon: Car },
+      { type: 'umbrella', label: 'Umbrella', icon: Umbrella },
+      { type: 'life', label: 'Life', icon: Heart }
+    ];
+
     return (
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center">
-                <section.icon className="w-6 h-6" style={{ color: '#C9A24D' }} />
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Insurance & Risk</h1>
+          <p className="text-gray-600">Maintains a living view of coverage across all policies—flagging gaps, overlaps, and life events that should trigger reviews.</p>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                <Shield className="w-5 h-5 text-blue-600" />
               </div>
-              <div>
-                <h3 className="font-semibold text-gray-900 text-lg">{section.title}</h3>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className={`text-3xl font-bold ${getScoreColor(section.score)}`}>
-                    {section.score}
-                  </span>
-                  <span className="text-sm text-gray-500">/10</span>
-                </div>
+              <span className="text-sm text-gray-600">Active Policies</span>
+            </div>
+            <p className="text-3xl font-bold text-gray-900">{insurancePolicies.length}</p>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
+                <DollarSign className="w-5 h-5 text-green-600" />
+              </div>
+              <span className="text-sm text-gray-600">Annual Premium</span>
+            </div>
+            <p className="text-3xl font-bold text-gray-900">${totalAnnualPremium.toLocaleString()}</p>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-yellow-600" />
+              </div>
+              <span className="text-sm text-gray-600">Need Attention</span>
+            </div>
+            <p className="text-3xl font-bold text-gray-900">{policiesNeedingAttention}</p>
+          </div>
+
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(201, 162, 77, 0.2)' }}>
+                <TrendingUp className="w-5 h-5" style={{ color: '#C9A24D' }} />
+              </div>
+              <span className="text-sm text-gray-600">Potential Savings</span>
+            </div>
+            <p className="text-3xl font-bold" style={{ color: '#C9A24D' }}>$690<span className="text-lg font-normal text-gray-500">/yr</span></p>
+          </div>
+        </div>
+
+        {/* Policies by Type */}
+        {policyTypes.map(({ type, label, icon: TypeIcon }) => {
+          const typePolicies = insurancePolicies.filter(p => p.type === type);
+          if (typePolicies.length === 0) return null;
+
+          return (
+            <div key={type} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+                <TypeIcon className="w-5 h-5" style={{ color: '#C9A24D' }} />
+                <h2 className="text-lg font-semibold text-gray-900">{label} Insurance</h2>
+                <span className="text-sm text-gray-500">({typePolicies.length} {typePolicies.length === 1 ? 'policy' : 'policies'})</span>
+              </div>
+              <div className="divide-y divide-gray-100">
+                {typePolicies.map(policy => (
+                  <PolicyRow key={policy.id} policy={policy} onClick={() => setSelectedPolicy(policy)} />
+                ))}
               </div>
             </div>
-            
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => toggleSection(section.id)}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+          );
+        })}
+
+        {/* Coverage Gaps Alert */}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-5 h-5 text-yellow-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-yellow-900 mb-1">Coverage Gap Identified</h3>
+              <p className="text-sm text-yellow-800 mb-3">
+                Your umbrella policy ($1M) may be insufficient for your net worth ($2.8M). In a worst-case liability scenario, 
+                you could be personally exposed for $1.8M+ in assets.
+              </p>
+              <button 
+                className="text-sm font-medium text-yellow-800 hover:text-yellow-900 flex items-center gap-1"
+                onClick={() => setSelectedPolicy(insurancePolicies.find(p => p.type === 'umbrella') || null)}
               >
-                {isExpanded ? (
-                  <ChevronDown className="w-5 h-5 text-gray-600" />
-                ) : (
-                  <ChevronRight className="w-5 h-5 text-gray-600" />
-                )}
-              </button>
-              <button
-                onClick={() => setActiveView(section.id)}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-white transition-all hover:opacity-90"
-                style={{ backgroundColor: '#C9A24D' }}
-              >
-                View Details
+                Review Umbrella Policy <ChevronRight className="w-4 h-4" />
               </button>
             </div>
           </div>
+        </div>
+      </div>
+    );
+  };
 
-          {isExpanded && (
-            <div className="mt-4 pt-4 border-t border-gray-200 space-y-4">
-              <p className="text-sm text-gray-600">{section.summary}</p>
-              
-              <div className="grid grid-cols-3 gap-4">
-                {section.keyMetrics.map((metric, idx) => (
-                  <div key={idx} className={`${getScoreBgColor(metric.status === 'good' ? 9 : metric.status === 'warning' ? 6 : 4)} rounded-lg p-3`}>
-                    <div className="text-xs text-gray-600 mb-1">{metric.label}</div>
-                    <div className="text-sm font-semibold text-gray-900">{metric.value}</div>
-                  </div>
-                ))}
+  // Policy Row Component
+  const PolicyRow: React.FC<{ policy: InsurancePolicy; onClick: () => void }> = ({ policy, onClick }) => {
+    const Icon = policy.icon;
+    const annualPremium = policy.premiumFrequency === 'monthly' ? policy.premium * 12 : 
+                          policy.premiumFrequency === 'quarterly' ? policy.premium * 4 : policy.premium;
+
+    return (
+      <div 
+        onClick={onClick}
+        className="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
+      >
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+              policy.status === 'action-needed' ? 'bg-red-100' :
+              policy.status === 'expiring-soon' ? 'bg-yellow-100' :
+              'bg-gray-100'
+            }`}>
+              <Icon className={`w-5 h-5 ${
+                policy.status === 'action-needed' ? 'text-red-600' :
+                policy.status === 'expiring-soon' ? 'text-yellow-600' :
+                'text-gray-600'
+              }`} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-medium text-gray-900">{policy.name}</h3>
+                {policy.status === 'expiring-soon' && (
+                  <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                    Renewal Soon
+                  </span>
+                )}
+                {policy.status === 'action-needed' && (
+                  <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                    Action Needed
+                  </span>
+                )}
               </div>
+              <p className="text-sm text-gray-500">{policy.carrier} • {policy.coverage}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-6">
+            <div className="text-right">
+              <p className="font-semibold text-gray-900">${annualPremium.toLocaleString()}/yr</p>
+              <p className="text-xs text-gray-500">Renews {policy.renewalDate}</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-gray-400" />
+          </div>
+        </div>
+      </div>
+    );
+  };
 
-              <div className="space-y-2">
-                {section.items.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between text-sm py-2 border-b border-gray-100 last:border-0">
-                    <span className="text-gray-700">{item.label}</span>
-                    <span className={`font-medium ${
-                      item.status === 'critical' ? 'text-red-600' :
-                      item.status === 'warning' ? 'text-yellow-600' :
-                      item.status === 'good' ? 'text-green-600' :
-                      'text-blue-600'
-                    }`}>
-                      {item.value}
-                    </span>
-                  </div>
-                ))}
+  // Policy Detail View
+  const PolicyDetailView: React.FC<{ policy: InsurancePolicy }> = ({ policy }) => {
+    const Icon = policy.icon;
+    const annualPremium = policy.premiumFrequency === 'monthly' ? policy.premium * 12 : 
+                          policy.premiumFrequency === 'quarterly' ? policy.premium * 4 : policy.premium;
+
+    return (
+      <div className="space-y-6">
+        <button
+          onClick={() => setSelectedPolicy(null)}
+          className="flex items-center gap-2 text-gray-600 hover:text-gray-900"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span className="text-sm font-medium">Back to Insurance</span>
+        </button>
+
+        {/* Policy Header */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <div className="flex items-start justify-between mb-6">
+            <div className="flex items-center gap-4">
+              <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${
+                policy.status === 'action-needed' ? 'bg-red-100' :
+                policy.status === 'expiring-soon' ? 'bg-yellow-100' :
+                'bg-gray-100'
+              }`}>
+                <Icon className={`w-7 h-7 ${
+                  policy.status === 'action-needed' ? 'text-red-600' :
+                  policy.status === 'expiring-soon' ? 'text-yellow-600' :
+                  'text-gray-600'
+                }`} />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-gray-900">{policy.name}</h1>
+                <p className="text-gray-600">{policy.carrier}</p>
               </div>
             </div>
-          )}
+            {policy.status !== 'active' && (
+              <span className={`px-3 py-1 text-sm font-medium rounded-full ${
+                policy.status === 'action-needed' ? 'bg-red-100 text-red-800' :
+                'bg-yellow-100 text-yellow-800'
+              }`}>
+                {policy.status === 'action-needed' ? 'Action Needed' : 'Renewal Soon'}
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="bg-gray-50 rounded-lg p-4">
+              <p className="text-xs text-gray-500 mb-1">Policy Number</p>
+              <p className="font-semibold text-gray-900">{policy.policyNumber}</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <p className="text-xs text-gray-500 mb-1">Annual Premium</p>
+              <p className="font-semibold text-gray-900">${annualPremium.toLocaleString()}</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <p className="text-xs text-gray-500 mb-1">Deductible</p>
+              <p className="font-semibold text-gray-900">${policy.deductible.toLocaleString()}</p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <p className="text-xs text-gray-500 mb-1">Renewal Date</p>
+              <p className="font-semibold text-gray-900">{policy.renewalDate}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Coverage Details */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Coverage Details</h2>
+          <div className="space-y-3">
+            {Object.entries(policy.details).map(([key, value]) => (
+              <div key={key} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                <span className="text-gray-600">{key}</span>
+                <span className="font-medium text-gray-900">{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Recommendations */}
+        {policy.recommendations && policy.recommendations.length > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <Info className="w-5 h-5 text-blue-600 mt-0.5" />
+              <h2 className="text-lg font-semibold text-blue-900">Recommendations</h2>
+            </div>
+            <div className="space-y-3">
+              {policy.recommendations.map((rec, index) => (
+                <div key={index} className="flex items-start gap-3">
+                  <CheckCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-blue-800">{rec}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex gap-3">
+          <button className="flex-1 px-4 py-3 rounded-lg text-white font-medium transition-all hover:opacity-90" style={{ backgroundColor: '#C9A24D' }}>
+            <span className="flex items-center justify-center gap-2">
+              <FileCheck className="w-5 h-5" />
+              Review Policy Document
+            </span>
+          </button>
+          <button className="px-4 py-3 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors">
+            <span className="flex items-center justify-center gap-2">
+              <ExternalLink className="w-5 h-5" />
+              Carrier Portal
+            </span>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  // Profile View
+  const ProfileView: React.FC = () => {
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Profile Settings</h1>
+          <p className="text-gray-600">Manage your account, security, and subscription</p>
+        </div>
+
+        {/* Profile Header */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <div className="flex items-center gap-6">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-yellow-600 to-yellow-500 flex items-center justify-center">
+              <span className="text-3xl font-bold text-white">AB</span>
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-gray-900">Adam Bailey</h2>
+              <p className="text-gray-600">Premium Member since January 2024</p>
+              <div className="flex items-center gap-2 mt-2">
+                <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                  Pro Plan
+                </span>
+                <span className="text-sm text-gray-500">• Household of 4</span>
+              </div>
+            </div>
+            <button className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors flex items-center gap-2">
+              <Edit3 className="w-4 h-4" />
+              Edit Profile
+            </button>
+          </div>
+        </div>
+
+        {/* Account Information */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-900">Account Information</h2>
+          </div>
+          <div className="divide-y divide-gray-100">
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                  <Mail className="w-5 h-5 text-gray-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Email Address</p>
+                  <p className="font-medium text-gray-900">adam.bailey@email.com</p>
+                </div>
+              </div>
+              <button className="text-sm font-medium hover:text-yellow-600" style={{ color: '#C9A24D' }}>Change</button>
+            </div>
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                  <Phone className="w-5 h-5 text-gray-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Phone Number</p>
+                  <p className="font-medium text-gray-900">(612) 555-0147</p>
+                </div>
+              </div>
+              <button className="text-sm font-medium hover:text-yellow-600" style={{ color: '#C9A24D' }}>Change</button>
+            </div>
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                  <MapPin className="w-5 h-5 text-gray-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-gray-500">Address</p>
+                  <p className="font-medium text-gray-900">1847 Oakwood Drive, Savage, MN 55378</p>
+                </div>
+              </div>
+              <button className="text-sm font-medium hover:text-yellow-600" style={{ color: '#C9A24D' }}>Change</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Security */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-900">Security</h2>
+          </div>
+          <div className="divide-y divide-gray-100">
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                  <Lock className="w-5 h-5 text-gray-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Password</p>
+                  <p className="text-sm text-gray-500">Last changed 3 months ago</p>
+                </div>
+              </div>
+              <button className="text-sm font-medium hover:text-yellow-600" style={{ color: '#C9A24D' }}>Update Password</button>
+            </div>
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                  <Shield className="w-5 h-5 text-gray-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Two-Factor Authentication</p>
+                  <p className="text-sm text-gray-500">Add an extra layer of security</p>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Enabled</span>
+            </div>
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                  <UserCheck className="w-5 h-5 text-gray-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Connected Accounts</p>
+                  <p className="text-sm text-gray-500">Google, Apple ID</p>
+                </div>
+              </div>
+              <button className="text-sm font-medium hover:text-yellow-600" style={{ color: '#C9A24D' }}>Manage</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Subscription & Billing */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-900">Subscription & Billing</h2>
+          </div>
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <div className="flex items-center gap-3 mb-1">
+                  <h3 className="text-lg font-bold text-gray-900">Pro Plan</h3>
+                  <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Active</span>
+                </div>
+                <p className="text-gray-600">$40/month • Renews February 15, 2026</p>
+              </div>
+              <button className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 transition-colors">
+                Change Plan
+              </button>
+            </div>
+            
+            <div className="bg-gray-50 rounded-lg p-4 mb-6">
+              <p className="text-sm font-medium text-gray-900 mb-2">Pro Plan includes:</p>
+              <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  Advanced risk scoring
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  Automation features
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  Annual optimization review
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  Priority support
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-gray-200 pt-6">
+              <h4 className="font-medium text-gray-900 mb-4">Payment Method</h4>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-8 rounded bg-gray-800 flex items-center justify-center">
+                    <CreditCard className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">Visa ending in 4242</p>
+                    <p className="text-sm text-gray-500">Expires 08/2027</p>
+                  </div>
+                </div>
+                <button className="text-sm font-medium hover:text-yellow-600" style={{ color: '#C9A24D' }}>Update</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Notifications */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-900">Notifications</h2>
+          </div>
+          <div className="divide-y divide-gray-100">
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                  <Bell className="w-5 h-5 text-gray-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Email Notifications</p>
+                  <p className="text-sm text-gray-500">Receive updates about your household</p>
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" className="sr-only peer" defaultChecked />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-500"></div>
+              </label>
+            </div>
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                  <AlertCircle className="w-5 h-5 text-gray-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Priority Alerts</p>
+                  <p className="text-sm text-gray-500">Immediate notifications for urgent items</p>
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" className="sr-only peer" defaultChecked />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-500"></div>
+              </label>
+            </div>
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                  <Calendar className="w-5 h-5 text-gray-600" />
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Weekly Summary</p>
+                  <p className="text-sm text-gray-500">Get a weekly digest of your household status</p>
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" className="sr-only peer" defaultChecked />
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-500"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+        {/* Household Members */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">Household Members</h2>
+            <button className="text-sm font-medium hover:text-yellow-600 flex items-center gap-1" style={{ color: '#C9A24D' }}>
+              <Plus className="w-4 h-4" />
+              Add Member
+            </button>
+          </div>
+          <div className="divide-y divide-gray-100">
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-600 to-yellow-500 flex items-center justify-center">
+                  <span className="text-sm font-bold text-white">AB</span>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Adam Bailey</p>
+                  <p className="text-sm text-gray-500">Owner • adam.bailey@email.com</p>
+                </div>
+              </div>
+              <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-600">You</span>
+            </div>
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-rose-500 flex items-center justify-center">
+                  <span className="text-sm font-bold text-white">SB</span>
+                </div>
+                <div>
+                  <p className="font-medium text-gray-900">Sarah Bailey</p>
+                  <p className="text-sm text-gray-500">Co-owner • sarah.bailey@email.com</p>
+                </div>
+              </div>
+              <button className="text-sm text-gray-500 hover:text-gray-700">Manage</button>
+            </div>
+          </div>
+        </div>
+
+        {/* Danger Zone */}
+        <div className="bg-white border border-red-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-red-100">
+            <h2 className="text-lg font-semibold text-red-900">Danger Zone</h2>
+          </div>
+          <div className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-gray-900">Delete Account</p>
+                <p className="text-sm text-gray-500">Permanently delete your account and all data</p>
+              </div>
+              <button className="px-4 py-2 rounded-lg border border-red-200 text-red-600 font-medium hover:bg-red-50 transition-colors">
+                Delete Account
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -850,7 +1469,7 @@ const CommandApp: React.FC = () => {
             </div>
 
             {/* Right: Section Scores Grid */}
-            <div className="flex-1 lg:max-w-2xl">
+            <div className="flex-1 lg:max-w-xl">
               <p className="text-xs text-gray-400 mb-3 lg:text-right">Section Scores</p>
               <div className="flex flex-wrap justify-start lg:justify-end gap-1">
                 {householdSections.map(section => (
@@ -887,16 +1506,6 @@ const CommandApp: React.FC = () => {
         {/* Timeline */}
         <TimelineSection />
 
-        {/* Household Sections */}
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900 mb-3">Household Sections</h2>
-          <div className="grid grid-cols-1 gap-4">
-            {householdSections.map(section => (
-              <SectionCard key={section.id} section={section} />
-            ))}
-          </div>
-        </div>
-
         {/* Dismissed Items */}
         {dismissedPriorityItems.length > 0 && (
           <div className="border-t border-gray-200 pt-6">
@@ -927,30 +1536,44 @@ const CommandApp: React.FC = () => {
     );
   };
 
-  const HomeView: React.FC = () => (
+  // Placeholder views for other sections
+  const PlaceholderView: React.FC<{ title: string; description: string }> = ({ title, description }) => (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Home & Asset Maintenance</h1>
-        <p className="text-gray-600">Track and maintain your home systems</p>
+        <h1 className="text-2xl font-bold text-gray-900 mb-1">{title}</h1>
+        <p className="text-gray-600">{description}</p>
       </div>
-      <div className="bg-white border border-gray-200 rounded-xl p-6">
-        <p className="text-gray-600">Detailed home management view coming soon...</p>
+      <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+        <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mx-auto mb-4">
+          <Settings className="w-8 h-8 text-gray-400" />
+        </div>
+        <h2 className="text-lg font-semibold text-gray-900 mb-2">Coming Soon</h2>
+        <p className="text-gray-500 max-w-md mx-auto">
+          This section is under development. Check back soon for full functionality.
+        </p>
       </div>
     </div>
   );
 
   const renderView = (): React.ReactNode => {
-    if (activeView === 'dashboard') return <DashboardView />;
-    if (activeView === 'home') return <HomeView />;
-    
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="text-xl font-semibold text-gray-900 mb-2">Coming Soon</div>
-          <p className="text-sm text-gray-500">This section is under development</p>
-        </div>
-      </div>
-    );
+    switch (activeView) {
+      case 'dashboard':
+        return <DashboardView />;
+      case 'insurance':
+        return <InsuranceView />;
+      case 'legal':
+        return <PlaceholderView title="Legal & Estate" description="Keeps your legal documents current, aligned, and ready when it matters." />;
+      case 'home':
+        return <PlaceholderView title="Home & Assets" description="Turns reactive maintenance into a proactive, planned system." />;
+      case 'taxes':
+        return <PlaceholderView title="Tax Planning" description="Planning, filing coordination, and record retention to streamline filings and optimize strategy." />;
+      case 'family':
+        return <PlaceholderView title="Family & Life Administration" description="Ensures life events trigger the right reviews and updates automatically." />;
+      case 'profile':
+        return <ProfileView />;
+      default:
+        return <DashboardView />;
+    }
   };
 
   return (

@@ -539,6 +539,112 @@ const CommandApp: React.FC = () => {
     }
   ];
 
+  // Tax Data
+  interface TaxDocument {
+    id: string;
+    name: string;
+    year: number;
+    type: 'w2' | '1099' | 'return' | 'estimate' | 'receipt' | 'statement' | 'other';
+    status: 'received' | 'pending' | 'filed' | 'uploaded';
+    dueDate?: string;
+    amount?: number;
+    source?: string;
+  }
+
+  interface CharitableContribution {
+    id: string;
+    organization: string;
+    date: string;
+    amount: number;
+    type: 'cash' | 'stock' | 'property' | 'goods';
+    acknowledged: boolean;
+    taxDeductible: boolean;
+  }
+
+  interface BusinessExpense {
+    id: string;
+    category: string;
+    description: string;
+    amount: number;
+    date: string;
+    deductible: boolean;
+    receipt: boolean;
+  }
+
+  interface TaxRecommendation {
+    id: string;
+    title: string;
+    description: string;
+    potentialSavings?: number;
+    priority: 'high' | 'medium' | 'low';
+    deadline?: string;
+  }
+
+  interface TaxLawUpdate {
+    id: string;
+    title: string;
+    effectiveDate: string;
+    impact: 'positive' | 'negative' | 'neutral';
+    summary: string;
+    actionRequired: boolean;
+  }
+
+  const taxDocuments: TaxDocument[] = [
+    { id: 'td-1', name: 'W-2 - Primary Employment', year: 2025, type: 'w2', status: 'received', source: 'Acme Corp', amount: 285000 },
+    { id: 'td-2', name: 'W-2 - Spouse Employment', year: 2025, type: 'w2', status: 'received', source: 'Metro Health', amount: 40000 },
+    { id: 'td-3', name: '1099-INT - Bank Interest', year: 2025, type: '1099', status: 'received', source: 'Chase Bank', amount: 1250 },
+    { id: 'td-4', name: '1099-DIV - Investment Dividends', year: 2025, type: '1099', status: 'received', source: 'Vanguard', amount: 8500 },
+    { id: 'td-5', name: '1099-NEC - Consulting Income', year: 2025, type: '1099', status: 'received', source: 'Various Clients', amount: 45000 },
+    { id: 'td-6', name: '1099-B - Stock Sales', year: 2025, type: '1099', status: 'pending', source: 'Fidelity' },
+    { id: 'td-7', name: 'Mortgage Interest Statement', year: 2025, type: 'statement', status: 'received', source: 'Wells Fargo', amount: 18500 },
+    { id: 'td-8', name: 'Property Tax Statement', year: 2025, type: 'statement', status: 'received', source: 'Scott County', amount: 8200 },
+    { id: 'td-9', name: '2024 Federal Return', year: 2024, type: 'return', status: 'filed' },
+    { id: 'td-10', name: '2024 State Return (MN)', year: 2024, type: 'return', status: 'filed' }
+  ];
+
+  const charitableContributions: CharitableContribution[] = [
+    { id: 'cc-1', organization: 'United Way', date: 'Dec 15, 2025', amount: 5000, type: 'cash', acknowledged: true, taxDeductible: true },
+    { id: 'cc-2', organization: 'St. Jude Children\'s Hospital', date: 'Nov 20, 2025', amount: 2500, type: 'cash', acknowledged: true, taxDeductible: true },
+    { id: 'cc-3', organization: 'Local Food Shelf', date: 'Oct 5, 2025', amount: 1000, type: 'cash', acknowledged: true, taxDeductible: true },
+    { id: 'cc-4', organization: 'Alma Mater University', date: 'Sep 1, 2025', amount: 10000, type: 'stock', acknowledged: true, taxDeductible: true },
+    { id: 'cc-5', organization: 'Habitat for Humanity', date: 'Aug 15, 2025', amount: 500, type: 'goods', acknowledged: false, taxDeductible: true }
+  ];
+
+  const businessExpenses: BusinessExpense[] = [
+    { id: 'be-1', category: 'Home Office', description: 'Dedicated office space (150 sq ft)', amount: 1800, date: '2025', deductible: true, receipt: true },
+    { id: 'be-2', category: 'Software', description: 'Adobe Creative Suite, Zoom Pro', amount: 850, date: '2025', deductible: true, receipt: true },
+    { id: 'be-3', category: 'Professional Development', description: 'Industry conference & courses', amount: 2200, date: '2025', deductible: true, receipt: true },
+    { id: 'be-4', category: 'Equipment', description: 'Computer upgrade, monitor', amount: 1500, date: '2025', deductible: true, receipt: true },
+    { id: 'be-5', category: 'Internet/Phone', description: 'Business portion (40%)', amount: 720, date: '2025', deductible: true, receipt: true },
+    { id: 'be-6', category: 'Professional Services', description: 'Legal consultation, accounting', amount: 1200, date: '2025', deductible: true, receipt: true },
+    { id: 'be-7', category: 'Travel', description: 'Client meetings, mileage', amount: 1850, date: '2025', deductible: true, receipt: true }
+  ];
+
+  const taxRecommendations: TaxRecommendation[] = [
+    { id: 'tr-1', title: 'Maximize 401(k) Contributions', description: 'You contributed $20,500 in 2025. The limit is $23,000. Consider increasing to capture additional $2,500 in tax-deferred savings.', potentialSavings: 875, priority: 'high', deadline: 'Dec 31, 2026' },
+    { id: 'tr-2', title: 'Consider Backdoor Roth IRA', description: 'Your income exceeds Roth IRA limits. A backdoor Roth conversion could provide tax-free growth.', potentialSavings: 0, priority: 'medium' },
+    { id: 'tr-3', title: 'Harvest Investment Losses', description: 'You have $12,000 in unrealized losses that could offset gains and reduce tax liability.', potentialSavings: 2400, priority: 'high', deadline: 'Dec 31, 2026' },
+    { id: 'tr-4', title: 'HSA Contribution Room', description: 'You contributed $5,000 to your HSA. Family limit is $8,300. Additional contributions reduce taxable income.', potentialSavings: 1155, priority: 'medium' },
+    { id: 'tr-5', title: 'Bunch Charitable Contributions', description: 'Consider "bunching" 2 years of donations into one year to exceed standard deduction threshold.', potentialSavings: 1500, priority: 'low' },
+    { id: 'tr-6', title: 'Review Estimated Tax Payments', description: 'Your consulting income requires quarterly estimates. Ensure Q1 2026 payment is adequate to avoid penalties.', priority: 'high', deadline: 'Apr 15, 2026' }
+  ];
+
+  const taxLawUpdates: TaxLawUpdate[] = [
+    { id: 'tl-1', title: 'SALT Deduction Cap Extended', effectiveDate: '2025', impact: 'negative', summary: 'The $10,000 cap on state and local tax (SALT) deductions continues through 2025. This affects your property tax and state income tax deductions.', actionRequired: false },
+    { id: 'tl-2', title: 'Standard Deduction Increase', effectiveDate: '2025', impact: 'positive', summary: 'Standard deduction for married filing jointly increased to $29,200. Compare against your itemized deductions to optimize.', actionRequired: true },
+    { id: 'tl-3', title: '1099-K Reporting Threshold', effectiveDate: '2025', impact: 'neutral', summary: 'Payment platforms must report transactions over $5,000 (down from $20,000). May receive additional 1099-K forms.', actionRequired: false },
+    { id: 'tl-4', title: 'Clean Vehicle Tax Credit', effectiveDate: '2025', impact: 'positive', summary: 'If purchasing an electric vehicle, credits up to $7,500 are available. Your Tesla may have qualified for the used EV credit.', actionRequired: true }
+  ];
+
+  const cpaTaxProfessional = {
+    name: 'Michael Chen, CPA',
+    firm: 'Chen & Associates Tax Advisors',
+    phone: '(612) 555-3400',
+    email: 'mchen@chentax.com',
+    address: '2800 Southtown Dr, Suite 300, Bloomington, MN 55431',
+    lastFiling: 'April 2025'
+  };
+
   // Insurance Policies Data
   const insurancePolicies: InsurancePolicy[] = [
     {
@@ -1422,35 +1528,6 @@ const CommandApp: React.FC = () => {
           </div>
         </div>
 
-        {/* Expense Timeline */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Planned Replacement Timeline</h2>
-          <div className="space-y-4">
-            {plannedExpenses.slice(0, 5).map(period => (
-              <div key={period.year} className="flex items-start gap-4">
-                <div className="w-16 text-center">
-                  <span className={`text-lg font-bold ${period.year <= 2028 ? 'text-yellow-600' : 'text-gray-400'}`}>{period.year}</span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex flex-wrap gap-2">
-                    {period.items.map((item, idx) => (
-                      <div key={idx} className={`px-3 py-2 rounded-lg text-sm ${period.year <= 2028 ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50 border border-gray-200'}`}>
-                        <span className="font-medium text-gray-900">{item.name}</span>
-                        <span className="text-gray-500 ml-2">${item.cost.toLocaleString()}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="font-semibold text-gray-900">
-                    ${period.items.reduce((sum, i) => sum + i.cost, 0).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
         {/* Assets by Category */}
         {assetCategories.map(category => {
           const categoryAssets = homeAssets.filter(a => a.category === category.id);
@@ -1508,6 +1585,35 @@ const CommandApp: React.FC = () => {
         <button onClick={() => setShowDocumentUpload(true)} className="w-full py-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-yellow-500 hover:text-yellow-600 transition-colors flex items-center justify-center gap-2">
           <Plus className="w-5 h-5" />Add New Asset
         </button>
+
+        {/* Expense Timeline - Now at bottom */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Planned Replacement Timeline</h2>
+          <div className="space-y-4">
+            {plannedExpenses.slice(0, 5).map(period => (
+              <div key={period.year} className="flex items-start gap-4">
+                <div className="w-16 text-center">
+                  <span className={`text-lg font-bold ${period.year <= 2028 ? 'text-yellow-600' : 'text-gray-400'}`}>{period.year}</span>
+                </div>
+                <div className="flex-1">
+                  <div className="flex flex-wrap gap-2">
+                    {period.items.map((item, idx) => (
+                      <div key={idx} className={`px-3 py-2 rounded-lg text-sm ${period.year <= 2028 ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50 border border-gray-200'}`}>
+                        <span className="font-medium text-gray-900">{item.name}</span>
+                        <span className="text-gray-500 ml-2">${item.cost.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="font-semibold text-gray-900">
+                    ${period.items.reduce((sum, i) => sum + i.cost, 0).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   };
@@ -1872,6 +1978,289 @@ const CommandApp: React.FC = () => {
     );
   };
 
+  // Tax Section View
+  const TaxView: React.FC = () => {
+    const totalIncome = taxDocuments.filter(d => ['w2', '1099'].includes(d.type) && d.amount).reduce((sum, d) => sum + (d.amount || 0), 0);
+    const totalContributions = charitableContributions.reduce((sum, c) => sum + c.amount, 0);
+    const totalBusinessExpenses = businessExpenses.reduce((sum, e) => sum + e.amount, 0);
+    const potentialSavings = taxRecommendations.reduce((sum, r) => sum + (r.potentialSavings || 0), 0);
+    const pendingDocs = taxDocuments.filter(d => d.status === 'pending').length;
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Tax Planning</h1>
+          <p className="text-gray-600">Planning, filing coordination, and record retention to streamline filings and optimize strategy.</p>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center"><DollarSign className="w-5 h-5 text-blue-600" /></div>
+              <span className="text-sm text-gray-600">2025 Gross Income</span>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">${totalIncome.toLocaleString()}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center"><Heart className="w-5 h-5 text-green-600" /></div>
+              <span className="text-sm text-gray-600">Charitable Giving</span>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">${totalContributions.toLocaleString()}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center"><Briefcase className="w-5 h-5 text-purple-600" /></div>
+              <span className="text-sm text-gray-600">Business Expenses</span>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">${totalBusinessExpenses.toLocaleString()}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(201, 162, 77, 0.2)' }}>
+                <TrendingUp className="w-5 h-5" style={{ color: '#C9A24D' }} />
+              </div>
+              <span className="text-sm text-gray-600">Potential Savings</span>
+            </div>
+            <p className="text-2xl font-bold" style={{ color: '#C9A24D' }}>${potentialSavings.toLocaleString()}</p>
+          </div>
+        </div>
+
+        {/* CPA Contact */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center">
+                <Briefcase className="w-7 h-7 text-gray-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-gray-900">{cpaTaxProfessional.name}</h2>
+                <p className="text-gray-600">{cpaTaxProfessional.firm}</p>
+                <div className="flex items-center gap-4 mt-3 text-sm">
+                  <a href={`tel:${cpaTaxProfessional.phone}`} className="flex items-center gap-1 text-gray-600 hover:text-gray-900">
+                    <Phone className="w-4 h-4" />{cpaTaxProfessional.phone}
+                  </a>
+                  <a href={`mailto:${cpaTaxProfessional.email}`} className="flex items-center gap-1 hover:text-yellow-600" style={{ color: '#C9A24D' }}>
+                    <Mail className="w-4 h-4" />{cpaTaxProfessional.email}
+                  </a>
+                </div>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-500">Last Filing</p>
+              <p className="font-medium text-green-600">{cpaTaxProfessional.lastFiling}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Tax Recommendations */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">Tax Optimization Recommendations</h2>
+            <span className="text-sm text-gray-500">{taxRecommendations.length} opportunities</span>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {taxRecommendations.map(rec => (
+              <div key={rec.id} className="px-6 py-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${rec.priority === 'high' ? 'bg-red-100' : rec.priority === 'medium' ? 'bg-yellow-100' : 'bg-blue-100'}`}>
+                      <TrendingUp className={`w-5 h-5 ${rec.priority === 'high' ? 'text-red-600' : rec.priority === 'medium' ? 'text-yellow-600' : 'text-blue-600'}`} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium text-gray-900">{rec.title}</h3>
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full capitalize ${rec.priority === 'high' ? 'bg-red-100 text-red-800' : rec.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'}`}>{rec.priority}</span>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">{rec.description}</p>
+                      {rec.deadline && <p className="text-xs text-gray-500 mt-1">Deadline: {rec.deadline}</p>}
+                    </div>
+                  </div>
+                  {rec.potentialSavings && rec.potentialSavings > 0 && (
+                    <div className="text-right">
+                      <p className="font-semibold" style={{ color: '#C9A24D' }}>Save ${rec.potentialSavings.toLocaleString()}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Tax Law Updates */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-900">Tax Law Updates for 2025</h2>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {taxLawUpdates.map(update => (
+              <div key={update.id} className="px-6 py-4">
+                <div className="flex items-start gap-4">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${update.impact === 'positive' ? 'bg-green-100' : update.impact === 'negative' ? 'bg-red-100' : 'bg-gray-100'}`}>
+                    <AlertCircle className={`w-5 h-5 ${update.impact === 'positive' ? 'text-green-600' : update.impact === 'negative' ? 'text-red-600' : 'text-gray-600'}`} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium text-gray-900">{update.title}</h3>
+                      {update.actionRequired && <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Action Required</span>}
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">{update.summary}</p>
+                    <p className="text-xs text-gray-500 mt-1">Effective: {update.effectiveDate}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Tax Documents */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Tax Documents</h2>
+              {pendingDocs > 0 && <p className="text-sm text-yellow-600">{pendingDocs} document(s) still pending</p>}
+            </div>
+            <button onClick={() => setShowDocumentUpload(true)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-100" style={{ color: '#C9A24D' }}>
+              <Upload className="w-4 h-4" />Upload Document
+            </button>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {taxDocuments.map(doc => (
+              <div key={doc.id} className="px-6 py-3 hover:bg-gray-50 cursor-pointer">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${doc.status === 'pending' ? 'bg-yellow-100' : doc.status === 'received' ? 'bg-green-100' : doc.status === 'filed' ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                      <FileText className={`w-4 h-4 ${doc.status === 'pending' ? 'text-yellow-600' : doc.status === 'received' ? 'text-green-600' : doc.status === 'filed' ? 'text-blue-600' : 'text-gray-600'}`} />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900 text-sm">{doc.name}</h3>
+                      <p className="text-xs text-gray-500">{doc.source || doc.year}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    {doc.amount && <span className="text-sm font-medium text-gray-900">${doc.amount.toLocaleString()}</span>}
+                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full capitalize ${doc.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : doc.status === 'received' ? 'bg-green-100 text-green-800' : doc.status === 'filed' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>{doc.status}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Charitable Contributions */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Charitable Contributions</h2>
+              <p className="text-sm text-gray-500">Tax Year 2025 • {charitableContributions.length} donations</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-500">Total Deductible</p>
+              <p className="font-semibold text-green-600">${totalContributions.toLocaleString()}</p>
+            </div>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {charitableContributions.map(contrib => (
+              <div key={contrib.id} className="px-6 py-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
+                      <Heart className="w-4 h-4 text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900 text-sm">{contrib.organization}</h3>
+                      <p className="text-xs text-gray-500">{contrib.date} • {contrib.type}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium text-gray-900">${contrib.amount.toLocaleString()}</span>
+                    {contrib.acknowledged ? (
+                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800">Acknowledged</span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Needs Receipt</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 1099 Business Expenses */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Consulting Business Expenses (1099)</h2>
+              <p className="text-sm text-gray-500">Side business deductions for Schedule C</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-500">Total Deductible</p>
+              <p className="font-semibold text-purple-600">${totalBusinessExpenses.toLocaleString()}</p>
+            </div>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {businessExpenses.map(expense => (
+              <div key={expense.id} className="px-6 py-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
+                      <Briefcase className="w-4 h-4 text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900 text-sm">{expense.category}</h3>
+                      <p className="text-xs text-gray-500">{expense.description}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium text-gray-900">${expense.amount.toLocaleString()}</span>
+                    {expense.receipt ? (
+                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800">Receipt</span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-800">No Receipt</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-gray-600">Estimated Tax Savings (24% bracket)</span>
+              <span className="font-semibold" style={{ color: '#C9A24D' }}>${Math.round(totalBusinessExpenses * 0.24).toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Key Deadlines */}
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center flex-shrink-0">
+              <Calendar className="w-5 h-5 text-yellow-600" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-yellow-900 mb-2">Upcoming Tax Deadlines</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <p className="font-medium text-yellow-900">Q1 Estimated Payment</p>
+                  <p className="text-yellow-700">April 15, 2026</p>
+                </div>
+                <div>
+                  <p className="font-medium text-yellow-900">Tax Filing Deadline</p>
+                  <p className="text-yellow-700">April 15, 2026</p>
+                </div>
+                <div>
+                  <p className="font-medium text-yellow-900">Extension Deadline</p>
+                  <p className="text-yellow-700">October 15, 2026</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const PlaceholderView: React.FC<{ title: string; description: string }> = ({ title, description }) => (
     <div className="space-y-6">
       <div><h1 className="text-2xl font-bold text-gray-900 mb-1">{title}</h1><p className="text-gray-600">{description}</p></div>
@@ -1885,7 +2274,7 @@ const CommandApp: React.FC = () => {
       case 'insurance': return <InsuranceView />;
       case 'legal': return <LegalView />;
       case 'home': return <HomeView />;
-      case 'taxes': return <PlaceholderView title="Tax Planning" description="Planning, filing coordination, and record retention to streamline filings and optimize strategy." />;
+      case 'taxes': return <TaxView />;
       case 'family': return <PlaceholderView title="Family & Life Administration" description="Ensures life events trigger the right reviews and updates automatically." />;
       case 'documents': return <DocumentsView />;
       case 'profile': return <ProfileView />;

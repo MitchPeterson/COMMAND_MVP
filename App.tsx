@@ -49,6 +49,21 @@ import {
   FileSignature,
   ClipboardList,
   CircleDot,
+  CreditCard,
+  Wallet,
+  GraduationCap,
+  Baby,
+  Gift,
+  Plane,
+  ShoppingCart,
+  Utensils,
+  Fuel,
+  Tv,
+  Sparkles,
+  Target,
+  PiggyBank,
+  TrendingDown,
+  BarChart3,
   LucideIcon
 } from 'lucide-react';
 
@@ -645,6 +660,261 @@ const CommandApp: React.FC = () => {
     lastFiling: 'April 2025'
   };
 
+  // Family & Life Administration Data
+  interface FamilyMember {
+    id: string;
+    name: string;
+    relationship: string;
+    birthDate: string;
+    age: number;
+    milestones: Milestone[];
+  }
+
+  interface Milestone {
+    id: string;
+    title: string;
+    date: string;
+    type: 'past' | 'upcoming';
+    category: 'education' | 'health' | 'legal' | 'financial' | 'life';
+    triggersReview: string[];
+    status?: 'completed' | 'pending' | 'action-needed';
+  }
+
+  interface CollegePlan {
+    childName: string;
+    targetYear: number;
+    estimatedCost: number;
+    currentSavings: number;
+    monthlyContribution: number;
+    accountType: string;
+    onTrack: boolean;
+  }
+
+  const familyMembers: FamilyMember[] = [
+    {
+      id: 'fm-1',
+      name: 'Adam Bailey',
+      relationship: 'Self',
+      birthDate: 'May 15, 1981',
+      age: 44,
+      milestones: [
+        { id: 'm1', title: '45th Birthday', date: 'May 15, 2026', type: 'upcoming', category: 'life', triggersReview: ['Life insurance review', 'Estate plan check'], status: 'pending' }
+      ]
+    },
+    {
+      id: 'fm-2',
+      name: 'Sarah Bailey',
+      relationship: 'Spouse',
+      birthDate: 'Aug 22, 1983',
+      age: 42,
+      milestones: [
+        { id: 'm2', title: 'Annual health screening', date: 'Mar 2026', type: 'upcoming', category: 'health', triggersReview: ['Health insurance benefits'], status: 'pending' }
+      ]
+    },
+    {
+      id: 'fm-3',
+      name: 'Emma Bailey',
+      relationship: 'Daughter',
+      birthDate: 'Sep 10, 2013',
+      age: 12,
+      milestones: [
+        { id: 'm3', title: 'Starting 7th Grade', date: 'Sep 2026', type: 'upcoming', category: 'education', triggersReview: ['School enrollment', 'Activity registrations'], status: 'pending' },
+        { id: 'm4', title: 'Drivers permit eligible', date: 'Sep 2028', type: 'upcoming', category: 'life', triggersReview: ['Auto insurance update', 'Driving school'], status: 'pending' }
+      ]
+    },
+    {
+      id: 'fm-4',
+      name: 'Jack Bailey',
+      relationship: 'Son',
+      birthDate: 'Mar 3, 2016',
+      age: 9,
+      milestones: [
+        { id: 'm5', title: 'Starting 4th Grade', date: 'Sep 2026', type: 'upcoming', category: 'education', triggersReview: ['School enrollment'], status: 'pending' }
+      ]
+    }
+  ];
+
+  const agingParents = [
+    { name: 'Robert Bailey', relationship: 'Father', age: 72, location: 'Rochester, MN', healthStatus: 'Good', lastVisit: 'Jan 2026', notes: 'Annual checkup scheduled for March' },
+    { name: 'Linda Bailey', relationship: 'Mother', age: 70, location: 'Rochester, MN', healthStatus: 'Good', lastVisit: 'Jan 2026', notes: 'Considering downsizing in 2-3 years' },
+    { name: 'Margaret Thompson', relationship: 'Mother-in-law', age: 68, location: 'Minneapolis, MN', healthStatus: 'Fair', lastVisit: 'Dec 2025', notes: 'Managing arthritis, may need additional support' }
+  ];
+
+  const collegePlans: CollegePlan[] = [
+    { childName: 'Emma Bailey', targetYear: 2031, estimatedCost: 200000, currentSavings: 45000, monthlyContribution: 800, accountType: '529 Plan', onTrack: true },
+    { childName: 'Jack Bailey', targetYear: 2034, estimatedCost: 220000, currentSavings: 28000, monthlyContribution: 600, accountType: '529 Plan', onTrack: true }
+  ];
+
+  const upcomingLifeEvents = [
+    { id: 'le-1', event: 'Emma turns 13', date: 'Sep 10, 2026', impact: 'Consider teen auto insurance rider', category: 'insurance' },
+    { id: 'le-2', event: 'Adam turns 45', date: 'May 15, 2026', impact: 'Life insurance rate review, estate plan check', category: 'legal' },
+    { id: 'le-3', event: 'Emma starts high school', date: 'Sep 2027', impact: 'College planning acceleration, extracurricular budget', category: 'financial' },
+    { id: 'le-4', event: 'Emma gets drivers license', date: 'Sep 2029', impact: 'Auto insurance adjustment (+$1,200/yr est.)', category: 'insurance' },
+    { id: 'le-5', event: 'Emma starts college', date: 'Aug 2031', impact: '529 distributions begin, health insurance decision', category: 'financial' }
+  ];
+
+  // Credit & Rewards Data
+  interface CreditCard {
+    id: string;
+    name: string;
+    issuer: string;
+    type: 'cashback' | 'travel' | 'rewards' | 'business';
+    annualFee: number;
+    apr: number;
+    creditLimit: number;
+    currentBalance: number;
+    rewardsRate: string;
+    rewardsBalance: number;
+    rewardsType: string;
+    bestFor: string[];
+    lastPayment: string;
+    dueDate: string;
+    status: 'active' | 'paid-off' | 'carrying-balance';
+  }
+
+  interface SpendingCategory {
+    category: string;
+    monthlyAvg: number;
+    bestCard: string;
+    currentCard: string;
+    potentialRewards: number;
+    actualRewards: number;
+    optimized: boolean;
+  }
+
+  const creditCards: CreditCard[] = [
+    {
+      id: 'cc-1',
+      name: 'Sapphire Reserve',
+      issuer: 'Chase',
+      type: 'travel',
+      annualFee: 550,
+      apr: 22.49,
+      creditLimit: 34000,
+      currentBalance: 2847,
+      rewardsRate: '3x travel, 3x dining, 1x other',
+      rewardsBalance: 145000,
+      rewardsType: 'Ultimate Rewards points',
+      bestFor: ['Travel', 'Dining', 'Lyft/DoorDash'],
+      lastPayment: 'Jan 28, 2026',
+      dueDate: 'Feb 15, 2026',
+      status: 'active'
+    },
+    {
+      id: 'cc-2',
+      name: 'Freedom Unlimited',
+      issuer: 'Chase',
+      type: 'cashback',
+      annualFee: 0,
+      apr: 20.49,
+      creditLimit: 18000,
+      currentBalance: 1250,
+      rewardsRate: '1.5% everything, 3% dining/drugstore',
+      rewardsBalance: 12500,
+      rewardsType: 'Ultimate Rewards points',
+      bestFor: ['Everyday spending', 'Drugstores'],
+      lastPayment: 'Jan 25, 2026',
+      dueDate: 'Feb 12, 2026',
+      status: 'active'
+    },
+    {
+      id: 'cc-3',
+      name: 'Blue Cash Preferred',
+      issuer: 'Amex',
+      type: 'cashback',
+      annualFee: 95,
+      apr: 19.24,
+      creditLimit: 25000,
+      currentBalance: 890,
+      rewardsRate: '6% groceries, 6% streaming, 3% gas',
+      rewardsBalance: 342,
+      rewardsType: 'Cash back ($)',
+      bestFor: ['Groceries', 'Streaming services', 'Gas'],
+      lastPayment: 'Jan 20, 2026',
+      dueDate: 'Feb 8, 2026',
+      status: 'active'
+    },
+    {
+      id: 'cc-4',
+      name: 'Ink Business Preferred',
+      issuer: 'Chase',
+      type: 'business',
+      annualFee: 95,
+      apr: 21.24,
+      creditLimit: 20000,
+      currentBalance: 0,
+      rewardsRate: '3x travel, shipping, advertising, telecom',
+      rewardsBalance: 48000,
+      rewardsType: 'Ultimate Rewards points',
+      bestFor: ['Business expenses', 'Advertising', 'Phone/Internet'],
+      lastPayment: 'Jan 15, 2026',
+      dueDate: 'Feb 5, 2026',
+      status: 'paid-off'
+    }
+  ];
+
+  const spendingOptimization: SpendingCategory[] = [
+    { category: 'Groceries', monthlyAvg: 1200, bestCard: 'Blue Cash Preferred', currentCard: 'Blue Cash Preferred', potentialRewards: 72, actualRewards: 72, optimized: true },
+    { category: 'Dining', monthlyAvg: 600, bestCard: 'Sapphire Reserve', currentCard: 'Sapphire Reserve', potentialRewards: 54, actualRewards: 54, optimized: true },
+    { category: 'Gas', monthlyAvg: 350, bestCard: 'Blue Cash Preferred', currentCard: 'Freedom Unlimited', potentialRewards: 21, actualRewards: 5.25, optimized: false },
+    { category: 'Travel', monthlyAvg: 400, bestCard: 'Sapphire Reserve', currentCard: 'Sapphire Reserve', potentialRewards: 36, actualRewards: 36, optimized: true },
+    { category: 'Online Shopping', monthlyAvg: 800, bestCard: 'Freedom Unlimited', currentCard: 'Various', potentialRewards: 12, actualRewards: 8, optimized: false },
+    { category: 'Subscriptions', monthlyAvg: 250, bestCard: 'Blue Cash Preferred', currentCard: 'Sapphire Reserve', potentialRewards: 15, actualRewards: 2.50, optimized: false }
+  ];
+
+  const creditRecommendations = [
+    { id: 'cr-1', title: 'Use Blue Cash Preferred for Gas', description: 'Switch gas purchases from Freedom to Blue Cash for 6% vs 1.5% back', monthlySavings: 15.75, priority: 'high' },
+    { id: 'cr-2', title: 'Consolidate Online Shopping', description: 'Use Freedom Unlimited for all online purchases to maximize 1.5% cashback', monthlySavings: 4, priority: 'medium' },
+    { id: 'cr-3', title: 'Move Streaming to Blue Cash', description: 'Transfer streaming services to Blue Cash Preferred for 6% vs 1%', monthlySavings: 12.50, priority: 'medium' },
+    { id: 'cr-4', title: 'Redeem Points Before Devaluation', description: 'Chase points historically devalue. Consider booking travel or transferring to partners.', priority: 'low' }
+  ];
+
+  // Finances & Budget Data
+  interface BudgetCategory {
+    category: string;
+    icon: LucideIcon;
+    budgeted: number;
+    actual: number;
+    color: string;
+  }
+
+  const monthlyBudget: BudgetCategory[] = [
+    { category: 'Housing', icon: Home, budgeted: 3500, actual: 3450, color: '#C9A24D' },
+    { category: 'Transportation', icon: Car, budgeted: 800, actual: 920, color: '#6366F1' },
+    { category: 'Groceries', icon: ShoppingCart, budgeted: 1200, actual: 1180, color: '#10B981' },
+    { category: 'Dining', icon: Utensils, budgeted: 600, actual: 720, color: '#F59E0B' },
+    { category: 'Utilities', icon: Zap, budgeted: 400, actual: 385, color: '#8B5CF6' },
+    { category: 'Insurance', icon: Shield, budgeted: 650, actual: 650, color: '#EC4899' },
+    { category: 'Healthcare', icon: Heart, budgeted: 300, actual: 275, color: '#EF4444' },
+    { category: 'Entertainment', icon: Tv, budgeted: 400, actual: 480, color: '#06B6D4' },
+    { category: 'Savings', icon: PiggyBank, budgeted: 3000, actual: 3000, color: '#22C55E' },
+    { category: 'Other', icon: DollarSign, budgeted: 500, actual: 540, color: '#64748B' }
+  ];
+
+  const financialSummary = {
+    monthlyIncome: 27083, // $325k / 12
+    totalBudgeted: 11350,
+    totalActual: 11600,
+    savingsRate: 26, // percentage
+    emergencyFund: 45000,
+    emergencyFundTarget: 50000,
+    monthsOfExpenses: 3.9
+  };
+
+  const upcomingObligations = [
+    { id: 'ob-1', description: 'Q1 Estimated Tax Payment', amount: 12500, dueDate: 'Apr 15, 2026', type: 'tax' },
+    { id: 'ob-2', description: 'Property Tax (1st half)', amount: 4100, dueDate: 'May 15, 2026', type: 'tax' },
+    { id: 'ob-3', description: 'Emma Summer Camp Deposit', amount: 1500, dueDate: 'Mar 1, 2026', type: 'family' },
+    { id: 'ob-4', description: 'Annual Life Insurance Premium', amount: 1020, dueDate: 'Dec 1, 2026', type: 'insurance' },
+    { id: 'ob-5', description: 'Car Registration Renewal', amount: 450, dueDate: 'Jun 30, 2026', type: 'auto' }
+  ];
+
+  const financialRecommendations = [
+    { id: 'fr-1', title: 'Top off Emergency Fund', description: 'Add $5,000 to reach 4-month expense target', priority: 'medium' },
+    { id: 'fr-2', title: 'Review Dining Budget', description: 'Consistently over budget by 20%. Consider adjusting to $700/month.', priority: 'low' },
+    { id: 'fr-3', title: 'Entertainment Overspend', description: 'Over budget 3 of last 4 months. Review subscriptions.', priority: 'low' }
+  ];
+
   // Insurance Policies Data
   const insurancePolicies: InsurancePolicy[] = [
     {
@@ -837,8 +1107,10 @@ const CommandApp: React.FC = () => {
     { id: 'insurance', icon: Shield, title: 'Insurance', score: 6.5, status: 'needs-attention', summary: 'You have 5 active policies with annual premiums of $5,850. Auto renewal is due in 12 days.', keyMetrics: [], items: [] },
     { id: 'legal', icon: FileText, title: 'Legal', score: 4.0, status: 'critical', summary: 'Your estate documents are 6 years old. With $2.8M net worth, you should have a revocable living trust in place.', keyMetrics: [], items: [] },
     { id: 'home', icon: Wrench, title: 'Home', score: 7.5, status: 'good', summary: 'Most systems are in good condition. HVAC is 14 years old and approaching replacement.', keyMetrics: [], items: [] },
+    { id: 'finances', icon: Wallet, title: 'Finances', score: 8.0, status: 'good', summary: 'Budget tracking on target. 26% savings rate. Emergency fund at 3.9 months.', keyMetrics: [], items: [] },
     { id: 'taxes', icon: Calendar, title: 'Taxes', score: 7.5, status: 'good', summary: 'Working with CPA for annual filing. Estimated quarterly payments current.', keyMetrics: [], items: [] },
-    { id: 'family', icon: Users, title: 'Family', score: 8.5, status: 'good', summary: 'School registrations current for both children. Emergency contacts up to date.', keyMetrics: [], items: [] }
+    { id: 'family', icon: Users, title: 'Family', score: 8.5, status: 'good', summary: 'School registrations current for both children. College savings on track.', keyMetrics: [], items: [] },
+    { id: 'credit', icon: CreditCard, title: 'Credit', score: 7.0, status: 'good', summary: '4 credit cards optimized. 5% utilization. $32K+ in rewards value.', keyMetrics: [], items: [] }
   ];
 
   const overallScore = Math.round(householdSections.reduce((sum, section) => sum + section.score, 0) / householdSections.length * 10);
@@ -1049,15 +1321,17 @@ const CommandApp: React.FC = () => {
               { id: 'insurance', label: 'Insurance', icon: Shield },
               { id: 'legal', label: 'Legal', icon: FileText },
               { id: 'home', label: 'Home', icon: Home },
+              { id: 'finances', label: 'Finances', icon: Wallet },
               { id: 'taxes', label: 'Tax', icon: Calendar },
-              { id: 'family', label: 'Family', icon: Users }
+              { id: 'family', label: 'Family', icon: Users },
+              { id: 'credit', label: 'Credit', icon: CreditCard }
             ].map(section => {
               const Icon = section.icon;
               return (
                 <button
                   key={section.id}
                   onClick={() => { setActiveView(section.id); setSelectedPriority(null); setSelectedPolicy(null); setSelectedLegalDoc(null); setSelectedAsset(null); }}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-colors ${
+                  className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm transition-colors ${
                     activeView === section.id ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
                   }`}
                 >
@@ -1107,8 +1381,10 @@ const CommandApp: React.FC = () => {
               { id: 'insurance', label: 'Insurance', icon: Shield },
               { id: 'legal', label: 'Legal', icon: FileText },
               { id: 'home', label: 'Home', icon: Wrench },
+              { id: 'finances', label: 'Finances', icon: Wallet },
               { id: 'taxes', label: 'Tax', icon: Calendar },
               { id: 'family', label: 'Family', icon: Users },
+              { id: 'credit', label: 'Credit', icon: CreditCard },
               { id: 'documents', label: 'All Documents', icon: Folder },
               { id: 'profile', label: 'Profile', icon: User }
             ].map(section => {
@@ -2261,6 +2537,541 @@ const CommandApp: React.FC = () => {
     );
   };
 
+  // Family & Life Administration View
+  const FamilyView: React.FC = () => {
+    const totalCollegeSavings = collegePlans.reduce((sum, p) => sum + p.currentSavings, 0);
+    const totalCollegeTarget = collegePlans.reduce((sum, p) => sum + p.estimatedCost, 0);
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Family & Life Administration</h1>
+          <p className="text-gray-600">Tracks major milestones and proactively prompts updates across all domains.</p>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center"><Users className="w-5 h-5 text-blue-600" /></div>
+              <span className="text-sm text-gray-600">Family Members</span>
+            </div>
+            <p className="text-3xl font-bold text-gray-900">{familyMembers.length}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center"><Heart className="w-5 h-5 text-purple-600" /></div>
+              <span className="text-sm text-gray-600">Aging Parents</span>
+            </div>
+            <p className="text-3xl font-bold text-gray-900">{agingParents.length}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center"><GraduationCap className="w-5 h-5 text-green-600" /></div>
+              <span className="text-sm text-gray-600">College Savings</span>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">${totalCollegeSavings.toLocaleString()}</p>
+            <p className="text-xs text-gray-500">of ${totalCollegeTarget.toLocaleString()} goal</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(201, 162, 77, 0.2)' }}>
+                <Calendar className="w-5 h-5" style={{ color: '#C9A24D' }} />
+              </div>
+              <span className="text-sm text-gray-600">Upcoming Events</span>
+            </div>
+            <p className="text-3xl font-bold text-gray-900">{upcomingLifeEvents.length}</p>
+          </div>
+        </div>
+
+        {/* Family Members */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-900">Household Members</h2>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {familyMembers.map(member => (
+              <div key={member.id} className="px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                      <span className="text-lg font-bold text-gray-600">{member.name.split(' ').map(n => n[0]).join('')}</span>
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">{member.name}</h3>
+                      <p className="text-sm text-gray-500">{member.relationship} • Age {member.age}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    {member.milestones.filter(m => m.type === 'upcoming').length > 0 && (
+                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
+                        {member.milestones.filter(m => m.type === 'upcoming').length} upcoming
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {member.milestones.filter(m => m.type === 'upcoming').length > 0 && (
+                  <div className="mt-3 ml-16 space-y-2">
+                    {member.milestones.filter(m => m.type === 'upcoming').slice(0, 2).map(milestone => (
+                      <div key={milestone.id} className="flex items-center gap-2 text-sm">
+                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-600">{milestone.title}</span>
+                        <span className="text-gray-400">•</span>
+                        <span className="text-gray-500">{milestone.date}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* College Planning */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+              <GraduationCap className="w-5 h-5" style={{ color: '#C9A24D' }} />
+              College Financial Planning
+            </h2>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {collegePlans.map((plan, idx) => {
+              const progress = Math.round((plan.currentSavings / plan.estimatedCost) * 100);
+              const yearsUntil = plan.targetYear - 2026;
+              return (
+                <div key={idx} className="px-6 py-5">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="font-medium text-gray-900">{plan.childName}</h3>
+                      <p className="text-sm text-gray-500">Target: {plan.targetYear} ({yearsUntil} years)</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-500">{plan.accountType}</p>
+                      {plan.onTrack ? (
+                        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800">On Track</span>
+                      ) : (
+                        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Review Needed</span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-600">Progress</span>
+                      <span className="font-medium text-gray-900">${plan.currentSavings.toLocaleString()} of ${plan.estimatedCost.toLocaleString()}</span>
+                    </div>
+                    <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
+                      <div className="h-full rounded-full" style={{ width: `${progress}%`, backgroundColor: '#C9A24D' }} />
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-gray-500">
+                      <span>{progress}% funded</span>
+                      <span>Contributing ${plan.monthlyContribution}/month</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Aging Parents */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-900">Aging Parents</h2>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {agingParents.map((parent, idx) => (
+              <div key={idx} className="px-6 py-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
+                      <Heart className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900">{parent.name}</h3>
+                      <p className="text-sm text-gray-500">{parent.relationship} • Age {parent.age} • {parent.location}</p>
+                      <p className="text-sm text-gray-600 mt-1">{parent.notes}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${parent.healthStatus === 'Good' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                      {parent.healthStatus}
+                    </span>
+                    <p className="text-xs text-gray-500 mt-1">Last visit: {parent.lastVisit}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Life Events Timeline */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Life Events & Impacts</h2>
+          <div className="space-y-4">
+            {upcomingLifeEvents.map(event => (
+              <div key={event.id} className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
+                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(201, 162, 77, 0.2)' }}>
+                  <Calendar className="w-5 h-5" style={{ color: '#C9A24D' }} />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-medium text-gray-900">{event.event}</h3>
+                    <span className="text-sm text-gray-500">{event.date}</span>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-1">{event.impact}</p>
+                  <span className={`inline-block mt-2 px-2 py-0.5 text-xs font-medium rounded-full capitalize ${
+                    event.category === 'insurance' ? 'bg-blue-100 text-blue-800' : 
+                    event.category === 'legal' ? 'bg-purple-100 text-purple-800' : 
+                    event.category === 'financial' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                  }`}>{event.category}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Credit & Rewards View
+  const CreditView: React.FC = () => {
+    const totalCreditLimit = creditCards.reduce((sum, c) => sum + c.creditLimit, 0);
+    const totalBalance = creditCards.reduce((sum, c) => sum + c.currentBalance, 0);
+    const totalRewardsValue = creditCards.reduce((sum, c) => sum + (c.rewardsType.includes('points') ? c.rewardsBalance * 0.015 : c.rewardsBalance), 0);
+    const utilizationRate = Math.round((totalBalance / totalCreditLimit) * 100);
+    const monthlyOptimizationSavings = creditRecommendations.reduce((sum, r) => sum + (r.monthlySavings || 0), 0);
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Credit & Rewards Optimization</h1>
+          <p className="text-gray-600">Maximizes value through smarter card selection and spending alignment.</p>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center"><CreditCard className="w-5 h-5 text-blue-600" /></div>
+              <span className="text-sm text-gray-600">Active Cards</span>
+            </div>
+            <p className="text-3xl font-bold text-gray-900">{creditCards.length}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center"><Sparkles className="w-5 h-5 text-green-600" /></div>
+              <span className="text-sm text-gray-600">Rewards Value</span>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">${Math.round(totalRewardsValue).toLocaleString()}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${utilizationRate < 30 ? 'bg-green-100' : utilizationRate < 50 ? 'bg-yellow-100' : 'bg-red-100'}`}>
+                <Target className={`w-5 h-5 ${utilizationRate < 30 ? 'text-green-600' : utilizationRate < 50 ? 'text-yellow-600' : 'text-red-600'}`} />
+              </div>
+              <span className="text-sm text-gray-600">Utilization</span>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{utilizationRate}%</p>
+            <p className="text-xs text-gray-500">of ${totalCreditLimit.toLocaleString()}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(201, 162, 77, 0.2)' }}>
+                <TrendingUp className="w-5 h-5" style={{ color: '#C9A24D' }} />
+              </div>
+              <span className="text-sm text-gray-600">Monthly Opportunity</span>
+            </div>
+            <p className="text-2xl font-bold" style={{ color: '#C9A24D' }}>+${monthlyOptimizationSavings.toFixed(0)}</p>
+          </div>
+        </div>
+
+        {/* Credit Cards */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-900">Your Credit Cards</h2>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {creditCards.map(card => (
+              <div key={card.id} className="px-6 py-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-start gap-4">
+                    <div className={`w-12 h-8 rounded flex items-center justify-center text-white text-xs font-bold ${
+                      card.issuer === 'Chase' ? 'bg-blue-600' : card.issuer === 'Amex' ? 'bg-blue-800' : 'bg-gray-600'
+                    }`}>
+                      {card.issuer.substring(0, 4).toUpperCase()}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-medium text-gray-900">{card.name}</h3>
+                        {card.annualFee > 0 && <span className="text-xs text-gray-500">${card.annualFee}/yr</span>}
+                      </div>
+                      <p className="text-sm text-gray-500">{card.rewardsRate}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        {card.bestFor.slice(0, 3).map((use, idx) => (
+                          <span key={idx} className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">{use}</span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-gray-900">${card.currentBalance.toLocaleString()}</p>
+                    <p className="text-xs text-gray-500">of ${card.creditLimit.toLocaleString()}</p>
+                    <p className="text-xs mt-1" style={{ color: '#C9A24D' }}>
+                      {card.rewardsType.includes('points') ? `${card.rewardsBalance.toLocaleString()} pts` : `$${card.rewardsBalance}`}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Spending Optimization */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-900">Spending Optimization</h2>
+            <p className="text-sm text-gray-500">Are you using the right card for each category?</p>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {spendingOptimization.map((cat, idx) => (
+              <div key={idx} className="px-6 py-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${cat.optimized ? 'bg-green-100' : 'bg-yellow-100'}`}>
+                      {cat.optimized ? <CheckCircle className="w-4 h-4 text-green-600" /> : <AlertTriangle className="w-4 h-4 text-yellow-600" />}
+                    </div>
+                    <div>
+                      <h3 className="font-medium text-gray-900 text-sm">{cat.category}</h3>
+                      <p className="text-xs text-gray-500">${cat.monthlyAvg}/mo avg</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-medium text-gray-900">{cat.bestCard}</p>
+                    {!cat.optimized && (
+                      <p className="text-xs text-green-600">+${(cat.potentialRewards - cat.actualRewards).toFixed(2)}/mo potential</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Recommendations */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-900">Optimization Recommendations</h2>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {creditRecommendations.map(rec => (
+              <div key={rec.id} className="px-6 py-4">
+                <div className="flex items-start gap-4">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${rec.priority === 'high' ? 'bg-green-100' : rec.priority === 'medium' ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                    <Zap className={`w-5 h-5 ${rec.priority === 'high' ? 'text-green-600' : rec.priority === 'medium' ? 'text-blue-600' : 'text-gray-600'}`} />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-medium text-gray-900">{rec.title}</h3>
+                      {rec.monthlySavings && <span className="text-sm font-medium" style={{ color: '#C9A24D' }}>+${rec.monthlySavings}/mo</span>}
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">{rec.description}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Finances & Budget View
+  const FinancesView: React.FC = () => {
+    const totalBudgeted = monthlyBudget.reduce((sum, b) => sum + b.budgeted, 0);
+    const totalActual = monthlyBudget.reduce((sum, b) => sum + b.actual, 0);
+    const variance = totalBudgeted - totalActual;
+    const maxBudget = Math.max(...monthlyBudget.map(b => Math.max(b.budgeted, b.actual)));
+
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Finances & Budget</h1>
+          <p className="text-gray-600">Executive-level view of cash flow, commitments, and upcoming decisions.</p>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center"><DollarSign className="w-5 h-5 text-blue-600" /></div>
+              <span className="text-sm text-gray-600">Monthly Income</span>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">${financialSummary.monthlyIncome.toLocaleString()}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${variance >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
+                {variance >= 0 ? <TrendingUp className="w-5 h-5 text-green-600" /> : <TrendingDown className="w-5 h-5 text-red-600" />}
+              </div>
+              <span className="text-sm text-gray-600">Budget Variance</span>
+            </div>
+            <p className={`text-2xl font-bold ${variance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {variance >= 0 ? '+' : ''}{variance < 0 ? '-' : ''}${Math.abs(variance).toLocaleString()}
+            </p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center"><PiggyBank className="w-5 h-5 text-green-600" /></div>
+              <span className="text-sm text-gray-600">Savings Rate</span>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{financialSummary.savingsRate}%</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(201, 162, 77, 0.2)' }}>
+                <Shield className="w-5 h-5" style={{ color: '#C9A24D' }} />
+              </div>
+              <span className="text-sm text-gray-600">Emergency Fund</span>
+            </div>
+            <p className="text-2xl font-bold text-gray-900">{financialSummary.monthsOfExpenses.toFixed(1)} mo</p>
+            <p className="text-xs text-gray-500">${financialSummary.emergencyFund.toLocaleString()}</p>
+          </div>
+        </div>
+
+        {/* Budget vs Actual Chart */}
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Budget vs. Actual - January 2026</h2>
+              <p className="text-sm text-gray-500">Spending by category</p>
+            </div>
+            <div className="flex items-center gap-6 text-sm">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#C9A24D' }}></div>
+                <span className="text-gray-600">Budget</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-gray-400"></div>
+                <span className="text-gray-600">Actual</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Chart */}
+          <div className="space-y-4">
+            {monthlyBudget.map((item, idx) => {
+              const budgetWidth = (item.budgeted / maxBudget) * 100;
+              const actualWidth = (item.actual / maxBudget) * 100;
+              const isOver = item.actual > item.budgeted;
+              const Icon = item.icon;
+              return (
+                <div key={idx} className="group">
+                  <div className="flex items-center gap-4 mb-2">
+                    <div className="w-28 flex items-center gap-2">
+                      <Icon className="w-4 h-4 text-gray-500" />
+                      <span className="text-sm font-medium text-gray-700">{item.category}</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="relative h-8">
+                        {/* Budget bar (background) */}
+                        <div 
+                          className="absolute top-1 h-3 rounded-full opacity-30"
+                          style={{ width: `${budgetWidth}%`, backgroundColor: item.color }}
+                        />
+                        {/* Actual bar (foreground) */}
+                        <div 
+                          className={`absolute top-1 h-3 rounded-full transition-all ${isOver ? 'ring-2 ring-red-300' : ''}`}
+                          style={{ width: `${actualWidth}%`, backgroundColor: item.color }}
+                        />
+                        {/* Budget marker line */}
+                        <div 
+                          className="absolute top-0 h-5 w-0.5 bg-gray-800"
+                          style={{ left: `${budgetWidth}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="w-32 text-right">
+                      <span className={`text-sm font-medium ${isOver ? 'text-red-600' : 'text-gray-900'}`}>
+                        ${item.actual.toLocaleString()}
+                      </span>
+                      <span className="text-sm text-gray-400"> / ${item.budgeted.toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Totals */}
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-gray-900">Total</span>
+              <div className="text-right">
+                <span className={`font-semibold ${totalActual > totalBudgeted ? 'text-red-600' : 'text-gray-900'}`}>
+                  ${totalActual.toLocaleString()}
+                </span>
+                <span className="text-gray-400"> / ${totalBudgeted.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Upcoming Obligations */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h2 className="text-lg font-semibold text-gray-900">Upcoming Obligations</h2>
+          </div>
+          <div className="divide-y divide-gray-100">
+            {upcomingObligations.map(ob => (
+              <div key={ob.id} className="px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                    ob.type === 'tax' ? 'bg-purple-100' : ob.type === 'insurance' ? 'bg-blue-100' : ob.type === 'family' ? 'bg-pink-100' : 'bg-gray-100'
+                  }`}>
+                    <Calendar className={`w-5 h-5 ${
+                      ob.type === 'tax' ? 'text-purple-600' : ob.type === 'insurance' ? 'text-blue-600' : ob.type === 'family' ? 'text-pink-600' : 'text-gray-600'
+                    }`} />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-gray-900">{ob.description}</h3>
+                    <p className="text-sm text-gray-500">Due: {ob.dueDate}</p>
+                  </div>
+                </div>
+                <span className="font-semibold text-gray-900">${ob.amount.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Recommendations */}
+        {financialRecommendations.length > 0 && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
+            <div className="flex items-start gap-4">
+              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
+                <Info className="w-5 h-5 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-blue-900 mb-2">Recommendations</h3>
+                <div className="space-y-2">
+                  {financialRecommendations.map(rec => (
+                    <div key={rec.id} className="flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span className="text-sm font-medium text-blue-900">{rec.title}:</span>
+                        <span className="text-sm text-blue-800 ml-1">{rec.description}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const PlaceholderView: React.FC<{ title: string; description: string }> = ({ title, description }) => (
     <div className="space-y-6">
       <div><h1 className="text-2xl font-bold text-gray-900 mb-1">{title}</h1><p className="text-gray-600">{description}</p></div>
@@ -2274,8 +3085,10 @@ const CommandApp: React.FC = () => {
       case 'insurance': return <InsuranceView />;
       case 'legal': return <LegalView />;
       case 'home': return <HomeView />;
+      case 'finances': return <FinancesView />;
       case 'taxes': return <TaxView />;
-      case 'family': return <PlaceholderView title="Family & Life Administration" description="Ensures life events trigger the right reviews and updates automatically." />;
+      case 'family': return <FamilyView />;
+      case 'credit': return <CreditView />;
       case 'documents': return <DocumentsView />;
       case 'profile': return <ProfileView />;
       default: return <DashboardView />;

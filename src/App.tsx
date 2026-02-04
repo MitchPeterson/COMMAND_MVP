@@ -118,18 +118,10 @@ interface InsurancePolicy {
 const CommandApp: React.FC = () => {
   const [activeView, setActiveView] = useState<string>('dashboard');
   const [selectedPriority, setSelectedPriority] = useState<Priority | null>(null);
-  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [dismissedPriorities, setDismissedPriorities] = useState<number[]>([]);
   const [showDismissed, setShowDismissed] = useState<boolean>(false);
   const [selectedPolicy, setSelectedPolicy] = useState<InsurancePolicy | null>(null);
-
-  const toggleSection = (id: string): void => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [id]: !prev[id]
-    }));
-  };
 
   const dismissPriority = (id: number, e: React.MouseEvent): void => {
     e.stopPropagation();
@@ -529,12 +521,6 @@ const CommandApp: React.FC = () => {
     if (score >= 8) return 'text-green-500';
     if (score >= 6) return 'text-yellow-500';
     return 'text-red-500';
-  };
-
-  const getScoreBgColor = (score: number): string => {
-    if (score >= 8) return 'bg-green-500/20';
-    if (score >= 6) return 'bg-yellow-500/20';
-    return 'bg-red-500/20';
   };
 
   const getScoreRingColor = (score: number): string => {

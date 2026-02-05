@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Home, 
   Shield, 
@@ -59,8 +59,330 @@ import {
   Target,
   PiggyBank,
   TrendingDown,
-  LucideIcon
+  LucideIcon,
+  ArrowRight
 } from 'lucide-react';
+
+// =============================================================================
+// WEEKLY BRIEF COMPONENT
+// =============================================================================
+
+interface BriefSection {
+  id: string;
+  type: 'risk' | 'leakage' | 'action';
+  title: string;
+  summary: string;
+  whyItMatters: string;
+  category: string;
+  isAssumption?: boolean;
+  assumptionNote?: string;
+  actionLabel?: string;
+  potentialImpact?: string;
+}
+
+interface WeeklyBriefProps {
+  onDismiss: () => void;
+  onNavigate: (view: string) => void;
+  userName?: string;
+  briefData?: {
+    risk: BriefSection;
+    leakage: BriefSection;
+    action: BriefSection;
+  };
+}
+
+// Default brief data based on Adam Bailey's household situation
+const defaultBriefData = {
+  risk: {
+    id: 'risk-1',
+    type: 'risk' as const,
+    title: 'Umbrella coverage gap',
+    summary: 'Your $1M umbrella policy may leave $1.8M+ of your net worth exposed in a worst-case liability scenario.',
+    whyItMatters: 'With a net worth of $2.8M and a household income of $325K, financial advisors typically recommend umbrella coverage of 2-3x your net worth. A serious auto accident or liability claim could exceed your current coverage and put your family\'s assets at risk.',
+    category: 'Insurance',
+    potentialImpact: 'Up to $1.8M exposure'
+  },
+  leakage: {
+    id: 'leakage-1',
+    type: 'leakage' as const,
+    title: 'Auto insurance overpayment',
+    summary: 'Your auto insurance premium is approximately 18% above market rate for comparable coverage.',
+    whyItMatters: 'You\'re currently paying $2,400/year with State Farm. Based on your driving history and vehicle profile, competing carriers could offer the same coverage for $1,950-$2,100/year. This represents $300-$450 in annual savings without changing your coverage.',
+    category: 'Insurance',
+    potentialImpact: 'Save $300-$450/year'
+  },
+  action: {
+    id: 'action-1',
+    type: 'action' as const,
+    title: 'Review auto insurance before Feb 2 renewal',
+    summary: 'Get competing quotes before your policy renews in 12 days to capture potential savings.',
+    whyItMatters: 'Your renewal is approaching quickly. Shopping quotes now gives you time to compare options without rushing. Even if you stay with State Farm, having competitive quotes gives you leverage to negotiate.',
+    category: 'Insurance',
+    actionLabel: 'Start Insurance Review',
+    potentialImpact: '12 days until renewal'
+  }
+};
+
+const WeeklyBrief: React.FC<WeeklyBriefProps> = ({
+  onDismiss,
+  onNavigate,
+  userName = 'Adam',
+  briefData = defaultBriefData
+}) => {
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+
+  const toggleSection = (sectionId: string) => {
+    setExpandedSections(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(sectionId)) {
+        newSet.delete(sectionId);
+      } else {
+        newSet.add(sectionId);
+      }
+      return newSet;
+    });
+  };
+
+  const getSectionIcon = (type: string) => {
+    switch (type) {
+      case 'risk':
+        return AlertTriangle;
+      case 'leakage':
+        return TrendingDown;
+      case 'action':
+        return Target;
+      default:
+        return Info;
+    }
+  };
+
+  const getSectionColors = (type: string) => {
+    switch (type) {
+      case 'risk':
+        return {
+          bg: 'bg-red-50',
+          border: 'border-red-200',
+          iconBg: 'bg-red-100',
+          iconColor: 'text-red-600',
+          headerText: 'text-red-900',
+          label: 'Risk',
+          labelBg: 'bg-red-100',
+          labelText: 'text-red-700'
+        };
+      case 'leakage':
+        return {
+          bg: 'bg-amber-50',
+          border: 'border-amber-200',
+          iconBg: 'bg-amber-100',
+          iconColor: 'text-amber-600',
+          headerText: 'text-amber-900',
+          label: 'Leakage',
+          labelBg: 'bg-amber-100',
+          labelText: 'text-amber-700'
+        };
+      case 'action':
+        return {
+          bg: 'bg-blue-50',
+          border: 'border-blue-200',
+          iconBg: 'bg-blue-100',
+          iconColor: 'text-blue-600',
+          headerText: 'text-blue-900',
+          label: 'Recommended Action',
+          labelBg: 'bg-blue-100',
+          labelText: 'text-blue-700'
+        };
+      default:
+        return {
+          bg: 'bg-gray-50',
+          border: 'border-gray-200',
+          iconBg: 'bg-gray-100',
+          iconColor: 'text-gray-600',
+          headerText: 'text-gray-900',
+          label: 'Info',
+          labelBg: 'bg-gray-100',
+          labelText: 'text-gray-700'
+        };
+    }
+  };
+
+  const getCategoryIcon = (category: string) => {
+    switch (category.toLowerCase()) {
+      case 'insurance':
+        return Shield;
+      case 'legal':
+        return FileText;
+      case 'finances':
+        return DollarSign;
+      default:
+        return Info;
+    }
+  };
+
+  const renderSection = (section: BriefSection) => {
+    const colors = getSectionColors(section.type);
+    const Icon = getSectionIcon(section.type);
+    const CategoryIcon = getCategoryIcon(section.category);
+    const isExpanded = expandedSections.has(section.id);
+
+    return (
+      <div
+        key={section.id}
+        className={`${colors.bg} ${colors.border} border rounded-xl overflow-hidden transition-all duration-200`}
+      >
+        <div className="p-5">
+          {/* Header */}
+          <div className="flex items-start gap-4">
+            <div className={`w-10 h-10 rounded-lg ${colors.iconBg} flex items-center justify-center flex-shrink-0`}>
+              <Icon className={`w-5 h-5 ${colors.iconColor}`} />
+            </div>
+            <div className="flex-1 min-w-0">
+              {/* Label and Category */}
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${colors.labelBg} ${colors.labelText}`}>
+                  {colors.label}
+                </span>
+                <span className="flex items-center gap-1 text-xs text-gray-500">
+                  <CategoryIcon className="w-3 h-3" />
+                  {section.category}
+                </span>
+                {section.potentialImpact && (
+                  <span className="text-xs font-medium" style={{ color: '#C9A24D' }}>
+                    {section.potentialImpact}
+                  </span>
+                )}
+              </div>
+
+              {/* Title */}
+              <h3 className={`font-semibold ${colors.headerText} mb-2`}>
+                {section.title}
+              </h3>
+
+              {/* Summary */}
+              <p className="text-sm text-gray-700 leading-relaxed">
+                {section.summary}
+              </p>
+
+              {/* Assumption Note */}
+              {section.isAssumption && section.assumptionNote && (
+                <p className="text-xs text-gray-500 mt-2 italic">
+                  Note: {section.assumptionNote}
+                </p>
+              )}
+
+              {/* Why It Matters - Expandable */}
+              <button
+                onClick={() => toggleSection(section.id)}
+                className="flex items-center gap-1 mt-3 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                {isExpanded ? (
+                  <ChevronUp className="w-4 h-4" />
+                ) : (
+                  <ChevronDown className="w-4 h-4" />
+                )}
+                <span className="font-medium">Why this matters</span>
+              </button>
+
+              {isExpanded && (
+                <div className="mt-3 pt-3 border-t border-gray-200/50">
+                  <p className="text-sm text-gray-600 leading-relaxed">
+                    {section.whyItMatters}
+                  </p>
+                </div>
+              )}
+
+              {/* Action Button (only for action type) */}
+              {section.type === 'action' && section.actionLabel && (
+                <button
+                  onClick={() => onNavigate('insurance')}
+                  className="mt-4 flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium text-sm hover:opacity-90 transition-opacity"
+                  style={{ backgroundColor: '#C9A24D' }}
+                >
+                  {section.actionLabel}
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Get current date for display
+  const today = new Date();
+  const weekStart = new Date(today);
+  weekStart.setDate(today.getDate() - today.getDay());
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  return (
+    <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4 sm:p-6">
+      <div className="w-full max-w-2xl">
+        {/* Header Card */}
+        <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-t-2xl p-6 text-white">
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="flex items-center gap-2 text-gray-400 text-sm mb-2">
+                <Clock className="w-4 h-4" />
+                <span>Week of {formatDate(weekStart)} – {formatDate(weekEnd)}</span>
+              </div>
+              <h1 className="text-2xl sm:text-3xl font-bold mb-1">This Week's Command Brief</h1>
+              <p className="text-gray-400">Good morning, {userName}. Here's what needs your attention.</p>
+            </div>
+            <button
+              onClick={onDismiss}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              title="Review later"
+            >
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
+        </div>
+
+        {/* Brief Sections */}
+        <div className="bg-white border-x border-b border-gray-200 rounded-b-2xl shadow-lg">
+          <div className="p-4 sm:p-6 space-y-4">
+            {renderSection(briefData.risk)}
+            {renderSection(briefData.leakage)}
+            {renderSection(briefData.action)}
+          </div>
+
+          {/* Footer */}
+          <div className="px-4 sm:px-6 pb-6">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-gray-100">
+              <button
+                onClick={onDismiss}
+                className="text-sm text-gray-500 hover:text-gray-700 flex items-center gap-1 transition-colors"
+              >
+                <Clock className="w-4 h-4" />
+                Review later
+              </button>
+              <button
+                onClick={() => onNavigate('dashboard')}
+                className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-gray-900 text-white font-medium text-sm hover:bg-gray-800 transition-colors"
+              >
+                Go to Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Info Note */}
+        <p className="text-center text-xs text-gray-400 mt-4">
+          This brief updates weekly based on your household data and priorities.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// =============================================================================
+// END WEEKLY BRIEF COMPONENT
+// =============================================================================
 
 // Logo path from public folder
 const commandLogo = '/Command_Logo.png';
@@ -223,6 +545,30 @@ const CommandApp: React.FC = () => {
   const [selectedAsset, setSelectedAsset] = useState<HomeAsset | null>(null);
   const [showDocumentUpload, setShowDocumentUpload] = useState<boolean>(false);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+  
+  // Weekly Brief state - shows by default, can be dismissed for the session
+  const [showWeeklyBrief, setShowWeeklyBrief] = useState<boolean>(() => {
+    // Check session storage to see if brief was dismissed this session
+    const dismissed = sessionStorage.getItem('commandBriefDismissed');
+    const dismissedTime = dismissed ? parseInt(dismissed, 10) : 0;
+    const now = Date.now();
+    // Show brief if never dismissed or dismissed more than 7 days ago
+    const sevenDays = 7 * 24 * 60 * 60 * 1000;
+    return !dismissed || (now - dismissedTime > sevenDays);
+  });
+
+  const dismissWeeklyBrief = () => {
+    setShowWeeklyBrief(false);
+    // Store dismissal time in sessionStorage (persists until browser closes)
+    // and localStorage for weekly reset
+    sessionStorage.setItem('commandBriefDismissed', Date.now().toString());
+  };
+
+  const handleBriefNavigate = (view: string) => {
+    setShowWeeklyBrief(false);
+    sessionStorage.setItem('commandBriefDismissed', Date.now().toString());
+    setActiveView(view);
+  };
 
   const dismissPriority = (id: number, e: React.MouseEvent): void => {
     e.stopPropagation();
@@ -1174,7 +1520,7 @@ const CommandApp: React.FC = () => {
                 <h3 className="font-semibold text-blue-900 mb-1">Smart Categorization</h3>
                 <p className="text-sm text-blue-800">
                   Documents are automatically analyzed and categorized. We'll detect insurance policies, 
-                  legal documents, warranties, and more—then file them in the right place.
+                  legal documents, warranties, and moreâ€”then file them in the right place.
                 </p>
               </div>
             </div>
@@ -1275,7 +1621,7 @@ const CommandApp: React.FC = () => {
                         <span className="font-medium text-gray-900">{version.uploadedDate}</span>
                         {index === 0 && <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800">Current</span>}
                       </div>
-                      <p className="text-sm text-gray-500">Uploaded by {version.uploadedBy} • {version.fileSize}</p>
+                      <p className="text-sm text-gray-500">Uploaded by {version.uploadedBy} â€¢ {version.fileSize}</p>
                       {version.changes && (
                         <p className="text-sm text-gray-700 mt-1">
                           <span className="font-medium">Changes:</span> {version.changes}
@@ -1338,6 +1684,15 @@ const CommandApp: React.FC = () => {
           </nav>
 
           <div className="hidden lg:flex items-center gap-3">
+            {/* Weekly Brief Button - Always accessible */}
+            <button 
+              onClick={() => setShowWeeklyBrief(true)}
+              className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 transition-colors"
+              title="View This Week's Brief"
+            >
+              <Zap className="w-4 h-4" style={{ color: '#C9A24D' }} />
+              <span className="hidden xl:inline">Weekly Brief</span>
+            </button>
             <button 
               onClick={() => setShowDocumentUpload(true)}
               className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium text-sm hover:opacity-90 transition-opacity"
@@ -1371,6 +1726,14 @@ const CommandApp: React.FC = () => {
       {mobileMenuOpen && (
         <div className="lg:hidden bg-white border-t border-gray-200 py-2">
           <div className="px-4 space-y-1">
+            {/* Weekly Brief - Always first in mobile menu */}
+            <button
+              onClick={() => { setShowWeeklyBrief(true); setMobileMenuOpen(false); }}
+              className="flex items-center gap-3 w-full px-4 py-3 rounded-lg font-medium text-sm text-gray-600 hover:bg-gray-100 border border-dashed border-gray-200"
+            >
+              <Zap className="w-5 h-5" style={{ color: '#C9A24D' }} />
+              This Week's Brief
+            </button>
             {[
               { id: 'dashboard', label: 'Dashboard', icon: Home },
               { id: 'insurance', label: 'Insurance', icon: Shield },
@@ -1634,7 +1997,7 @@ const CommandApp: React.FC = () => {
               <h3 className="font-semibold text-red-900 mb-1">Revocable Trust Needed</h3>
               <p className="text-sm text-red-800 mb-3">
                 With a net worth of $2.8M, you should establish a revocable living trust. Without one, your estate 
-                will go through probate—costing an estimated $15,000-$40,000 and becoming public record.
+                will go through probateâ€”costing an estimated $15,000-$40,000 and becoming public record.
               </p>
               <button className="text-sm font-medium text-red-800 hover:text-red-900 flex items-center gap-1">
                 Schedule Attorney Consultation <ChevronRight className="w-4 h-4" />
@@ -1828,7 +2191,7 @@ const CommandApp: React.FC = () => {
                               <h3 className="font-medium text-gray-900">{asset.name}</h3>
                               <span className={`px-2 py-0.5 text-xs font-medium rounded-full capitalize ${getConditionColor(asset.condition)}`}>{asset.condition.replace('-', ' ')}</span>
                             </div>
-                            <p className="text-sm text-gray-500">{asset.brand} {asset.model && `• ${asset.model}`}</p>
+                            <p className="text-sm text-gray-500">{asset.brand} {asset.model && `â€¢ ${asset.model}`}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-6">
@@ -1979,7 +2342,7 @@ const CommandApp: React.FC = () => {
                         record.type === 'repair' ? 'bg-orange-100 text-orange-800' : record.type === 'replacement' ? 'bg-red-100 text-red-800' : record.type === 'inspection' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
                       }`}>{record.type}</span>
                     </div>
-                    <p className="text-sm text-gray-500">{record.date} {record.provider && `• ${record.provider}`}</p>
+                    <p className="text-sm text-gray-500">{record.date} {record.provider && `â€¢ ${record.provider}`}</p>
                     {record.notes && <p className="text-sm text-gray-600 mt-1">{record.notes}</p>}
                   </div>
                   <div className="text-right">
@@ -2077,9 +2440,9 @@ const CommandApp: React.FC = () => {
                       <h3 className="font-medium text-gray-900">{doc.name}</h3>
                       <div className="flex items-center gap-2 text-sm text-gray-500">
                         <span className="capitalize">{doc.category}</span>
-                        <span>•</span>
+                        <span>â€¢</span>
                         <span>{doc.type}</span>
-                        <span>•</span>
+                        <span>â€¢</span>
                         <span>Modified {doc.lastModified}</span>
                       </div>
                     </div>
@@ -2113,7 +2476,7 @@ const CommandApp: React.FC = () => {
           <div className="flex-1">
             <h2 className="text-xl font-bold text-gray-900">Adam Bailey</h2>
             <p className="text-gray-600">Premium Member since January 2024</p>
-            <div className="flex items-center gap-2 mt-2"><span className="px-2.5 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Pro Plan</span><span className="text-sm text-gray-500">• Household of 4</span></div>
+            <div className="flex items-center gap-2 mt-2"><span className="px-2.5 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Pro Plan</span><span className="text-sm text-gray-500">â€¢ Household of 4</span></div>
           </div>
           <button className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 flex items-center gap-2"><Edit3 className="w-4 h-4" />Edit Profile</button>
         </div>
@@ -2133,7 +2496,7 @@ const CommandApp: React.FC = () => {
         <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-semibold text-gray-900">Subscription & Billing</h2></div>
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <div><div className="flex items-center gap-3 mb-1"><h3 className="text-lg font-bold text-gray-900">Pro Plan</h3><span className="px-2.5 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Active</span></div><p className="text-gray-600">$40/month • Renews February 15, 2026</p></div>
+            <div><div className="flex items-center gap-3 mb-1"><h3 className="text-lg font-bold text-gray-900">Pro Plan</h3><span className="px-2.5 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Active</span></div><p className="text-gray-600">$40/month â€¢ Renews February 15, 2026</p></div>
             <button className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50">Change Plan</button>
           </div>
           <div className="bg-gray-50 rounded-lg p-4">
@@ -2214,7 +2577,7 @@ const CommandApp: React.FC = () => {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
                           <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${policy.status === 'action-needed' ? 'bg-red-100' : policy.status === 'expiring-soon' ? 'bg-yellow-100' : 'bg-gray-100'}`}><Icon className={`w-5 h-5 ${policy.status === 'action-needed' ? 'text-red-600' : policy.status === 'expiring-soon' ? 'text-yellow-600' : 'text-gray-600'}`} /></div>
-                          <div><div className="flex items-center gap-2"><h3 className="font-medium text-gray-900">{policy.name}</h3>{policy.status !== 'active' && <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${policy.status === 'action-needed' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>{policy.status === 'action-needed' ? 'Action Needed' : 'Renewal Soon'}</span>}</div><p className="text-sm text-gray-500">{policy.carrier} • {policy.coverage}</p></div>
+                          <div><div className="flex items-center gap-2"><h3 className="font-medium text-gray-900">{policy.name}</h3>{policy.status !== 'active' && <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${policy.status === 'action-needed' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>{policy.status === 'action-needed' ? 'Action Needed' : 'Renewal Soon'}</span>}</div><p className="text-sm text-gray-500">{policy.carrier} â€¢ {policy.coverage}</p></div>
                         </div>
                         <div className="flex items-center gap-6"><div className="text-right"><p className="font-semibold text-gray-900">${annualPremium.toLocaleString()}/yr</p><p className="text-xs text-gray-500">Renews {policy.renewalDate}</p></div><ChevronRight className="w-5 h-5 text-gray-400" /></div>
                       </div>
@@ -2424,7 +2787,7 @@ const CommandApp: React.FC = () => {
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Charitable Contributions</h2>
-              <p className="text-sm text-gray-500">Tax Year 2025 • {charitableContributions.length} donations</p>
+              <p className="text-sm text-gray-500">Tax Year 2025 â€¢ {charitableContributions.length} donations</p>
             </div>
             <div className="text-right">
               <p className="text-sm text-gray-500">Total Deductible</p>
@@ -2441,7 +2804,7 @@ const CommandApp: React.FC = () => {
                     </div>
                     <div>
                       <h3 className="font-medium text-gray-900 text-sm">{contrib.organization}</h3>
-                      <p className="text-xs text-gray-500">{contrib.date} • {contrib.type}</p>
+                      <p className="text-xs text-gray-500">{contrib.date} â€¢ {contrib.type}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -2594,7 +2957,7 @@ const CommandApp: React.FC = () => {
                     </div>
                     <div>
                       <h3 className="font-medium text-gray-900">{member.name}</h3>
-                      <p className="text-sm text-gray-500">{member.relationship} • Age {member.age}</p>
+                      <p className="text-sm text-gray-500">{member.relationship} â€¢ Age {member.age}</p>
                     </div>
                   </div>
                   <div className="text-right">
@@ -2611,7 +2974,7 @@ const CommandApp: React.FC = () => {
                       <div key={milestone.id} className="flex items-center gap-2 text-sm">
                         <Calendar className="w-4 h-4 text-gray-400" />
                         <span className="text-gray-600">{milestone.title}</span>
-                        <span className="text-gray-400">•</span>
+                        <span className="text-gray-400">â€¢</span>
                         <span className="text-gray-500">{milestone.date}</span>
                       </div>
                     ))}
@@ -2684,7 +3047,7 @@ const CommandApp: React.FC = () => {
                     </div>
                     <div>
                       <h3 className="font-medium text-gray-900">{parent.name}</h3>
-                      <p className="text-sm text-gray-500">{parent.relationship} • Age {parent.age} • {parent.location}</p>
+                      <p className="text-sm text-gray-500">{parent.relationship} â€¢ Age {parent.age} â€¢ {parent.location}</p>
                       <p className="text-sm text-gray-600 mt-1">{parent.notes}</p>
                     </div>
                   </div>
@@ -3086,7 +3449,17 @@ const CommandApp: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100">
       <Header />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">{renderView()}</main>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {showWeeklyBrief ? (
+          <WeeklyBrief 
+            onDismiss={dismissWeeklyBrief}
+            onNavigate={handleBriefNavigate}
+            userName="Adam"
+          />
+        ) : (
+          renderView()
+        )}
+      </main>
       {showDocumentUpload && <DocumentUploadModal />}
       {selectedDocument && <DocumentVersionModal document={selectedDocument} />}
     </div>

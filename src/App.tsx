@@ -64,6 +64,561 @@ import {
 } from 'lucide-react';
 
 // =============================================================================
+// ONBOARDING COMPONENT
+// =============================================================================
+
+interface OnboardingData {
+  householdType: 'single' | 'partnered' | 'partnered-kids' | null;
+  housingStatus: 'own' | 'rent' | null;
+  state: string | null;
+  incomeRange: string | null;
+  ageRange: string | null;
+  optionalConnection: {
+    type: 'insurance' | 'credit-card' | 'financial' | 'skip' | null;
+    provider?: string;
+    details?: string;
+  };
+}
+
+interface OnboardingProps {
+  onComplete: (data: OnboardingData) => void;
+}
+
+const US_STATES = [
+  { value: 'AL', label: 'Alabama' }, { value: 'AK', label: 'Alaska' }, { value: 'AZ', label: 'Arizona' },
+  { value: 'AR', label: 'Arkansas' }, { value: 'CA', label: 'California' }, { value: 'CO', label: 'Colorado' },
+  { value: 'CT', label: 'Connecticut' }, { value: 'DE', label: 'Delaware' }, { value: 'FL', label: 'Florida' },
+  { value: 'GA', label: 'Georgia' }, { value: 'HI', label: 'Hawaii' }, { value: 'ID', label: 'Idaho' },
+  { value: 'IL', label: 'Illinois' }, { value: 'IN', label: 'Indiana' }, { value: 'IA', label: 'Iowa' },
+  { value: 'KS', label: 'Kansas' }, { value: 'KY', label: 'Kentucky' }, { value: 'LA', label: 'Louisiana' },
+  { value: 'ME', label: 'Maine' }, { value: 'MD', label: 'Maryland' }, { value: 'MA', label: 'Massachusetts' },
+  { value: 'MI', label: 'Michigan' }, { value: 'MN', label: 'Minnesota' }, { value: 'MS', label: 'Mississippi' },
+  { value: 'MO', label: 'Missouri' }, { value: 'MT', label: 'Montana' }, { value: 'NE', label: 'Nebraska' },
+  { value: 'NV', label: 'Nevada' }, { value: 'NH', label: 'New Hampshire' }, { value: 'NJ', label: 'New Jersey' },
+  { value: 'NM', label: 'New Mexico' }, { value: 'NY', label: 'New York' }, { value: 'NC', label: 'North Carolina' },
+  { value: 'ND', label: 'North Dakota' }, { value: 'OH', label: 'Ohio' }, { value: 'OK', label: 'Oklahoma' },
+  { value: 'OR', label: 'Oregon' }, { value: 'PA', label: 'Pennsylvania' }, { value: 'RI', label: 'Rhode Island' },
+  { value: 'SC', label: 'South Carolina' }, { value: 'SD', label: 'South Dakota' }, { value: 'TN', label: 'Tennessee' },
+  { value: 'TX', label: 'Texas' }, { value: 'UT', label: 'Utah' }, { value: 'VT', label: 'Vermont' },
+  { value: 'VA', label: 'Virginia' }, { value: 'WA', label: 'Washington' }, { value: 'WV', label: 'West Virginia' },
+  { value: 'WI', label: 'Wisconsin' }, { value: 'WY', label: 'Wyoming' }, { value: 'DC', label: 'Washington D.C.' }
+];
+
+const INCOME_RANGES = [
+  { value: 'under-50k', label: 'Under $50,000' },
+  { value: '50k-100k', label: '$50,000 – $100,000' },
+  { value: '100k-200k', label: '$100,000 – $200,000' },
+  { value: '200k-350k', label: '$200,000 – $350,000' },
+  { value: '350k-500k', label: '$350,000 – $500,000' },
+  { value: 'over-500k', label: 'Over $500,000' }
+];
+
+const AGE_RANGES = [
+  { value: '18-29', label: '18 – 29' },
+  { value: '30-39', label: '30 – 39' },
+  { value: '40-49', label: '40 – 49' },
+  { value: '50-59', label: '50 – 59' },
+  { value: '60-69', label: '60 – 69' },
+  { value: '70+', label: '70+' }
+];
+
+const INSURANCE_PROVIDERS = [
+  'State Farm', 'Geico', 'Progressive', 'Allstate', 'USAA', 'Liberty Mutual',
+  'Farmers', 'Nationwide', 'Travelers', 'American Family', 'Other'
+];
+
+const FINANCIAL_INSTITUTIONS = [
+  'Chase', 'Bank of America', 'Wells Fargo', 'Citi', 'Capital One', 'US Bank',
+  'PNC', 'TD Bank', 'Truist', 'Charles Schwab', 'Fidelity', 'Vanguard', 'Other'
+];
+
+const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
+  const [currentStep, setCurrentStep] = useState(1);
+  const [data, setData] = useState<OnboardingData>({
+    householdType: null,
+    housingStatus: null,
+    state: null,
+    incomeRange: null,
+    ageRange: null,
+    optionalConnection: { type: null }
+  });
+  const [connectionProvider, setConnectionProvider] = useState('');
+  const [showStateDropdown, setShowStateDropdown] = useState(false);
+  const [stateSearch, setStateSearch] = useState('');
+
+  const totalSteps = 4;
+
+  const canProceed = (): boolean => {
+    switch (currentStep) {
+      case 1:
+        return data.householdType !== null && data.housingStatus !== null;
+      case 2:
+        return data.state !== null;
+      case 3:
+        return data.incomeRange !== null && data.ageRange !== null;
+      case 4:
+        return true; // Optional step, can always proceed
+      default:
+        return false;
+    }
+  };
+
+  const handleNext = () => {
+    if (currentStep < totalSteps) {
+      setCurrentStep(currentStep + 1);
+    } else {
+      // Complete onboarding
+      const finalData = {
+        ...data,
+        optionalConnection: {
+          ...data.optionalConnection,
+          provider: connectionProvider || undefined
+        }
+      };
+      onComplete(finalData);
+    }
+  };
+
+  const handleBack = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
+  const filteredStates = US_STATES.filter(state =>
+    state.label.toLowerCase().includes(stateSearch.toLowerCase()) ||
+    state.value.toLowerCase().includes(stateSearch.toLowerCase())
+  );
+
+  const ProgressBar = () => (
+    <div className="flex items-center gap-2 mb-8">
+      {[1, 2, 3, 4].map((step) => (
+        <div key={step} className="flex items-center flex-1">
+          <div
+            className={`h-1.5 flex-1 rounded-full transition-colors ${
+              step <= currentStep ? 'bg-[#C9A24D]' : 'bg-gray-200'
+            }`}
+          />
+        </div>
+      ))}
+    </div>
+  );
+
+  const SelectionCard: React.FC<{
+    selected: boolean;
+    onClick: () => void;
+    icon: React.ReactNode;
+    title: string;
+    description?: string;
+  }> = ({ selected, onClick, icon, title, description }) => (
+    <button
+      onClick={onClick}
+      className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+        selected
+          ? 'border-[#C9A24D] bg-[#C9A24D]/5'
+          : 'border-gray-200 hover:border-gray-300 bg-white'
+      }`}
+    >
+      <div className="flex items-center gap-4">
+        <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+          selected ? 'bg-[#C9A24D]/20' : 'bg-gray-100'
+        }`}>
+          {icon}
+        </div>
+        <div>
+          <h3 className={`font-semibold ${selected ? 'text-gray-900' : 'text-gray-700'}`}>
+            {title}
+          </h3>
+          {description && (
+            <p className="text-sm text-gray-500 mt-0.5">{description}</p>
+          )}
+        </div>
+        {selected && (
+          <CheckCircle className="w-5 h-5 ml-auto" style={{ color: '#C9A24D' }} />
+        )}
+      </div>
+    </button>
+  );
+
+  // Step 1: Household & Housing
+  const Step1 = () => (
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Tell us about your household</h2>
+        <p className="text-gray-600">This helps us prioritize what matters most for your situation.</p>
+      </div>
+
+      <div className="space-y-3">
+        <label className="block text-sm font-medium text-gray-700 mb-2">Household type</label>
+        <SelectionCard
+          selected={data.householdType === 'single'}
+          onClick={() => setData({ ...data, householdType: 'single' })}
+          icon={<User className="w-6 h-6 text-gray-600" />}
+          title="Single"
+          description="Living alone or with roommates"
+        />
+        <SelectionCard
+          selected={data.householdType === 'partnered'}
+          onClick={() => setData({ ...data, householdType: 'partnered' })}
+          icon={<Users className="w-6 h-6 text-gray-600" />}
+          title="Partnered"
+          description="Married or living with a partner"
+        />
+        <SelectionCard
+          selected={data.householdType === 'partnered-kids'}
+          onClick={() => setData({ ...data, householdType: 'partnered-kids' })}
+          icon={<Heart className="w-6 h-6 text-gray-600" />}
+          title="Family with children"
+          description="Partnered with kids at home"
+        />
+      </div>
+
+      <div className="space-y-3">
+        <label className="block text-sm font-medium text-gray-700 mb-2">Housing status</label>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => setData({ ...data, housingStatus: 'own' })}
+            className={`p-4 rounded-xl border-2 text-center transition-all ${
+              data.housingStatus === 'own'
+                ? 'border-[#C9A24D] bg-[#C9A24D]/5'
+                : 'border-gray-200 hover:border-gray-300 bg-white'
+            }`}
+          >
+            <Building className={`w-6 h-6 mx-auto mb-2 ${data.housingStatus === 'own' ? 'text-[#C9A24D]' : 'text-gray-500'}`} />
+            <span className={`font-medium ${data.housingStatus === 'own' ? 'text-gray-900' : 'text-gray-700'}`}>
+              Homeowner
+            </span>
+          </button>
+          <button
+            onClick={() => setData({ ...data, housingStatus: 'rent' })}
+            className={`p-4 rounded-xl border-2 text-center transition-all ${
+              data.housingStatus === 'rent'
+                ? 'border-[#C9A24D] bg-[#C9A24D]/5'
+                : 'border-gray-200 hover:border-gray-300 bg-white'
+            }`}
+          >
+            <Home className={`w-6 h-6 mx-auto mb-2 ${data.housingStatus === 'rent' ? 'text-[#C9A24D]' : 'text-gray-500'}`} />
+            <span className={`font-medium ${data.housingStatus === 'rent' ? 'text-gray-900' : 'text-gray-700'}`}>
+              Renter
+            </span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // Step 2: Location
+  const Step2 = () => (
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Where are you located?</h2>
+        <p className="text-gray-600">State-specific rules affect insurance, taxes, and legal recommendations.</p>
+      </div>
+
+      <div className="space-y-3">
+        <label className="block text-sm font-medium text-gray-700 mb-2">State of residence</label>
+        <div className="relative">
+          <button
+            onClick={() => setShowStateDropdown(!showStateDropdown)}
+            className="w-full p-4 rounded-xl border-2 border-gray-200 hover:border-gray-300 bg-white text-left flex items-center justify-between"
+          >
+            <div className="flex items-center gap-3">
+              <MapPin className="w-5 h-5 text-gray-400" />
+              <span className={data.state ? 'text-gray-900 font-medium' : 'text-gray-500'}>
+                {data.state ? US_STATES.find(s => s.value === data.state)?.label : 'Select your state'}
+              </span>
+            </div>
+            <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${showStateDropdown ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showStateDropdown && (
+            <div className="absolute z-20 top-full left-0 right-0 mt-2 bg-white rounded-xl border border-gray-200 shadow-lg max-h-64 overflow-hidden">
+              <div className="p-2 border-b border-gray-100">
+                <div className="relative">
+                  <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search states..."
+                    value={stateSearch}
+                    onChange={(e) => setStateSearch(e.target.value)}
+                    className="w-full pl-9 pr-3 py-2 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A24D]/50"
+                  />
+                </div>
+              </div>
+              <div className="overflow-y-auto max-h-48">
+                {filteredStates.map(state => (
+                  <button
+                    key={state.value}
+                    onClick={() => {
+                      setData({ ...data, state: state.value });
+                      setShowStateDropdown(false);
+                      setStateSearch('');
+                    }}
+                    className={`w-full px-4 py-3 text-left hover:bg-gray-50 flex items-center justify-between ${
+                      data.state === state.value ? 'bg-[#C9A24D]/5' : ''
+                    }`}
+                  >
+                    <span className="text-gray-900">{state.label}</span>
+                    {data.state === state.value && (
+                      <CheckCircle className="w-4 h-4" style={{ color: '#C9A24D' }} />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {data.state && (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+          <div className="flex items-start gap-3">
+            <Info className="w-5 h-5 text-blue-600 mt-0.5" />
+            <p className="text-sm text-blue-800">
+              We'll tailor recommendations based on {US_STATES.find(s => s.value === data.state)?.label}'s specific insurance requirements, tax rules, and legal considerations.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
+  // Step 3: Financial Profile
+  const Step3 = () => (
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">A bit about your financial picture</h2>
+        <p className="text-gray-600">Broad ranges help us calibrate recommendations. We never ask for exact figures.</p>
+      </div>
+
+      <div className="space-y-3">
+        <label className="block text-sm font-medium text-gray-700 mb-2">Household income range</label>
+        <div className="grid grid-cols-2 gap-2">
+          {INCOME_RANGES.map(range => (
+            <button
+              key={range.value}
+              onClick={() => setData({ ...data, incomeRange: range.value })}
+              className={`p-3 rounded-xl border-2 text-sm font-medium transition-all ${
+                data.incomeRange === range.value
+                  ? 'border-[#C9A24D] bg-[#C9A24D]/5 text-gray-900'
+                  : 'border-gray-200 hover:border-gray-300 bg-white text-gray-700'
+              }`}
+            >
+              {range.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <label className="block text-sm font-medium text-gray-700 mb-2">Your age range</label>
+        <div className="grid grid-cols-3 gap-2">
+          {AGE_RANGES.map(range => (
+            <button
+              key={range.value}
+              onClick={() => setData({ ...data, ageRange: range.value })}
+              className={`p-3 rounded-xl border-2 text-sm font-medium transition-all ${
+                data.ageRange === range.value
+                  ? 'border-[#C9A24D] bg-[#C9A24D]/5 text-gray-900'
+                  : 'border-gray-200 hover:border-gray-300 bg-white text-gray-700'
+              }`}
+            >
+              {range.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Step 4: Optional Connection
+  const Step4 = () => (
+    <div className="space-y-8">
+      <div>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">One more thing (optional)</h2>
+        <p className="text-gray-600">Connect one account to unlock personalized insights right away.</p>
+      </div>
+
+      {/* Reassurance Message */}
+      <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+        <div className="flex items-start gap-3">
+          <Sparkles className="w-5 h-5 mt-0.5" style={{ color: '#C9A24D' }} />
+          <div>
+            <p className="text-sm text-gray-700 font-medium">You do not need to complete everything now.</p>
+            <p className="text-sm text-gray-600 mt-1">Command works with partial information. You can always add more later.</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <label className="block text-sm font-medium text-gray-700 mb-2">Choose one to start (or skip)</label>
+        
+        <SelectionCard
+          selected={data.optionalConnection.type === 'insurance'}
+          onClick={() => {
+            setData({ ...data, optionalConnection: { type: 'insurance' } });
+            setConnectionProvider('');
+          }}
+          icon={<Shield className="w-6 h-6 text-gray-600" />}
+          title="Insurance provider"
+          description="Auto, home, or umbrella policy"
+        />
+
+        {data.optionalConnection.type === 'insurance' && (
+          <div className="ml-16 mt-2">
+            <select
+              value={connectionProvider}
+              onChange={(e) => setConnectionProvider(e.target.value)}
+              className="w-full p-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A24D]/50"
+            >
+              <option value="">Select provider (optional)</option>
+              {INSURANCE_PROVIDERS.map(provider => (
+                <option key={provider} value={provider}>{provider}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <SelectionCard
+          selected={data.optionalConnection.type === 'credit-card'}
+          onClick={() => {
+            setData({ ...data, optionalConnection: { type: 'credit-card' } });
+            setConnectionProvider('');
+          }}
+          icon={<CreditCard className="w-6 h-6 text-gray-600" />}
+          title="Credit card"
+          description="Analyze rewards optimization"
+        />
+
+        {data.optionalConnection.type === 'credit-card' && (
+          <div className="ml-16 mt-2">
+            <input
+              type="text"
+              placeholder="Card name (e.g., Chase Sapphire)"
+              value={connectionProvider}
+              onChange={(e) => setConnectionProvider(e.target.value)}
+              className="w-full p-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A24D]/50"
+            />
+          </div>
+        )}
+
+        <SelectionCard
+          selected={data.optionalConnection.type === 'financial'}
+          onClick={() => {
+            setData({ ...data, optionalConnection: { type: 'financial' } });
+            setConnectionProvider('');
+          }}
+          icon={<Building className="w-6 h-6 text-gray-600" />}
+          title="Financial institution"
+          description="Bank or investment account"
+        />
+
+        {data.optionalConnection.type === 'financial' && (
+          <div className="ml-16 mt-2">
+            <select
+              value={connectionProvider}
+              onChange={(e) => setConnectionProvider(e.target.value)}
+              className="w-full p-3 rounded-lg border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-[#C9A24D]/50"
+            >
+              <option value="">Select institution (optional)</option>
+              {FINANCIAL_INSTITUTIONS.map(inst => (
+                <option key={inst} value={inst}>{inst}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <button
+          onClick={() => {
+            setData({ ...data, optionalConnection: { type: 'skip' } });
+            setConnectionProvider('');
+          }}
+          className={`w-full p-4 rounded-xl border-2 text-left transition-all ${
+            data.optionalConnection.type === 'skip'
+              ? 'border-gray-400 bg-gray-50'
+              : 'border-gray-200 hover:border-gray-300 bg-white'
+          }`}
+        >
+          <div className="flex items-center gap-4">
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+              data.optionalConnection.type === 'skip' ? 'bg-gray-200' : 'bg-gray-100'
+            }`}>
+              <ArrowRight className="w-6 h-6 text-gray-500" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-700">Skip for now</h3>
+              <p className="text-sm text-gray-500">I'll add accounts later</p>
+            </div>
+          </div>
+        </button>
+      </div>
+    </div>
+  );
+
+  const renderStep = () => {
+    switch (currentStep) {
+      case 1: return <Step1 />;
+      case 2: return <Step2 />;
+      case 3: return <Step3 />;
+      case 4: return <Step4 />;
+      default: return <Step1 />;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 flex items-center justify-center p-4">
+      <div className="w-full max-w-lg">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <img src="/Command_Logo.png" alt="Command" className="h-12 mx-auto mb-6" />
+          <p className="text-sm text-gray-500">Step {currentStep} of {totalSteps}</p>
+        </div>
+
+        {/* Card */}
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-200 p-6 sm:p-8">
+          <ProgressBar />
+          
+          {renderStep()}
+
+          {/* Navigation */}
+          <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
+            {currentStep > 1 ? (
+              <button
+                onClick={handleBack}
+                className="flex items-center gap-2 text-gray-600 hover:text-gray-900 font-medium"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back
+              </button>
+            ) : (
+              <div />
+            )}
+
+            <button
+              onClick={handleNext}
+              disabled={!canProceed()}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all ${
+                canProceed()
+                  ? 'bg-gray-900 text-white hover:bg-gray-800'
+                  : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+              }`}
+            >
+              {currentStep === totalSteps ? 'See Your First Brief' : 'Continue'}
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Footer Note */}
+        <p className="text-center text-xs text-gray-400 mt-6">
+          Your data is encrypted and never shared. See our privacy policy.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+// =============================================================================
 // WEEKLY BRIEF COMPONENT
 // =============================================================================
 
@@ -84,12 +639,189 @@ interface WeeklyBriefProps {
   onDismiss: () => void;
   onNavigate: (view: string) => void;
   userName?: string;
+  userProfile?: OnboardingData | null;
   briefData?: {
     risk: BriefSection;
     leakage: BriefSection;
     action: BriefSection;
   };
 }
+
+// Generate brief data based on user profile from onboarding
+const generateBriefForProfile = (profile: OnboardingData | null | undefined): { risk: BriefSection; leakage: BriefSection; action: BriefSection } => {
+  // Default/demo data for Adam Bailey
+  const defaultBrief = {
+    risk: {
+      id: 'risk-1',
+      type: 'risk' as const,
+      title: 'Umbrella coverage gap',
+      summary: 'Your $1M umbrella policy may leave $1.8M+ of your net worth exposed in a worst-case liability scenario.',
+      whyItMatters: 'With a net worth of $2.8M and a household income of $325K, financial advisors typically recommend umbrella coverage of 2-3x your net worth. A serious auto accident or liability claim could exceed your current coverage and put your family\'s assets at risk.',
+      category: 'Insurance',
+      potentialImpact: 'Up to $1.8M exposure'
+    },
+    leakage: {
+      id: 'leakage-1',
+      type: 'leakage' as const,
+      title: 'Auto insurance overpayment',
+      summary: 'Your auto insurance premium is approximately 18% above market rate for comparable coverage.',
+      whyItMatters: 'You\'re currently paying $2,400/year with State Farm. Based on your driving history and vehicle profile, competing carriers could offer the same coverage for $1,950-$2,100/year. This represents $300-$450 in annual savings without changing your coverage.',
+      category: 'Insurance',
+      potentialImpact: 'Save $300-$450/year'
+    },
+    action: {
+      id: 'action-1',
+      type: 'action' as const,
+      title: 'Review auto insurance before Feb 2 renewal',
+      summary: 'Get competing quotes before your policy renews in 12 days to capture potential savings.',
+      whyItMatters: 'Your renewal is approaching quickly. Shopping quotes now gives you time to compare options without rushing. Even if you stay with State Farm, having competitive quotes gives you leverage to negotiate.',
+      category: 'Insurance',
+      actionLabel: 'Start Insurance Review',
+      potentialImpact: '12 days until renewal'
+    }
+  };
+
+  if (!profile) return defaultBrief;
+
+  // Generate personalized brief based on profile
+  const isHomeowner = profile.housingStatus === 'own';
+  const hasKids = profile.householdType === 'partnered-kids';
+  const isHighIncome = ['200k-350k', '350k-500k', 'over-500k'].includes(profile.incomeRange || '');
+  const isMidCareer = ['40-49', '50-59'].includes(profile.ageRange || '');
+
+  // Customize risk based on profile
+  let risk: BriefSection;
+  if (isHomeowner && isHighIncome) {
+    risk = {
+      id: 'risk-new-1',
+      type: 'risk',
+      title: 'Potential liability exposure',
+      summary: 'Based on your income range, you may need umbrella coverage beyond standard auto/home policies.',
+      whyItMatters: 'Households in higher income brackets are statistically more likely to be targets of liability claims. An umbrella policy provides an additional layer of protection above your auto and homeowners coverage.',
+      category: 'Insurance',
+      isAssumption: true,
+      assumptionNote: 'Based on typical households in your income range.',
+      potentialImpact: 'Review coverage'
+    };
+  } else if (isHomeowner) {
+    risk = {
+      id: 'risk-new-1',
+      type: 'risk',
+      title: 'Home insurance coverage check',
+      summary: 'Rising replacement costs may have left your home underinsured without you realizing it.',
+      whyItMatters: 'Construction and material costs have increased significantly. Many homeowners find their dwelling coverage hasn\'t kept pace, leaving a gap between what they\'re insured for and what rebuilding would actually cost.',
+      category: 'Insurance',
+      isAssumption: true,
+      assumptionNote: 'Based on typical homeowners in your state.',
+      potentialImpact: 'Potential gap'
+    };
+  } else {
+    risk = {
+      id: 'risk-new-1',
+      type: 'risk',
+      title: 'Renters insurance gap',
+      summary: 'Many renters underestimate the value of their belongings and lack adequate coverage.',
+      whyItMatters: 'Your landlord\'s insurance doesn\'t cover your personal property. If there\'s a fire, theft, or water damage, you\'d need to replace everything out of pocket without renters insurance.',
+      category: 'Insurance',
+      isAssumption: true,
+      assumptionNote: 'Based on typical renters in your area.',
+      potentialImpact: 'Check coverage'
+    };
+  }
+
+  // Customize leakage based on profile
+  let leakage: BriefSection;
+  if (hasKids && isMidCareer) {
+    leakage = {
+      id: 'leakage-new-1',
+      type: 'leakage',
+      title: 'Estate planning opportunity',
+      summary: 'Families with children often delay critical estate documents, potentially costing thousands in probate.',
+      whyItMatters: 'Without a will or trust, the state decides how your assets are distributed and who cares for your children. Establishing these documents now protects your family and can save $15,000-$40,000 in probate costs.',
+      category: 'Legal',
+      isAssumption: true,
+      assumptionNote: 'Based on typical families in your situation.',
+      potentialImpact: 'Save $15K-$40K'
+    };
+  } else if (isHighIncome) {
+    leakage = {
+      id: 'leakage-new-1',
+      type: 'leakage',
+      title: 'Tax optimization opportunity',
+      summary: 'Higher-income households often miss deductions and retirement contribution opportunities.',
+      whyItMatters: 'Maximizing tax-advantaged accounts like 401(k), HSA, and backdoor Roth IRA contributions can reduce your tax burden significantly. Many people don\'t contribute the maximum allowed.',
+      category: 'Tax',
+      isAssumption: true,
+      assumptionNote: 'Based on typical households in your income range.',
+      potentialImpact: 'Tax savings'
+    };
+  } else {
+    leakage = {
+      id: 'leakage-new-1',
+      type: 'leakage',
+      title: 'Insurance comparison opportunity',
+      summary: 'Most households overpay for auto insurance by not shopping rates annually.',
+      whyItMatters: 'Insurance rates vary significantly between carriers for the same coverage. Shopping your policy annually or when circumstances change (new car, moving, etc.) typically saves 10-25% on premiums.',
+      category: 'Insurance',
+      isAssumption: true,
+      assumptionNote: 'Based on typical households in your state.',
+      potentialImpact: 'Save 10-25%'
+    };
+  }
+
+  // Customize action based on what they connected in onboarding
+  let action: BriefSection;
+  const connectionType = profile.optionalConnection?.type;
+  
+  if (connectionType === 'insurance') {
+    action = {
+      id: 'action-new-1',
+      type: 'action',
+      title: 'Complete your insurance profile',
+      summary: 'Add your policy details so we can analyze your coverage and find optimization opportunities.',
+      whyItMatters: 'With your insurance provider connected, we can track renewal dates, compare rates, identify coverage gaps, and alert you to potential savings automatically.',
+      category: 'Insurance',
+      actionLabel: 'Add Policy Details',
+      potentialImpact: 'Unlock insights'
+    };
+  } else if (connectionType === 'credit-card') {
+    action = {
+      id: 'action-new-1',
+      type: 'action',
+      title: 'Optimize your rewards strategy',
+      summary: 'Add your spending categories so we can recommend the best card for each purchase type.',
+      whyItMatters: 'Most people leave money on the table by using the wrong card for certain purchases. We\'ll analyze your spending patterns and recommend which card to use where.',
+      category: 'Credit',
+      actionLabel: 'Set Up Card Strategy',
+      potentialImpact: 'Maximize rewards'
+    };
+  } else if (connectionType === 'financial') {
+    action = {
+      id: 'action-new-1',
+      type: 'action',
+      title: 'Set up budget tracking',
+      summary: 'Connect your accounts to get a complete picture of your cash flow and spending patterns.',
+      whyItMatters: 'Understanding where your money goes is the first step to financial optimization. We\'ll categorize transactions and identify opportunities to save.',
+      category: 'Finances',
+      actionLabel: 'Connect Accounts',
+      potentialImpact: 'See full picture'
+    };
+  } else {
+    // Default action for those who skipped
+    action = {
+      id: 'action-new-1',
+      type: 'action',
+      title: 'Upload your first document',
+      summary: 'Add an insurance policy, financial statement, or legal document to unlock personalized insights.',
+      whyItMatters: 'Command becomes more powerful with each document you add. Start with something simple like a car insurance declaration page or a recent bank statement.',
+      category: 'Documents',
+      actionLabel: 'Upload Document',
+      potentialImpact: 'Get started'
+    };
+  }
+
+  return { risk, leakage, action };
+};
 
 // Default brief data based on Adam Bailey's household situation
 const defaultBriefData = {
@@ -126,10 +858,14 @@ const defaultBriefData = {
 const WeeklyBrief: React.FC<WeeklyBriefProps> = ({
   onDismiss,
   onNavigate,
-  userName = 'Adam',
-  briefData = defaultBriefData
+  userName = 'there',
+  userProfile,
+  briefData
 }) => {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set());
+
+  // Use provided briefData or generate from profile
+  const activeBriefData = briefData || generateBriefForProfile(userProfile);
 
   const toggleSection = (sectionId: string) => {
     setExpandedSections(prev => {
@@ -346,9 +1082,9 @@ const WeeklyBrief: React.FC<WeeklyBriefProps> = ({
         {/* Brief Sections */}
         <div className="bg-white border-x border-b border-gray-200 rounded-b-2xl shadow-lg">
           <div className="p-4 sm:p-6 space-y-4">
-            {renderSection(briefData.risk)}
-            {renderSection(briefData.leakage)}
-            {renderSection(briefData.action)}
+            {renderSection(activeBriefData.risk)}
+            {renderSection(activeBriefData.leakage)}
+            {renderSection(activeBriefData.action)}
           </div>
 
           {/* Footer */}
@@ -545,9 +1281,38 @@ const CommandApp: React.FC = () => {
   const [selectedAsset, setSelectedAsset] = useState<HomeAsset | null>(null);
   const [showDocumentUpload, setShowDocumentUpload] = useState<boolean>(false);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
+
+  // Onboarding state - check if user has completed onboarding
+  const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
+    const onboardingComplete = localStorage.getItem('commandOnboardingComplete');
+    return !onboardingComplete;
+  });
   
-  // Weekly Brief state - shows by default, can be dismissed for the session
+  const [userProfile, setUserProfile] = useState<OnboardingData | null>(() => {
+    const saved = localStorage.getItem('commandUserProfile');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const handleOnboardingComplete = (data: OnboardingData) => {
+    // Save user profile
+    setUserProfile(data);
+    localStorage.setItem('commandUserProfile', JSON.stringify(data));
+    localStorage.setItem('commandOnboardingComplete', 'true');
+    
+    // Hide onboarding and show Weekly Brief
+    setShowOnboarding(false);
+    setShowWeeklyBrief(true);
+    
+    // Clear any previous brief dismissal so they see the first brief
+    sessionStorage.removeItem('commandBriefDismissed');
+  };
+  
+  // Weekly Brief state - shows by default after onboarding, can be dismissed for the session
   const [showWeeklyBrief, setShowWeeklyBrief] = useState<boolean>(() => {
+    // Don't show if onboarding hasn't been completed
+    const onboardingComplete = localStorage.getItem('commandOnboardingComplete');
+    if (!onboardingComplete) return false;
+    
     // Check session storage to see if brief was dismissed this session
     const dismissed = sessionStorage.getItem('commandBriefDismissed');
     const dismissedTime = dismissed ? parseInt(dismissed, 10) : 0;
@@ -3446,6 +4211,11 @@ const CommandApp: React.FC = () => {
     }
   };
 
+  // Show onboarding for new users
+  if (showOnboarding) {
+    return <Onboarding onComplete={handleOnboardingComplete} />;
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100">
       <Header />
@@ -3454,7 +4224,8 @@ const CommandApp: React.FC = () => {
           <WeeklyBrief 
             onDismiss={dismissWeeklyBrief}
             onNavigate={handleBriefNavigate}
-            userName="Adam"
+            userName={userProfile?.householdType === 'single' ? 'there' : 'there'}
+            userProfile={userProfile}
           />
         ) : (
           renderView()

@@ -14,10 +14,10 @@ COMMAND brings order, foresight, and automation to everything a family is accoun
 ### Installation
 
 ```bash
-# Install dependencies
+# Install dependencies for Mr. Mitch
 npm install
 
-# Start development server
+# Start development server 
 npm run dev
 
 # Build for production

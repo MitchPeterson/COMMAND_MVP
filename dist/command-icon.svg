@@ -1,0 +1,43 @@
+<svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+  <!-- Center hub - golden with bright center -->
+  <circle cx="50" cy="50" r="12" fill="#C9A24D"/>
+  <circle cx="50" cy="50" r="8" fill="#F5C842"/>
+  
+  <!-- Outer ring -->
+  <circle cx="50" cy="50" r="38" fill="none" stroke="#C9A24D" stroke-width="4"/>
+  
+  <!-- Spokes (dark lines) -->
+  <line x1="50" y1="50" x2="88" y2="50" stroke="#1C1D20" stroke-width="2"/>
+  <line x1="50" y1="50" x2="76.87" y2="76.87" stroke="#1C1D20" stroke-width="2"/>
+  <line x1="50" y1="50" x2="50" y2="88" stroke="#1C1D20" stroke-width="2"/>
+  <line x1="50" y1="50" x2="23.13" y2="76.87" stroke="#1C1D20" stroke-width="2"/>
+  <line x1="50" y1="50" x2="12" y2="50" stroke="#1C1D20" stroke-width="2"/>
+  <line x1="50" y1="50" x2="23.13" y2="23.13" stroke="#1C1D20" stroke-width="2"/>
+  <line x1="50" y1="50" x2="50" y2="12" stroke="#1C1D20" stroke-width="2"/>
+  <line x1="50" y1="50" x2="76.87" y2="23.13" stroke="#1C1D20" stroke-width="2"/>
+  
+  <!-- Outer nodes - golden with bright centers -->
+  <circle cx="88" cy="50" r="7" fill="#C9A24D"/>
+  <circle cx="88" cy="50" r="4" fill="#F5C842"/>
+  
+  <circle cx="76.87" cy="76.87" r="7" fill="#C9A24D"/>
+  <circle cx="76.87" cy="76.87" r="4" fill="#F5C842"/>
+  
+  <circle cx="50" cy="88" r="7" fill="#C9A24D"/>
+  <circle cx="50" cy="88" r="4" fill="#F5C842"/>
+  
+  <circle cx="23.13" cy="76.87" r="7" fill="#C9A24D"/>
+  <circle cx="23.13" cy="76.87" r="4" fill="#F5C842"/>
+  
+  <circle cx="12" cy="50" r="7" fill="#C9A24D"/>
+  <circle cx="12" cy="50" r="4" fill="#F5C842"/>
+  
+  <circle cx="23.13" cy="23.13" r="7" fill="#C9A24D"/>
+  <circle cx="23.13" cy="23.13" r="4" fill="#F5C842"/>
+  
+  <circle cx="50" cy="12" r="7" fill="#C9A24D"/>
+  <circle cx="50" cy="12" r="4" fill="#F5C842"/>
+  
+  <circle cx="76.87" cy="23.13" r="7" fill="#C9A24D"/>
+  <circle cx="76.87" cy="23.13" r="4" fill="#F5C842"/>
+</svg>

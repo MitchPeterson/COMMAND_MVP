@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Home, 
   Shield, 
@@ -619,6 +619,496 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 };
 
 // =============================================================================
+// ADMIN / DEV PANEL COMPONENT
+// =============================================================================
+
+interface TestPersona {
+  id: string;
+  name: string;
+  description: string;
+  profile: OnboardingData;
+}
+
+const TEST_PERSONAS: TestPersona[] = [
+  {
+    id: 'adam-bailey',
+    name: 'Adam Bailey (Default)',
+    description: 'VP, married with kids, homeowner, high income, MN',
+    profile: {
+      householdType: 'partnered-kids',
+      housingStatus: 'own',
+      state: 'MN',
+      incomeRange: '200k-350k',
+      ageRange: '40-49',
+      optionalConnection: { type: 'insurance', provider: 'State Farm' }
+    }
+  },
+  {
+    id: 'young-professional',
+    name: 'Young Professional',
+    description: 'Single renter, early career, urban',
+    profile: {
+      householdType: 'single',
+      housingStatus: 'rent',
+      state: 'NY',
+      incomeRange: '50k-100k',
+      ageRange: '18-29',
+      optionalConnection: { type: 'credit-card', provider: 'Chase Sapphire' }
+    }
+  },
+  {
+    id: 'dink-couple',
+    name: 'DINK Couple',
+    description: 'Dual income, no kids, homeowners',
+    profile: {
+      householdType: 'partnered',
+      housingStatus: 'own',
+      state: 'CA',
+      incomeRange: '200k-350k',
+      ageRange: '30-39',
+      optionalConnection: { type: 'financial', provider: 'Vanguard' }
+    }
+  },
+  {
+    id: 'near-retirement',
+    name: 'Near Retirement',
+    description: 'Empty nesters, high net worth, estate planning focus',
+    profile: {
+      householdType: 'partnered',
+      housingStatus: 'own',
+      state: 'FL',
+      incomeRange: '350k-500k',
+      ageRange: '60-69',
+      optionalConnection: { type: 'insurance', provider: 'Northwestern Mutual' }
+    }
+  },
+  {
+    id: 'new-family',
+    name: 'New Family',
+    description: 'First-time parents, recently bought home',
+    profile: {
+      householdType: 'partnered-kids',
+      housingStatus: 'own',
+      state: 'TX',
+      incomeRange: '100k-200k',
+      ageRange: '30-39',
+      optionalConnection: { type: 'skip' }
+    }
+  },
+  {
+    id: 'fresh-user',
+    name: 'Brand New User',
+    description: 'No data - triggers onboarding',
+    profile: null as unknown as OnboardingData
+  }
+];
+
+interface AdminPanelProps {
+  isOpen: boolean;
+  onClose: () => void;
+  currentProfile: OnboardingData | null;
+  onLoadPersona: (profile: OnboardingData | null) => void;
+  onResetOnboarding: () => void;
+  onClearAllData: () => void;
+}
+
+const AdminPanel: React.FC<AdminPanelProps> = ({
+  isOpen,
+  onClose,
+  currentProfile,
+  onLoadPersona,
+  onResetOnboarding,
+  onClearAllData
+}) => {
+  const [activeTab, setActiveTab] = useState<'personas' | 'current' | 'custom' | 'actions'>('personas');
+  const [customProfile, setCustomProfile] = useState<OnboardingData>({
+    householdType: null,
+    housingStatus: null,
+    state: null,
+    incomeRange: null,
+    ageRange: null,
+    optionalConnection: { type: null }
+  });
+  const [showConfirmClear, setShowConfirmClear] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleLoadPersona = (persona: TestPersona) => {
+    if (persona.id === 'fresh-user') {
+      onResetOnboarding();
+    } else {
+      onLoadPersona(persona.profile);
+    }
+    onClose();
+  };
+
+  const handleSaveCustomProfile = () => {
+    onLoadPersona(customProfile);
+    onClose();
+  };
+
+  const handleClearAll = () => {
+    onClearAllData();
+    setShowConfirmClear(false);
+    onClose();
+  };
+
+  const TabButton: React.FC<{ tab: typeof activeTab; label: string; icon: React.ReactNode }> = ({ tab, label, icon }) => (
+    <button
+      onClick={() => setActiveTab(tab)}
+      className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+        activeTab === tab
+          ? 'bg-[#C9A24D] text-white'
+          : 'text-gray-600 hover:bg-gray-100'
+      }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-200 bg-gradient-to-r from-gray-900 to-gray-800">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[#C9A24D]/20 flex items-center justify-center">
+                <Zap className="w-5 h-5 text-[#C9A24D]" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white">Dev Tools</h2>
+                <p className="text-xs text-gray-400">Testing & Administration</p>
+              </div>
+            </div>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="px-6 py-3 border-b border-gray-100 flex gap-2 overflow-x-auto">
+          <TabButton tab="personas" label="Test Personas" icon={<Users className="w-4 h-4" />} />
+          <TabButton tab="current" label="Current Profile" icon={<User className="w-4 h-4" />} />
+          <TabButton tab="custom" label="Custom User" icon={<Edit3 className="w-4 h-4" />} />
+          <TabButton tab="actions" label="Actions" icon={<Zap className="w-4 h-4" />} />
+        </div>
+
+        {/* Content */}
+        <div className="p-6 overflow-y-auto max-h-[60vh]">
+          {/* Personas Tab */}
+          {activeTab === 'personas' && (
+            <div className="space-y-3">
+              <p className="text-sm text-gray-600 mb-4">
+                Load a pre-configured test persona to quickly switch contexts.
+              </p>
+              {TEST_PERSONAS.map(persona => (
+                <button
+                  key={persona.id}
+                  onClick={() => handleLoadPersona(persona)}
+                  className="w-full p-4 rounded-xl border-2 border-gray-200 hover:border-[#C9A24D] hover:bg-[#C9A24D]/5 text-left transition-all"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-semibold text-gray-900">{persona.name}</h3>
+                      <p className="text-sm text-gray-500">{persona.description}</p>
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-gray-400" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Current Profile Tab */}
+          {activeTab === 'current' && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600 mb-4">
+                View the currently loaded user profile data.
+              </p>
+              {currentProfile ? (
+                <div className="bg-gray-50 rounded-xl p-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 uppercase">Household Type</label>
+                      <p className="text-sm font-medium text-gray-900">{currentProfile.householdType || '—'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 uppercase">Housing Status</label>
+                      <p className="text-sm font-medium text-gray-900">{currentProfile.housingStatus || '—'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 uppercase">State</label>
+                      <p className="text-sm font-medium text-gray-900">{currentProfile.state || '—'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 uppercase">Income Range</label>
+                      <p className="text-sm font-medium text-gray-900">{currentProfile.incomeRange || '—'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 uppercase">Age Range</label>
+                      <p className="text-sm font-medium text-gray-900">{currentProfile.ageRange || '—'}</p>
+                    </div>
+                    <div>
+                      <label className="text-xs font-medium text-gray-500 uppercase">Connection</label>
+                      <p className="text-sm font-medium text-gray-900">
+                        {currentProfile.optionalConnection?.type || '—'}
+                        {currentProfile.optionalConnection?.provider && ` (${currentProfile.optionalConnection.provider})`}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Raw JSON */}
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <label className="text-xs font-medium text-gray-500 uppercase mb-2 block">Raw Data (localStorage)</label>
+                    <pre className="text-xs bg-gray-900 text-green-400 p-3 rounded-lg overflow-x-auto">
+                      {JSON.stringify(currentProfile, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
+                    <div>
+                      <h3 className="font-medium text-yellow-900">No Profile Loaded</h3>
+                      <p className="text-sm text-yellow-700">User has not completed onboarding yet.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Storage Status */}
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                <h4 className="font-medium text-blue-900 mb-2">Storage Status</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700">Onboarding Complete:</span>
+                    <span className={`font-medium ${localStorage.getItem('commandOnboardingComplete') ? 'text-green-600' : 'text-red-600'}`}>
+                      {localStorage.getItem('commandOnboardingComplete') ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-blue-700">Brief Dismissed:</span>
+                    <span className={`font-medium ${sessionStorage.getItem('commandBriefDismissed') ? 'text-green-600' : 'text-gray-500'}`}>
+                      {sessionStorage.getItem('commandBriefDismissed') ? 'Yes' : 'No'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Custom User Tab */}
+          {activeTab === 'custom' && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600 mb-4">
+                Create a custom test user with specific attributes.
+              </p>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Household Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Household Type</label>
+                  <select
+                    value={customProfile.householdType || ''}
+                    onChange={(e) => setCustomProfile({ ...customProfile, householdType: e.target.value as OnboardingData['householdType'] })}
+                    className="w-full p-2 rounded-lg border border-gray-200 text-sm"
+                  >
+                    <option value="">Select...</option>
+                    <option value="single">Single</option>
+                    <option value="partnered">Partnered</option>
+                    <option value="partnered-kids">Family with Kids</option>
+                  </select>
+                </div>
+
+                {/* Housing Status */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Housing Status</label>
+                  <select
+                    value={customProfile.housingStatus || ''}
+                    onChange={(e) => setCustomProfile({ ...customProfile, housingStatus: e.target.value as OnboardingData['housingStatus'] })}
+                    className="w-full p-2 rounded-lg border border-gray-200 text-sm"
+                  >
+                    <option value="">Select...</option>
+                    <option value="own">Homeowner</option>
+                    <option value="rent">Renter</option>
+                  </select>
+                </div>
+
+                {/* State */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
+                  <select
+                    value={customProfile.state || ''}
+                    onChange={(e) => setCustomProfile({ ...customProfile, state: e.target.value })}
+                    className="w-full p-2 rounded-lg border border-gray-200 text-sm"
+                  >
+                    <option value="">Select...</option>
+                    {US_STATES.map(state => (
+                      <option key={state.value} value={state.value}>{state.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Income Range */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Income Range</label>
+                  <select
+                    value={customProfile.incomeRange || ''}
+                    onChange={(e) => setCustomProfile({ ...customProfile, incomeRange: e.target.value })}
+                    className="w-full p-2 rounded-lg border border-gray-200 text-sm"
+                  >
+                    <option value="">Select...</option>
+                    {INCOME_RANGES.map(range => (
+                      <option key={range.value} value={range.value}>{range.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Age Range */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Age Range</label>
+                  <select
+                    value={customProfile.ageRange || ''}
+                    onChange={(e) => setCustomProfile({ ...customProfile, ageRange: e.target.value })}
+                    className="w-full p-2 rounded-lg border border-gray-200 text-sm"
+                  >
+                    <option value="">Select...</option>
+                    {AGE_RANGES.map(range => (
+                      <option key={range.value} value={range.value}>{range.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Connection Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Connection Type</label>
+                  <select
+                    value={customProfile.optionalConnection?.type || ''}
+                    onChange={(e) => setCustomProfile({ 
+                      ...customProfile, 
+                      optionalConnection: { type: e.target.value as OnboardingData['optionalConnection']['type'] } 
+                    })}
+                    className="w-full p-2 rounded-lg border border-gray-200 text-sm"
+                  >
+                    <option value="">None</option>
+                    <option value="insurance">Insurance</option>
+                    <option value="credit-card">Credit Card</option>
+                    <option value="financial">Financial Institution</option>
+                    <option value="skip">Skipped</option>
+                  </select>
+                </div>
+              </div>
+
+              <button
+                onClick={handleSaveCustomProfile}
+                className="w-full mt-4 px-4 py-3 bg-gray-900 text-white rounded-xl font-medium hover:bg-gray-800 transition-colors"
+              >
+                Load Custom Profile
+              </button>
+            </div>
+          )}
+
+          {/* Actions Tab */}
+          {activeTab === 'actions' && (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600 mb-4">
+                Quick actions for testing different app states.
+              </p>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => { onResetOnboarding(); onClose(); }}
+                  className="w-full p-4 rounded-xl border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 text-left transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                      <ArrowLeft className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Reset Onboarding</h3>
+                      <p className="text-sm text-gray-500">Clear profile and restart onboarding flow</p>
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => {
+                    sessionStorage.removeItem('commandBriefDismissed');
+                    window.location.reload();
+                  }}
+                  className="w-full p-4 rounded-xl border-2 border-gray-200 hover:border-purple-500 hover:bg-purple-50 text-left transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                      <FileText className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-gray-900">Show Weekly Brief</h3>
+                      <p className="text-sm text-gray-500">Reset brief dismissal and reload</p>
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => setShowConfirmClear(true)}
+                  className="w-full p-4 rounded-xl border-2 border-red-200 hover:border-red-500 hover:bg-red-50 text-left transition-all"
+                >
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center">
+                      <XCircle className="w-5 h-5 text-red-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-red-900">Clear All Data</h3>
+                      <p className="text-sm text-red-600">Remove all localStorage and sessionStorage</p>
+                    </div>
+                  </div>
+                </button>
+
+                {showConfirmClear && (
+                  <div className="bg-red-50 border border-red-200 rounded-xl p-4 mt-2">
+                    <p className="text-sm text-red-800 mb-3">
+                      Are you sure? This will clear all stored data and reload the app.
+                    </p>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleClearAll}
+                        className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700"
+                      >
+                        Yes, Clear Everything
+                      </button>
+                      <button
+                        onClick={() => setShowConfirmClear(false)}
+                        className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Keyboard Shortcut Info */}
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <p className="text-xs text-gray-500">
+                  <strong>Tip:</strong> Press <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono">Ctrl</kbd> + <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono">Shift</kbd> + <kbd className="px-1.5 py-0.5 bg-gray-100 rounded text-xs font-mono">D</kbd> to toggle this panel
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// =============================================================================
 // WEEKLY BRIEF COMPONENT
 // =============================================================================
 
@@ -821,38 +1311,6 @@ const generateBriefForProfile = (profile: OnboardingData | null | undefined): { 
   }
 
   return { risk, leakage, action };
-};
-
-// Default brief data based on Adam Bailey's household situation
-const defaultBriefData = {
-  risk: {
-    id: 'risk-1',
-    type: 'risk' as const,
-    title: 'Umbrella coverage gap',
-    summary: 'Your $1M umbrella policy may leave $1.8M+ of your net worth exposed in a worst-case liability scenario.',
-    whyItMatters: 'With a net worth of $2.8M and a household income of $325K, financial advisors typically recommend umbrella coverage of 2-3x your net worth. A serious auto accident or liability claim could exceed your current coverage and put your family\'s assets at risk.',
-    category: 'Insurance',
-    potentialImpact: 'Up to $1.8M exposure'
-  },
-  leakage: {
-    id: 'leakage-1',
-    type: 'leakage' as const,
-    title: 'Auto insurance overpayment',
-    summary: 'Your auto insurance premium is approximately 18% above market rate for comparable coverage.',
-    whyItMatters: 'You\'re currently paying $2,400/year with State Farm. Based on your driving history and vehicle profile, competing carriers could offer the same coverage for $1,950-$2,100/year. This represents $300-$450 in annual savings without changing your coverage.',
-    category: 'Insurance',
-    potentialImpact: 'Save $300-$450/year'
-  },
-  action: {
-    id: 'action-1',
-    type: 'action' as const,
-    title: 'Review auto insurance before Feb 2 renewal',
-    summary: 'Get competing quotes before your policy renews in 12 days to capture potential savings.',
-    whyItMatters: 'Your renewal is approaching quickly. Shopping quotes now gives you time to compare options without rushing. Even if you stay with State Farm, having competitive quotes gives you leverage to negotiate.',
-    category: 'Insurance',
-    actionLabel: 'Start Insurance Review',
-    potentialImpact: '12 days until renewal'
-  }
 };
 
 const WeeklyBrief: React.FC<WeeklyBriefProps> = ({
@@ -1333,6 +1791,47 @@ const CommandApp: React.FC = () => {
     setShowWeeklyBrief(false);
     sessionStorage.setItem('commandBriefDismissed', Date.now().toString());
     setActiveView(view);
+  };
+
+  // Admin Panel state and handlers
+  const [showAdminPanel, setShowAdminPanel] = useState<boolean>(false);
+
+  // Keyboard shortcut for admin panel (Ctrl+Shift+D)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        e.preventDefault();
+        setShowAdminPanel(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  const handleLoadPersona = (profile: OnboardingData | null) => {
+    if (profile) {
+      setUserProfile(profile);
+      localStorage.setItem('commandUserProfile', JSON.stringify(profile));
+      localStorage.setItem('commandOnboardingComplete', 'true');
+      setShowOnboarding(false);
+      setShowWeeklyBrief(true);
+      sessionStorage.removeItem('commandBriefDismissed');
+    }
+  };
+
+  const handleResetOnboarding = () => {
+    localStorage.removeItem('commandOnboardingComplete');
+    localStorage.removeItem('commandUserProfile');
+    sessionStorage.removeItem('commandBriefDismissed');
+    setUserProfile(null);
+    setShowOnboarding(true);
+    setShowWeeklyBrief(false);
+  };
+
+  const handleClearAllData = () => {
+    localStorage.clear();
+    sessionStorage.clear();
+    window.location.reload();
   };
 
   const dismissPriority = (id: number, e: React.MouseEvent): void => {
@@ -2472,6 +2971,14 @@ const CommandApp: React.FC = () => {
             >
               <Folder className="w-5 h-5 text-gray-600" />
             </button>
+            {/* Dev Tools Button */}
+            <button 
+              onClick={() => setShowAdminPanel(true)}
+              className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              title="Dev Tools (Ctrl+Shift+D)"
+            >
+              <Sparkles className="w-5 h-5 text-gray-400 hover:text-[#C9A24D]" />
+            </button>
             <button 
               onClick={() => setActiveView('profile')} 
               className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
@@ -2525,6 +3032,16 @@ const CommandApp: React.FC = () => {
                 </button>
               );
             })}
+            {/* Dev Tools - Mobile */}
+            <div className="border-t border-gray-200 mt-2 pt-2">
+              <button
+                onClick={() => { setShowAdminPanel(true); setMobileMenuOpen(false); }}
+                className="flex items-center gap-3 w-full px-4 py-3 rounded-lg font-medium text-sm text-gray-400 hover:bg-gray-100"
+              >
+                <Sparkles className="w-5 h-5" />
+                Dev Tools
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -4213,7 +4730,27 @@ const CommandApp: React.FC = () => {
 
   // Show onboarding for new users
   if (showOnboarding) {
-    return <Onboarding onComplete={handleOnboardingComplete} />;
+    return (
+      <>
+        <Onboarding onComplete={handleOnboardingComplete} />
+        <AdminPanel
+          isOpen={showAdminPanel}
+          onClose={() => setShowAdminPanel(false)}
+          currentProfile={userProfile}
+          onLoadPersona={handleLoadPersona}
+          onResetOnboarding={handleResetOnboarding}
+          onClearAllData={handleClearAllData}
+        />
+        {/* Floating dev tools button during onboarding */}
+        <button
+          onClick={() => setShowAdminPanel(true)}
+          className="fixed bottom-4 right-4 p-3 bg-gray-900 text-white rounded-full shadow-lg hover:bg-gray-800 transition-colors z-40"
+          title="Dev Tools (Ctrl+Shift+D)"
+        >
+          <Sparkles className="w-5 h-5" />
+        </button>
+      </>
+    );
   }
 
   return (
@@ -4233,6 +4770,14 @@ const CommandApp: React.FC = () => {
       </main>
       {showDocumentUpload && <DocumentUploadModal />}
       {selectedDocument && <DocumentVersionModal document={selectedDocument} />}
+      <AdminPanel
+        isOpen={showAdminPanel}
+        onClose={() => setShowAdminPanel(false)}
+        currentProfile={userProfile}
+        onLoadPersona={handleLoadPersona}
+        onResetOnboarding={handleResetOnboarding}
+        onClearAllData={handleClearAllData}
+      />
     </div>
   );
 };

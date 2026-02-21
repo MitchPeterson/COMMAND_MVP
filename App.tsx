@@ -3959,10 +3959,12 @@ const CommandApp: React.FC = () => {
 
   // Tax Section View
   const TaxView: React.FC = () => {
+    const [dismissedTaxRecs, setDismissedTaxRecs] = useState<string[]>([]);
     const totalIncome = taxDocuments.filter(d => ['w2', '1099'].includes(d.type) && d.amount).reduce((sum, d) => sum + (d.amount || 0), 0);
     const totalContributions = charitableContributions.reduce((sum, c) => sum + c.amount, 0);
     const totalBusinessExpenses = businessExpenses.reduce((sum, e) => sum + e.amount, 0);
-    const potentialSavings = taxRecommendations.reduce((sum, r) => sum + (r.potentialSavings || 0), 0);
+    const activeTaxRecs = taxRecommendations.filter(r => !dismissedTaxRecs.includes(r.id));
+    const potentialSavings = activeTaxRecs.reduce((sum, r) => sum + (r.potentialSavings || 0), 0);
     const pendingDocs = taxDocuments.filter(d => d.status === 'pending').length;
 
     return (
@@ -4038,10 +4040,10 @@ const CommandApp: React.FC = () => {
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">Tax Optimization Recommendations</h2>
-            <span className="text-sm text-gray-500">{taxRecommendations.length} opportunities</span>
+            <span className="text-sm text-gray-500">{activeTaxRecs.length} opportunities</span>
           </div>
           <div className="divide-y divide-gray-100">
-            {taxRecommendations.map(rec => (
+            {activeTaxRecs.map(rec => (
               <div key={rec.id} className="px-6 py-4">
                 <div className="flex items-start justify-between">
                   <div className="flex items-start gap-4">
@@ -4057,14 +4059,27 @@ const CommandApp: React.FC = () => {
                       {rec.deadline && <p className="text-xs text-gray-500 mt-1">Deadline: {rec.deadline}</p>}
                     </div>
                   </div>
-                  {rec.potentialSavings && rec.potentialSavings > 0 && (
-                    <div className="text-right">
+                  <div className="flex items-center gap-3">
+                    {rec.potentialSavings && rec.potentialSavings > 0 && (
                       <p className="font-semibold" style={{ color: '#C9A24D' }}>Save ${rec.potentialSavings.toLocaleString()}</p>
-                    </div>
-                  )}
+                    )}
+                    <button 
+                      onClick={() => setDismissedTaxRecs(prev => [...prev, rec.id])}
+                      className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg"
+                      title="Dismiss"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
+            {activeTaxRecs.length === 0 && (
+              <div className="px-6 py-8 text-center text-gray-500">
+                <CheckCircle className="w-8 h-8 mx-auto mb-2 text-green-500" />
+                <p>All recommendations reviewed</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -4133,11 +4148,16 @@ const CommandApp: React.FC = () => {
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Charitable Contributions</h2>
-              <p className="text-sm text-gray-500">Tax Year 2025 â€¢ {charitableContributions.length} donations</p>
+              <p className="text-sm text-gray-500">Tax Year 2025 • {charitableContributions.length} donations</p>
             </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-500">Total Deductible</p>
-              <p className="font-semibold text-green-600">${totalContributions.toLocaleString()}</p>
+            <div className="flex items-center gap-4">
+              <button onClick={() => setShowDocumentUpload(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-100" style={{ color: '#C9A24D' }}>
+                <Plus className="w-4 h-4" />Add
+              </button>
+              <div className="text-right">
+                <p className="text-sm text-gray-500">Total Deductible</p>
+                <p className="font-semibold text-green-600">${totalContributions.toLocaleString()}</p>
+              </div>
             </div>
           </div>
           <div className="divide-y divide-gray-100">
@@ -4174,9 +4194,14 @@ const CommandApp: React.FC = () => {
               <h2 className="text-lg font-semibold text-gray-900">Consulting Business Expenses (1099)</h2>
               <p className="text-sm text-gray-500">Side business deductions for Schedule C</p>
             </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-500">Total Deductible</p>
-              <p className="font-semibold text-purple-600">${totalBusinessExpenses.toLocaleString()}</p>
+            <div className="flex items-center gap-4">
+              <button onClick={() => setShowDocumentUpload(true)} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-100" style={{ color: '#C9A24D' }}>
+                <Plus className="w-4 h-4" />Add
+              </button>
+              <div className="text-right">
+                <p className="text-sm text-gray-500">Total Deductible</p>
+                <p className="font-semibold text-purple-600">${totalBusinessExpenses.toLocaleString()}</p>
+              </div>
             </div>
           </div>
           <div className="divide-y divide-gray-100">

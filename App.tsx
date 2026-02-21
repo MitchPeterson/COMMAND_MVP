@@ -1740,6 +1740,55 @@ const CommandApp: React.FC = () => {
   const [showDocumentUpload, setShowDocumentUpload] = useState<boolean>(false);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
 
+  // ==========================================================================
+  // BROWSER HISTORY MANAGEMENT
+  // ==========================================================================
+  
+  // Navigation function that updates both state AND browser history
+  const navigateTo = (view: string, detail?: { type: string; id: string }) => {
+    const state = { view, detail };
+    window.history.pushState(state, '', `#${view}${detail ? `/${detail.type}/${detail.id}` : ''}`);
+    
+    // Clear any selected items when navigating to a new view
+    setSelectedPriority(null);
+    setSelectedPolicy(null);
+    setSelectedLegalDoc(null);
+    setSelectedAsset(null);
+    setActiveView(view);
+  };
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = (event: PopStateEvent) => {
+      const state = event.state;
+      
+      if (state?.view) {
+        // Restore the view from history
+        setActiveView(state.view);
+        // Clear selections when going back
+        setSelectedPriority(null);
+        setSelectedPolicy(null);
+        setSelectedLegalDoc(null);
+        setSelectedAsset(null);
+      } else {
+        // No state means we're at the initial entry - go to dashboard
+        setActiveView('dashboard');
+        setSelectedPriority(null);
+        setSelectedPolicy(null);
+        setSelectedLegalDoc(null);
+        setSelectedAsset(null);
+      }
+    };
+
+    // Set initial history state
+    if (!window.history.state) {
+      window.history.replaceState({ view: 'dashboard' }, '', '#dashboard');
+    }
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
   // Onboarding state - check if user has completed onboarding
   const [showOnboarding, setShowOnboarding] = useState<boolean>(() => {
     const onboardingComplete = localStorage.getItem('commandOnboardingComplete');
@@ -2915,7 +2964,7 @@ const CommandApp: React.FC = () => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <button 
-            onClick={() => { setActiveView('dashboard'); setSelectedPriority(null); setSelectedPolicy(null); setSelectedLegalDoc(null); setSelectedAsset(null); }}
+            onClick={() => navigateTo('dashboard')}
             className="flex items-center gap-2 hover:opacity-80 transition-opacity"
           >
             <img src={commandLogo} alt="Command" className="h-10 w-auto" />
@@ -2935,7 +2984,7 @@ const CommandApp: React.FC = () => {
               return (
                 <button
                   key={section.id}
-                  onClick={() => { setActiveView(section.id); setSelectedPriority(null); setSelectedPolicy(null); setSelectedLegalDoc(null); setSelectedAsset(null); }}
+                  onClick={() => navigateTo(section.id)}
                   className={`flex items-center gap-2 px-3 py-2 rounded-lg font-medium text-sm transition-colors ${
                     activeView === section.id ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
                   }`}
@@ -3022,7 +3071,7 @@ const CommandApp: React.FC = () => {
               return (
                 <button
                   key={section.id}
-                  onClick={() => { setActiveView(section.id); setSelectedPriority(null); setMobileMenuOpen(false); }}
+                  onClick={() => { navigateTo(section.id); setMobileMenuOpen(false); }}
                   className={`flex items-center gap-3 w-full px-4 py-3 rounded-lg font-medium text-sm ${
                     activeView === section.id ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-100'
                   }`}
@@ -3144,7 +3193,7 @@ const CommandApp: React.FC = () => {
   // Back to Dashboard button component
   const BackToDashboard: React.FC = () => (
     <button 
-      onClick={() => setActiveView('dashboard')} 
+      onClick={() => navigateTo('dashboard')} 
       className="flex items-center gap-2 text-gray-500 hover:text-gray-700 mb-4"
     >
       <ArrowLeft className="w-4 h-4" />

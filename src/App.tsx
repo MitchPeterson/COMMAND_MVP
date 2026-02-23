@@ -224,6 +224,11 @@ const CommandApp: React.FC = () => {
   const [showDocumentUpload, setShowDocumentUpload] = useState<boolean>(false);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [dismissedTaxRecs, setDismissedTaxRecs] = useState<string[]>([]);
+  const [showAddContribution, setShowAddContribution] = useState<boolean>(false);
+  const [showAddExpense, setShowAddExpense] = useState<boolean>(false);
+  const [showUploadTaxDoc, setShowUploadTaxDoc] = useState<'contributions' | 'expenses' | null>(null);
+  const [uploadParseStatus, setUploadParseStatus] = useState<'idle' | 'parsing' | 'done'>('idle');
+  const [parsedUploadItems, setParsedUploadItems] = useState<any[]>([]);
 
   const dismissPriority = (id: number, e: React.MouseEvent): void => {
     e.stopPropagation();
@@ -613,15 +618,15 @@ const CommandApp: React.FC = () => {
     { id: 'td-10', name: '2024 State Return (MN)', year: 2024, type: 'return', status: 'filed' }
   ];
 
-  const charitableContributions: CharitableContribution[] = [
+  const [charitableContributions, setCharitableContributions] = useState<CharitableContribution[]>([
     { id: 'cc-1', organization: 'United Way', date: 'Dec 15, 2025', amount: 5000, type: 'cash', acknowledged: true, taxDeductible: true },
     { id: 'cc-2', organization: 'St. Jude Children\'s Hospital', date: 'Nov 20, 2025', amount: 2500, type: 'cash', acknowledged: true, taxDeductible: true },
     { id: 'cc-3', organization: 'Local Food Shelf', date: 'Oct 5, 2025', amount: 1000, type: 'cash', acknowledged: true, taxDeductible: true },
     { id: 'cc-4', organization: 'Alma Mater University', date: 'Sep 1, 2025', amount: 10000, type: 'stock', acknowledged: true, taxDeductible: true },
     { id: 'cc-5', organization: 'Habitat for Humanity', date: 'Aug 15, 2025', amount: 500, type: 'goods', acknowledged: false, taxDeductible: true }
-  ];
+  ]);
 
-  const businessExpenses: BusinessExpense[] = [
+  const [businessExpenses, setBusinessExpenses] = useState<BusinessExpense[]>([
     { id: 'be-1', category: 'Home Office', description: 'Dedicated office space (150 sq ft)', amount: 1800, date: '2025', deductible: true, receipt: true },
     { id: 'be-2', category: 'Software', description: 'Adobe Creative Suite, Zoom Pro', amount: 850, date: '2025', deductible: true, receipt: true },
     { id: 'be-3', category: 'Professional Development', description: 'Industry conference & courses', amount: 2200, date: '2025', deductible: true, receipt: true },
@@ -629,7 +634,7 @@ const CommandApp: React.FC = () => {
     { id: 'be-5', category: 'Internet/Phone', description: 'Business portion (40%)', amount: 720, date: '2025', deductible: true, receipt: true },
     { id: 'be-6', category: 'Professional Services', description: 'Legal consultation, accounting', amount: 1200, date: '2025', deductible: true, receipt: true },
     { id: 'be-7', category: 'Travel', description: 'Client meetings, mileage', amount: 1850, date: '2025', deductible: true, receipt: true }
-  ];
+  ]);
 
   const taxRecommendations: TaxRecommendation[] = [
     { id: 'tr-1', title: 'Maximize 401(k) Contributions', description: 'You contributed $20,500 in 2025. The limit is $23,000. Consider increasing to capture additional $2,500 in tax-deferred savings.', potentialSavings: 875, priority: 'high', deadline: 'Dec 31, 2026' },
@@ -1143,6 +1148,358 @@ const CommandApp: React.FC = () => {
       case 'expired': return 'text-red-600 bg-red-100';
       default: return 'text-gray-600 bg-gray-100';
     }
+  };
+
+  // ── Tax: Add Charitable Contribution Modal ───────────────────────────────
+  const AddContributionModal: React.FC = () => {
+    const [form, setForm] = useState({ organization: '', date: '', amount: '', type: 'cash' as CharitableContribution['type'], acknowledged: false });
+    const [error, setError] = useState('');
+
+    const handleSubmit = () => {
+      if (!form.organization.trim() || !form.date || !form.amount) { setError('Please fill in all required fields.'); return; }
+      const newItem: CharitableContribution = {
+        id: 'cc-' + Date.now(),
+        organization: form.organization.trim(),
+        date: form.date,
+        amount: parseFloat(form.amount),
+        type: form.type,
+        acknowledged: form.acknowledged,
+        taxDeductible: true
+      };
+      setCharitableContributions(prev => [newItem, ...prev]);
+      setShowAddContribution(false);
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl max-w-lg w-full shadow-xl">
+          <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Add Charitable Contribution</h2>
+              <p className="text-sm text-gray-500 mt-0.5">Tax Year 2025</p>
+            </div>
+            <button onClick={() => setShowAddContribution(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
+          <div className="p-6 space-y-4">
+            {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Organization <span className="text-red-500">*</span></label>
+              <input
+                type="text" placeholder="e.g. Red Cross"
+                value={form.organization}
+                onChange={e => setForm(f => ({ ...f, organization: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:border-transparent"
+                style={{ ['--tw-ring-color' as any]: '#C9A24D' }}
+                onFocus={e => e.target.style.borderColor = '#C9A24D'}
+                onBlur={e => e.target.style.borderColor = ''}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date <span className="text-red-500">*</span></label>
+                <input
+                  type="date"
+                  value={form.date}
+                  onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                  onFocus={e => e.target.style.borderColor = '#C9A24D'}
+                  onBlur={e => e.target.style.borderColor = ''}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Amount ($) <span className="text-red-500">*</span></label>
+                <input
+                  type="number" min="0" step="0.01" placeholder="0.00"
+                  value={form.amount}
+                  onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                  onFocus={e => e.target.style.borderColor = '#C9A24D'}
+                  onBlur={e => e.target.style.borderColor = ''}
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Contribution Type</label>
+              <div className="grid grid-cols-4 gap-2">
+                {(['cash', 'stock', 'property', 'goods'] as const).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setForm(f => ({ ...f, type: t }))}
+                    className={`py-2 text-sm font-medium rounded-lg border capitalize transition-colors ${form.type === t ? 'text-white border-transparent' : 'border-gray-200 text-gray-700 hover:bg-gray-50'}`}
+                    style={form.type === t ? { backgroundColor: '#C9A24D', borderColor: '#C9A24D' } : {}}
+                  >{t}</button>
+                ))}
+              </div>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={form.acknowledged}
+                onChange={e => setForm(f => ({ ...f, acknowledged: e.target.checked }))}
+                className="w-4 h-4 rounded"
+              />
+              <span className="text-sm text-gray-700">Acknowledgment / receipt received from organization</span>
+            </label>
+          </div>
+          <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
+            <button onClick={() => setShowAddContribution(false)} className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50">Cancel</button>
+            <button onClick={handleSubmit} className="px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 transition-opacity" style={{ backgroundColor: '#C9A24D' }}>Add Contribution</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Tax: Add Business Expense Modal ─────────────────────────────────────
+  const AddExpenseModal: React.FC = () => {
+    const expenseCategories = ['Home Office', 'Software', 'Equipment', 'Travel', 'Professional Development', 'Professional Services', 'Internet/Phone', 'Marketing', 'Meals & Entertainment', 'Other'];
+    const [form, setForm] = useState({ category: 'Software', description: '', amount: '', date: '', receipt: false });
+    const [error, setError] = useState('');
+
+    const handleSubmit = () => {
+      if (!form.description.trim() || !form.amount || !form.date) { setError('Please fill in all required fields.'); return; }
+      const newItem: BusinessExpense = {
+        id: 'be-' + Date.now(),
+        category: form.category,
+        description: form.description.trim(),
+        amount: parseFloat(form.amount),
+        date: form.date,
+        deductible: true,
+        receipt: form.receipt
+      };
+      setBusinessExpenses(prev => [newItem, ...prev]);
+      setShowAddExpense(false);
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl max-w-lg w-full shadow-xl">
+          <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Add Business Expense</h2>
+              <p className="text-sm text-gray-500 mt-0.5">Schedule C / 1099 Deductions</p>
+            </div>
+            <button onClick={() => setShowAddExpense(false)} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
+          <div className="p-6 space-y-4">
+            {error && <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</p>}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
+              <select
+                value={form.category}
+                onChange={e => setForm(f => ({ ...f, category: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none bg-white"
+                onFocus={e => e.target.style.borderColor = '#C9A24D'}
+                onBlur={e => e.target.style.borderColor = ''}
+              >
+                {expenseCategories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Description <span className="text-red-500">*</span></label>
+              <input
+                type="text" placeholder="Brief description of the expense"
+                value={form.description}
+                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                onFocus={e => e.target.style.borderColor = '#C9A24D'}
+                onBlur={e => e.target.style.borderColor = ''}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Amount ($) <span className="text-red-500">*</span></label>
+                <input
+                  type="number" min="0" step="0.01" placeholder="0.00"
+                  value={form.amount}
+                  onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                  onFocus={e => e.target.style.borderColor = '#C9A24D'}
+                  onBlur={e => e.target.style.borderColor = ''}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Date / Period <span className="text-red-500">*</span></label>
+                <input
+                  type="text" placeholder="e.g. 2025 or Mar 2025"
+                  value={form.date}
+                  onChange={e => setForm(f => ({ ...f, date: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none"
+                  onFocus={e => e.target.style.borderColor = '#C9A24D'}
+                  onBlur={e => e.target.style.borderColor = ''}
+                />
+              </div>
+            </div>
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={form.receipt}
+                onChange={e => setForm(f => ({ ...f, receipt: e.target.checked }))}
+                className="w-4 h-4 rounded"
+              />
+              <span className="text-sm text-gray-700">Receipt / documentation on file</span>
+            </label>
+          </div>
+          <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
+            <button onClick={() => setShowAddExpense(false)} className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50">Cancel</button>
+            <button onClick={handleSubmit} className="px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 transition-opacity" style={{ backgroundColor: '#C9A24D' }}>Add Expense</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Tax: Upload Document Modal (Contributions or Expenses) ───────────────
+  const UploadTaxDocModal: React.FC = () => {
+    const isContrib = showUploadTaxDoc === 'contributions';
+    const [fileName, setFileName] = useState('');
+    const [selectedItems, setSelectedItems] = useState<Set<number>>(new Set());
+
+    const mockParsedContributions = [
+      { organization: 'American Red Cross', date: 'Jan 15, 2025', amount: 750, type: 'cash', acknowledged: true },
+      { organization: 'Doctors Without Borders', date: 'Mar 8, 2025', amount: 1200, type: 'cash', acknowledged: true },
+      { organization: 'Local Community Foundation', date: 'Jun 22, 2025', amount: 500, type: 'cash', acknowledged: false },
+    ];
+    const mockParsedExpenses = [
+      { category: 'Software', description: 'Figma annual subscription', amount: 144, date: 'Jan 2025', receipt: true },
+      { category: 'Travel', description: 'Flight to Chicago client meeting', amount: 380, date: 'Feb 2025', receipt: true },
+      { category: 'Meals & Entertainment', description: 'Client dinner, 3 attendees', amount: 210, date: 'Feb 2025', receipt: false },
+    ];
+    const mockItems = isContrib ? mockParsedContributions : mockParsedExpenses;
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setFileName(file.name);
+      setUploadParseStatus('parsing');
+      setTimeout(() => {
+        setUploadParseStatus('done');
+        setParsedUploadItems(mockItems);
+        setSelectedItems(new Set(mockItems.map((_, i) => i)));
+      }, 1800);
+    };
+
+    const toggleItem = (idx: number) => {
+      setSelectedItems(prev => {
+        const next = new Set(prev);
+        next.has(idx) ? next.delete(idx) : next.add(idx);
+        return next;
+      });
+    };
+
+    const handleImport = () => {
+      if (isContrib) {
+        const toAdd: CharitableContribution[] = [...selectedItems].map(i => ({
+          id: 'cc-' + Date.now() + '-' + i,
+          ...mockParsedContributions[i],
+          type: mockParsedContributions[i].type as CharitableContribution['type'],
+          taxDeductible: true
+        }));
+        setCharitableContributions(prev => [...toAdd, ...prev]);
+      } else {
+        const toAdd: BusinessExpense[] = [...selectedItems].map(i => ({
+          id: 'be-' + Date.now() + '-' + i,
+          ...mockParsedExpenses[i],
+          deductible: true
+        }));
+        setBusinessExpenses(prev => [...toAdd, ...prev]);
+      }
+      setShowUploadTaxDoc(null);
+      setUploadParseStatus('idle');
+      setParsedUploadItems([]);
+    };
+
+    const handleClose = () => {
+      setShowUploadTaxDoc(null);
+      setUploadParseStatus('idle');
+      setParsedUploadItems([]);
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-xl max-w-xl w-full shadow-xl">
+          <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Upload {isContrib ? 'Contribution' : 'Expense'} Document</h2>
+              <p className="text-sm text-gray-500 mt-0.5">{isContrib ? 'Import multiple donations from a statement or export' : 'Import multiple expenses from a receipt log or statement'}</p>
+            </div>
+            <button onClick={handleClose} className="p-2 hover:bg-gray-100 rounded-lg transition-colors">
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
+
+          <div className="p-6 space-y-5">
+            {/* Drop Zone */}
+            {uploadParseStatus === 'idle' && (
+              <label className="flex flex-col items-center justify-center border-2 border-dashed border-gray-300 rounded-xl p-10 text-center hover:border-yellow-400 transition-colors cursor-pointer">
+                <Upload className="w-10 h-10 text-gray-300 mb-3" />
+                <p className="font-medium text-gray-700 mb-1">Drop your file here or click to browse</p>
+                <p className="text-sm text-gray-400">PDF, CSV, XLS — up to 25MB</p>
+                <input type="file" accept=".pdf,.csv,.xls,.xlsx" className="hidden" onChange={handleFileChange} />
+              </label>
+            )}
+
+            {/* Parsing animation */}
+            {uploadParseStatus === 'parsing' && (
+              <div className="flex flex-col items-center justify-center py-10 gap-4">
+                <div className="w-12 h-12 rounded-full border-4 border-gray-200 border-t-yellow-500 animate-spin" style={{ borderTopColor: '#C9A24D' }} />
+                <div className="text-center">
+                  <p className="font-medium text-gray-800">Analyzing {fileName}…</p>
+                  <p className="text-sm text-gray-500 mt-1">Extracting {isContrib ? 'contributions' : 'expenses'} from your document</p>
+                </div>
+              </div>
+            )}
+
+            {/* Parsed results */}
+            {uploadParseStatus === 'done' && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-medium text-gray-700">{parsedUploadItems.length} entries found in <span className="text-gray-900">{fileName}</span></p>
+                  <button onClick={() => setSelectedItems(selectedItems.size === parsedUploadItems.length ? new Set() : new Set(parsedUploadItems.map((_, i) => i)))}
+                    className="text-xs underline text-gray-500 hover:text-gray-800">
+                    {selectedItems.size === parsedUploadItems.length ? 'Deselect all' : 'Select all'}
+                  </button>
+                </div>
+                <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg overflow-hidden">
+                  {parsedUploadItems.map((item, idx) => (
+                    <div key={idx} onClick={() => toggleItem(idx)} className={`flex items-center gap-3 px-4 py-3 cursor-pointer transition-colors ${selectedItems.has(idx) ? 'bg-yellow-50' : 'hover:bg-gray-50'}`}>
+                      <div className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 ${selectedItems.has(idx) ? 'border-transparent' : 'border-gray-300'}`}
+                        style={selectedItems.has(idx) ? { backgroundColor: '#C9A24D' } : {}}>
+                        {selectedItems.has(idx) && <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 12 12"><path d="M10 3L5 8.5 2 5.5" stroke="white" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900">{isContrib ? (item as any).organization : (item as any).description}</p>
+                        <p className="text-xs text-gray-500">{isContrib ? (item as any).date : `${(item as any).category} • ${(item as any).date}`}</p>
+                      </div>
+                      <p className="text-sm font-semibold text-gray-900 flex-shrink-0">${(item as any).amount.toLocaleString()}</p>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-gray-400">Select the entries you want to import. Uncheck any you want to skip.</p>
+              </div>
+            )}
+          </div>
+
+          <div className="p-6 border-t border-gray-100 flex gap-3 justify-end">
+            <button onClick={handleClose} className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50">Cancel</button>
+            {uploadParseStatus === 'done' && (
+              <button
+                onClick={handleImport}
+                disabled={selectedItems.size === 0}
+                className="px-4 py-2 rounded-lg text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-40"
+                style={{ backgroundColor: '#C9A24D' }}
+              >
+                Import {selectedItems.size} {isContrib ? (selectedItems.size === 1 ? 'Contribution' : 'Contributions') : (selectedItems.size === 1 ? 'Expense' : 'Expenses')}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // Global Document Upload Modal
@@ -2459,10 +2816,10 @@ const CommandApp: React.FC = () => {
               <p className="text-sm text-gray-500">Tax Year 2025 • {charitableContributions.length} donations</p>
             </div>
             <div className="flex items-center gap-3">
-              <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700">
+              <button onClick={() => setShowAddContribution(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700">
                 <Plus className="w-3.5 h-3.5" /> Add Entry
               </button>
-              <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg text-white transition-colors" style={{ backgroundColor: '#C9A24D' }}>
+              <button onClick={() => setShowUploadTaxDoc('contributions')} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg text-white transition-colors" style={{ backgroundColor: '#C9A24D' }}>
                 <Upload className="w-3.5 h-3.5" /> Upload Doc
               </button>
             </div>
@@ -2502,10 +2859,10 @@ const CommandApp: React.FC = () => {
               <p className="text-sm text-gray-500">Side business deductions for Schedule C</p>
             </div>
             <div className="flex items-center gap-3">
-              <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700">
+              <button onClick={() => setShowAddExpense(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700">
                 <Plus className="w-3.5 h-3.5" /> Add Entry
               </button>
-              <button className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg text-white transition-colors" style={{ backgroundColor: '#C9A24D' }}>
+              <button onClick={() => setShowUploadTaxDoc('expenses')} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg text-white transition-colors" style={{ backgroundColor: '#C9A24D' }}>
                 <Upload className="w-3.5 h-3.5" /> Upload Doc
               </button>
             </div>
@@ -3129,6 +3486,9 @@ const CommandApp: React.FC = () => {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">{renderView()}</main>
       {showDocumentUpload && <DocumentUploadModal />}
       {selectedDocument && <DocumentVersionModal document={selectedDocument} />}
+      {showAddContribution && <AddContributionModal />}
+      {showAddExpense && <AddExpenseModal />}
+      {showUploadTaxDoc && <UploadTaxDocModal />}
     </div>
   );
 };

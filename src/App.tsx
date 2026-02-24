@@ -230,6 +230,42 @@ const CommandApp: React.FC = () => {
   const [uploadParseStatus, setUploadParseStatus] = useState<'idle' | 'parsing' | 'done'>('idle');
   const [parsedUploadItems, setParsedUploadItems] = useState<any[]>([]);
 
+  // ── Weekly Brief ─────────────────────────────────────────────────────────
+  const shouldShowWeeklyBrief = (): boolean => {
+    try {
+      const last = localStorage.getItem('command_brief_dismissed');
+      if (!last) return true;
+      const daysSince = (Date.now() - parseInt(last)) / (1000 * 60 * 60 * 24);
+      return daysSince >= 7;
+    } catch { return true; }
+  };
+  const [showWeeklyBrief, setShowWeeklyBrief] = useState<boolean>(shouldShowWeeklyBrief);
+  const [briefExpanded, setBriefExpanded] = useState<Record<string, boolean>>({});
+
+  const dismissWeeklyBrief = () => {
+    try { localStorage.setItem('command_brief_dismissed', Date.now().toString()); } catch {}
+    setShowWeeklyBrief(false);
+  };
+
+  // ── Dev Persona Switcher ──────────────────────────────────────────────────
+  interface DevPersona {
+    id: string;
+    name: string;
+    initials: string;
+    title: string;
+    hhi: string;
+    netWorth: string;
+    score: number;
+    description: string;
+  }
+  const devPersonas: DevPersona[] = [
+    { id: 'adam', name: 'Adam Bailey', initials: 'AB', title: 'VP / Senior Director', hhi: '$325K', netWorth: '$2.8M', score: 72, description: 'Dual-income, 2 kids, $750K home — primary demo persona' },
+    { id: 'rachel', name: 'Rachel Kim', initials: 'RK', title: 'Senior Engineer', hhi: '$185K', netWorth: '$420K', score: 58, description: 'Single, first-time homeowner, heavy student loan payoff phase' },
+    { id: 'tom', name: 'Tom & Nancy Reeves', initials: 'TR', title: 'Near-Retirees', hhi: '$210K', netWorth: '$4.1M', score: 85, description: 'Empty nesters, 3 years from retirement, estate planning focus' },
+  ];
+  const [activePersona, setActivePersona] = useState<DevPersona>(devPersonas[0]);
+  const [showDevSwitcher, setShowDevSwitcher] = useState<boolean>(false);
+
   const dismissPriority = (id: number, e: React.MouseEvent): void => {
     e.stopPropagation();
     setDismissedPriorities(prev => [...prev, id]);
@@ -1150,6 +1186,184 @@ const CommandApp: React.FC = () => {
     }
   };
 
+  // ── Weekly Command Brief Modal ────────────────────────────────────────────
+  const WeeklyBriefModal: React.FC = () => {
+    const sections = [
+      {
+        id: 'risk',
+        label: 'Risk',
+        icon: AlertTriangle,
+        color: 'text-red-600',
+        bg: 'bg-red-50',
+        border: 'border-red-200',
+        iconBg: 'bg-red-100',
+        headline: '2 risks need action this week',
+        summary: 'Your umbrella policy has a $500K gap relative to your net worth, and your auto policy renewal in 18 days has a 12% premium increase flagged.',
+        why: 'An umbrella gap at your net worth level ($2.8M) exposes personal assets directly to liability claims exceeding home/auto limits. The auto renewal increase can typically be negotiated or shopped — waiting past renewal locks you in for another year.',
+      },
+      {
+        id: 'leakage',
+        label: 'Leakage',
+        icon: TrendingDown,
+        color: 'text-orange-600',
+        bg: 'bg-orange-50',
+        border: 'border-orange-200',
+        iconBg: 'bg-orange-100',
+        headline: '$2,655 in recoverable money identified',
+        summary: 'You have $875 in uncaptured 401(k) tax savings, $2,400 from harvestable investment losses, and an HSA contribution gap of $3,300 ($1,155 in tax savings).',
+        why: 'These aren\'t hypothetical — they\'re based on your actual numbers. The 401(k) gap and HSA room both have hard year-end deadlines. Investment loss harvesting requires selling before Dec 31 to offset 2025 gains.',
+      },
+      {
+        id: 'action',
+        label: 'Recommended Action',
+        icon: Zap,
+        color: 'text-yellow-700',
+        bg: 'bg-yellow-50',
+        border: 'border-yellow-200',
+        iconBg: 'bg-yellow-100',
+        headline: 'Call your CPA before April 15',
+        summary: 'With Q1 estimated taxes due April 15 and your consulting income up this year, your current withholding may result in an underpayment penalty. One 20-minute call with Michael Chen can confirm your exposure.',
+        why: 'The IRS underpayment penalty is currently 8% annualized. Given your 1099 consulting income of $45K this year, a shortfall of even $5K in estimated taxes creates a ~$200 penalty — avoidable with a quick check.',
+      },
+    ];
+
+    return (
+      <div className="fixed inset-0 bg-black/60 flex items-start justify-center z-50 p-4 pt-12 overflow-y-auto">
+        <div className="bg-white rounded-2xl max-w-xl w-full shadow-2xl mb-12">
+          {/* Header */}
+          <div className="px-6 pt-6 pb-5 border-b border-gray-100">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <div className="w-6 h-6 rounded flex items-center justify-center" style={{ backgroundColor: '#C9A24D' }}>
+                    <Zap className="w-3.5 h-3.5 text-white" />
+                  </div>
+                  <span className="text-xs font-semibold uppercase tracking-widest text-gray-400">Weekly Command Brief</span>
+                </div>
+                <h2 className="text-xl font-bold text-gray-900">Week of Feb 23, 2026</h2>
+                <p className="text-sm text-gray-500 mt-0.5">3 things that need your attention</p>
+              </div>
+              <button onClick={dismissWeeklyBrief} className="p-2 hover:bg-gray-100 rounded-lg transition-colors mt-0.5">
+                <X className="w-5 h-5 text-gray-400" />
+              </button>
+            </div>
+          </div>
+
+          {/* Sections */}
+          <div className="divide-y divide-gray-100">
+            {sections.map(section => {
+              const Icon = section.icon;
+              const isOpen = briefExpanded[section.id];
+              return (
+                <div key={section.id} className={`transition-colors ${isOpen ? section.bg : ''}`}>
+                  <div className="px-6 py-4">
+                    <div className="flex items-start gap-3">
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${section.iconBg}`}>
+                        <Icon className={`w-4.5 h-4.5 ${section.color}`} style={{ width: '18px', height: '18px' }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className={`text-xs font-semibold uppercase tracking-wider ${section.color}`}>{section.label}</span>
+                        </div>
+                        <p className="font-semibold text-gray-900 text-sm leading-snug">{section.headline}</p>
+                        <p className="text-sm text-gray-600 mt-1 leading-relaxed">{section.summary}</p>
+                        <button
+                          onClick={() => setBriefExpanded(prev => ({ ...prev, [section.id]: !prev[section.id] }))}
+                          className={`flex items-center gap-1 mt-2 text-xs font-medium transition-colors ${section.color} hover:opacity-70`}
+                        >
+                          {isOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                          {isOpen ? 'Less detail' : 'Why this matters'}
+                        </button>
+                        {isOpen && (
+                          <div className={`mt-3 p-3 rounded-lg border text-sm text-gray-700 leading-relaxed ${section.border} ${section.bg}`}>
+                            {section.why}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between">
+            <p className="text-xs text-gray-400">Returns automatically next week</p>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => { dismissWeeklyBrief(); setActiveView('dashboard'); }}
+                className="px-4 py-2 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                View Dashboard
+              </button>
+              <button
+                onClick={dismissWeeklyBrief}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-white hover:opacity-90 transition-opacity"
+                style={{ backgroundColor: '#C9A24D' }}
+              >
+                Got it
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Dev Persona Switcher ──────────────────────────────────────────────────
+  const DevPersonaSwitcher: React.FC = () => (
+    <div className="fixed bottom-5 left-5 z-40">
+      {showDevSwitcher && (
+        <div className="mb-2 bg-gray-900 rounded-xl shadow-2xl overflow-hidden w-72 border border-gray-700">
+          <div className="px-4 py-3 border-b border-gray-700">
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">Dev — Persona Switcher</p>
+          </div>
+          <div className="divide-y divide-gray-800">
+            {devPersonas.map(persona => (
+              <button
+                key={persona.id}
+                onClick={() => { setActivePersona(persona); setShowDevSwitcher(false); }}
+                className={`w-full px-4 py-3 text-left transition-colors hover:bg-gray-800 flex items-start gap-3 ${activePersona.id === persona.id ? 'bg-gray-800' : ''}`}
+              >
+                <div className="w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0 mt-0.5"
+                  style={{ backgroundColor: activePersona.id === persona.id ? '#C9A24D' : '#374151' }}>
+                  {persona.initials}
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-white">{persona.name}</p>
+                    {activePersona.id === persona.id && (
+                      <span className="text-xs px-1.5 py-0.5 rounded text-white font-medium" style={{ backgroundColor: '#C9A24D' }}>Active</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">{persona.hhi} HHI · {persona.netWorth} NW · Score {persona.score}</p>
+                  <p className="text-xs text-gray-500 mt-0.5 leading-snug">{persona.description}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+          <div className="px-4 py-2 bg-gray-950">
+            <p className="text-xs text-gray-600">Data stays as Adam Bailey — persona affects name & score display only</p>
+          </div>
+        </div>
+      )}
+      <button
+        onClick={() => setShowDevSwitcher(prev => !prev)}
+        className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold shadow-lg border transition-all ${showDevSwitcher ? 'bg-gray-900 text-white border-gray-700' : 'bg-gray-900 text-gray-300 border-gray-700 hover:border-gray-500'}`}
+      >
+        <div className="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs font-bold"
+          style={{ backgroundColor: '#C9A24D', fontSize: '9px' }}>
+          {activePersona.initials}
+        </div>
+        <span>{activePersona.name}</span>
+        <span className="text-gray-500">·</span>
+        <span className="text-gray-400">DEV</span>
+        {showDevSwitcher ? <ChevronDown className="w-3 h-3 text-gray-400" /> : <ChevronUp className="w-3 h-3 text-gray-400" />}
+      </button>
+    </div>
+  );
+
   // ── Tax: Add Charitable Contribution Modal ───────────────────────────────
   const AddContributionModal: React.FC = () => {
     const [form, setForm] = useState({ organization: '', date: '', amount: '', type: 'cash' as CharitableContribution['type'], acknowledged: false });
@@ -1712,11 +1926,12 @@ const CommandApp: React.FC = () => {
             </button>
             <button 
               onClick={() => setActiveView('profile')} 
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
-                activeView === 'profile' ? 'bg-gray-900 ring-2 ring-yellow-500' : 'bg-gradient-to-br from-yellow-600 to-yellow-500 hover:from-yellow-500 hover:to-yellow-400'
+              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all text-sm font-bold text-white ${
+                activeView === 'profile' ? 'ring-2 ring-yellow-500' : ''
               }`}
+              style={{ backgroundColor: '#C9A24D' }}
             >
-              <User className="w-5 h-5 text-white" />
+              {activePersona.initials}
             </button>
           </div>
 
@@ -2596,7 +2811,7 @@ const CommandApp: React.FC = () => {
       <div className="space-y-6">
         <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-xl p-6 text-white shadow-lg">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div><p className="text-sm text-gray-400 mb-1">Welcome back, Adam</p><h2 className="text-base font-medium text-gray-300 mb-2">Overall Household Health</h2><div className="flex items-end gap-2"><span className="text-6xl lg:text-7xl font-bold">{overallScore}</span><span className="text-2xl text-gray-400 pb-2">/100</span></div><p className="text-xs text-gray-400 mt-2">{overallScore >= 80 ? 'Excellent - household is well optimized' : overallScore >= 60 ? 'Good - some areas need attention' : 'Needs attention - multiple areas require action'}</p></div>
+            <div><p className="text-sm text-gray-400 mb-1">Welcome back, {activePersona.name.split(' ')[0]}</p><h2 className="text-base font-medium text-gray-300 mb-2">Overall Household Health</h2><div className="flex items-end gap-2"><span className="text-6xl lg:text-7xl font-bold">{activePersona.score}</span><span className="text-2xl text-gray-400 pb-2">/100</span></div><p className="text-xs text-gray-400 mt-2">{activePersona.score >= 80 ? 'Excellent - household is well optimized' : activePersona.score >= 60 ? 'Good - some areas need attention' : 'Needs attention - multiple areas require action'}</p></div>
             <div className="flex-1 lg:max-w-xl"><p className="text-xs text-gray-400 mb-3 lg:text-right">Section Scores</p><div className="flex flex-wrap justify-start lg:justify-end gap-1">{householdSections.map(section => <SectionScoreCard key={section.id} section={section} compact />)}</div></div>
           </div>
         </div>
@@ -3489,6 +3704,8 @@ const CommandApp: React.FC = () => {
       {showAddContribution && <AddContributionModal />}
       {showAddExpense && <AddExpenseModal />}
       {showUploadTaxDoc && <UploadTaxDocModal />}
+      {showWeeklyBrief && <WeeklyBriefModal />}
+      <DevPersonaSwitcher />
     </div>
   );
 };

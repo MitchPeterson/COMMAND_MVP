@@ -1150,8 +1150,6 @@ const CommandApp: React.FC = () => {
     { id: 'credit', icon: CreditCard, title: 'Credit', score: 7.0, status: 'good', summary: '4 credit cards optimized. 5% utilization. $32K+ in rewards value.', keyMetrics: [], items: [] }
   ];
 
-  const overallScore = Math.round(householdSections.reduce((sum, section) => sum + section.score, 0) / householdSections.length * 10);
-
   const getScoreColor = (score: number): string => {
     if (score >= 8) return 'text-green-500';
     if (score >= 6) return 'text-yellow-500';

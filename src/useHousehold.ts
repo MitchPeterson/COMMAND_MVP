@@ -3,7 +3,7 @@
 // Usage: const { data, loading, error, refresh } = useHousehold()
 
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from './lib/supabase';
 import {
   getHousehold,
   createHousehold,
@@ -19,7 +19,7 @@ import {
   type TimelineEvent,
   type SectionScore,
   type HouseholdProfile,
-} from '../lib/supabase';
+} from './lib/supabase';
 
 export interface HouseholdData {
   household: Household | null;

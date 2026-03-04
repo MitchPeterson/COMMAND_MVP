@@ -108,7 +108,7 @@ export function useHousehold(): UseHouseholdReturn {
   useEffect(() => {
     // Subscribe to auth state
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (_event: any, session: any) => {
         const uid = session?.user?.id ?? null;
         setUserId(uid);
         if (uid) {
@@ -121,7 +121,7 @@ export function useHousehold(): UseHouseholdReturn {
     );
 
     // Check current session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session } }: any) => {
       const uid = session?.user?.id ?? null;
       setUserId(uid);
       if (uid) {

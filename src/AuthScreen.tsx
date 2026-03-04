@@ -3,7 +3,7 @@
 // Handles email+password auth via Supabase
 
 import { useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from './lib/supabase';
 
 interface AuthScreenProps {
   onSuccess?: () => void;

@@ -1,4 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from './lib/supabase';
+import { useHousehold } from './hooks/useHousehold';
+import { AuthScreen } from './components/AuthScreen';
 import { 
   Home, 
   Shield, 
@@ -213,6 +216,7 @@ interface MaintenanceRecord {
 }
 
 const CommandApp: React.FC = () => {
+  const { data, loading, userId } = useHousehold();
   const [activeView, setActiveView] = useState<string>('dashboard');
   const [selectedPriority, setSelectedPriority] = useState<Priority | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
@@ -2686,7 +2690,13 @@ const CommandApp: React.FC = () => {
             <p className="text-gray-600">Premium Member since January 2024</p>
             <div className="flex items-center gap-2 mt-2"><span className="px-2.5 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Pro Plan</span><span className="text-sm text-gray-500">â€¢ Household of 4</span></div>
           </div>
-          <button className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 flex items-center gap-2"><Edit3 className="w-4 h-4" />Edit Profile</button>
+          <div className="flex items-center gap-3">
+  <button className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 flex items-center gap-2"><Edit3 className="w-4 h-4" />Edit Profile</button>
+  <button
+    onClick={() => supabase.auth.signOut()}
+    className="px-4 py-2 rounded-lg border border-red-200 text-red-600 font-medium hover:bg-red-50"
+  >Sign Out</button>
+</div>
         </div>
       </div>
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -2809,7 +2819,7 @@ const CommandApp: React.FC = () => {
       <div className="space-y-6">
         <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-xl p-6 text-white shadow-lg">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div><p className="text-sm text-gray-400 mb-1">Welcome back, {activePersona.name.split(' ')[0]}</p><h2 className="text-base font-medium text-gray-300 mb-2">Overall Household Health</h2><div className="flex items-end gap-2"><span className="text-6xl lg:text-7xl font-bold">{activePersona.score}</span><span className="text-2xl text-gray-400 pb-2">/100</span></div><p className="text-xs text-gray-400 mt-2">{activePersona.score >= 80 ? 'Excellent - household is well optimized' : activePersona.score >= 60 ? 'Good - some areas need attention' : 'Needs attention - multiple areas require action'}</p></div>
+            <div><p className="text-sm text-gray-400 mb-1">Welcome back, {activePersona.name.split(' ')[0]}</p><h2 className="text-base font-medium text-gray-300 mb-2">Overall Household Health</h2><div className="flex items-end gap-2"><span className="text-6xl lg:text-7xl font-bold">{data?.household?.health_score ?? activePersona.score}</span><span className="text-2xl text-gray-400 pb-2">/100</span></div><p className="text-xs text-gray-400 mt-2">{activePersona.score >= 80 ? 'Excellent - household is well optimized' : activePersona.score >= 60 ? 'Good - some areas need attention' : 'Needs attention - multiple areas require action'}</p></div>
             <div className="flex-1 lg:max-w-xl"><p className="text-xs text-gray-400 mb-3 lg:text-right">Section Scores</p><div className="flex flex-wrap justify-start lg:justify-end gap-1">{householdSections.map(section => <SectionScoreCard key={section.id} section={section} compact />)}</div></div>
           </div>
         </div>
@@ -3692,6 +3702,23 @@ const CommandApp: React.FC = () => {
       default: return <DashboardView />;
     }
   };
+
+if (!userId && !loading) {
+    return <AuthScreen />;
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0F0F10] flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-[#C9A24D] text-xs tracking-[0.3em] font-medium mb-6">
+            HOUSEHOLD OPERATING SYSTEM
+          </div>
+          <div className="w-8 h-8 border-2 border-[#2a2b2e] border-t-[#C9A24D] rounded-full animate-spin mx-auto" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100">

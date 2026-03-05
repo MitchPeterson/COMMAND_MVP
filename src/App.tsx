@@ -217,7 +217,7 @@ interface MaintenanceRecord {
 }
 
 const CommandApp: React.FC = () => {
-  const { data, loading, userId } = useHousehold();
+  const { data, loading, userId, refresh } = useHousehold();
   const [activeView, setActiveView] = useState<string>('dashboard');
   const [onboardingComplete, setOnboardingComplete] = useState<boolean>(false);
   const isNewUser = !loading && !!userId && !data?.household && !onboardingComplete;
@@ -3726,9 +3726,9 @@ if (isNewUser && userId) {
     return (
       <OnboardingFlow
         userId={userId}
-        onComplete={() => {
+        onComplete={async () => {
           setOnboardingComplete(true);
-          window.location.reload();
+          await refresh();
         }}
       />
     );

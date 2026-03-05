@@ -74,16 +74,17 @@ const LIFE_EVENTS = [
   'Inheritance expected',
 ];
 
+// BUG FIX: column is 'section' not 'section_name', status must be valid SectionStatus
 const SECTION_SCORE_DEFAULTS = [
-  { section_name: 'advisory', score: 0, status: 'not_started' },
-  { section_name: 'insurance', score: 0, status: 'not_started' },
-  { section_name: 'legal', score: 0, status: 'not_started' },
-  { section_name: 'family', score: 0, status: 'not_started' },
-  { section_name: 'home', score: 0, status: 'not_started' },
-  { section_name: 'taxes', score: 0, status: 'not_started' },
-  { section_name: 'healthcare', score: 0, status: 'not_started' },
-  { section_name: 'finances', score: 0, status: 'not_started' },
-  { section_name: 'credit', score: 0, status: 'not_started' },
+  { section: 'advisory', score: 0, status: 'review' },
+  { section: 'insurance', score: 0, status: 'review' },
+  { section: 'legal', score: 0, status: 'review' },
+  { section: 'family', score: 0, status: 'review' },
+  { section: 'home', score: 0, status: 'review' },
+  { section: 'tax', score: 0, status: 'review' },
+  { section: 'healthcare', score: 0, status: 'review' },
+  { section: 'finances', score: 0, status: 'review' },
+  { section: 'credit', score: 0, status: 'review' },
 ];
 
 // ─────────────────────────────────────────────
@@ -407,18 +408,20 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
           household_id: householdId,
           title: 'Create a will',
           category: 'Legal',
-          severity: 'Critical',
+          severity: 'critical',
+          status: 'open',
+          source: 'system',
           description: 'You don\'t have a will. Without one, the state decides how your assets are distributed.',
-          is_dismissed: false,
         });
       } else if (form.hasWill === 'outdated') {
         actions.push({
           household_id: householdId,
           title: 'Update your will',
           category: 'Legal',
-          severity: 'High',
+          severity: 'high',
+          status: 'open',
+          source: 'system',
           description: 'Your will may not reflect your current wishes, assets, or family situation.',
-          is_dismissed: false,
         });
       }
 
@@ -427,9 +430,10 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
           household_id: householdId,
           title: 'Add umbrella liability insurance',
           category: 'Insurance',
-          severity: 'High',
+          severity: 'high',
+          status: 'open',
+          source: 'system',
           description: 'You have no umbrella policy. A $1–2M policy costs ~$200–400/year and protects your net worth.',
-          is_dismissed: false,
         });
       }
 
@@ -438,9 +442,10 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
           household_id: householdId,
           title: 'Review life insurance coverage',
           category: 'Insurance',
-          severity: 'High',
+          severity: 'high',
+          status: 'open',
+          source: 'system',
           description: 'Your life insurance hasn\'t been reviewed recently. Coverage gaps are common after major life changes.',
-          is_dismissed: false,
         });
       }
 
@@ -449,9 +454,10 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
           household_id: householdId,
           title: 'Plan HVAC replacement',
           category: 'Home',
-          severity: 'Medium',
+          severity: 'medium',
+          status: 'open',
+          source: 'system',
           description: 'Your HVAC system is over 15 years old. Average lifespan is 15–20 years — plan ahead to avoid emergency replacement costs.',
-          is_dismissed: false,
         });
       }
 
@@ -460,9 +466,10 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
           household_id: householdId,
           title: 'Build emergency fund to 3–6 months',
           category: 'Finances',
-          severity: 'High',
+          severity: 'high',
+          status: 'open',
+          source: 'system',
           description: 'Your emergency fund is below the recommended 3-month minimum. This is a foundational financial risk.',
-          is_dismissed: false,
         });
       }
 

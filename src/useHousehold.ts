@@ -2,7 +2,7 @@
 // Primary data hook — loads all household data from Supabase
 // Usage: const { data, loading, error, refresh } = useHousehold()
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from './lib/supabase';
 import {
   getHousehold,
@@ -54,20 +54,15 @@ export function useHousehold(): UseHouseholdReturn {
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
 
-  // FIX 2: Ref to prevent double-load from onAuthStateChange + getSession race
-  const initialLoadDone = useRef(false);
-
   const loadData = useCallback(async (uid: string) => {
     setLoading(true);
     setError(null);
 
     try {
-      // FIX 1: Do NOT auto-create household — return null if none exists.
-      // A null household means the user is brand new → App.tsx shows OnboardingFlow.
+      // Do NOT auto-create household — null means new user → OnboardingFlow
       const household = await getHousehold(uid);
 
       if (!household) {
-        // New user — no household yet. Onboarding flow will create it.
         setData(EMPTY_DATA);
         setLoading(false);
         return;
@@ -75,7 +70,6 @@ export function useHousehold(): UseHouseholdReturn {
 
       const hid = household.id;
 
-      // Fetch all data in parallel
       const [
         profile,
         insurancePolicies,
@@ -116,39 +110,50 @@ export function useHousehold(): UseHouseholdReturn {
   }, []);
 
   useEffect(() => {
-    // FIX 2: Get session once on mount — source of truth for initial load.
-    // onAuthStateChange handles all subsequent changes (sign in, sign out).
-    supabase.auth.getSession().then(({ data: { session } }: any) => {
+    // mounted flag prevents state updates after component unmounts
+    let mounted = true;
+
+    // Step 1: getSession() is the single source of truth for the initial load.
+    const initAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!mounted) return;
+
       const uid = session?.user?.id ?? null;
       setUserId(uid);
+
       if (uid) {
-        loadData(uid);
+        await loadData(uid);
       } else {
+        // No session — show login screen
         setLoading(false);
       }
-      initialLoadDone.current = true;
-    });
+    };
 
-    // Subscribe to auth state changes — but skip the initial INITIAL_SESSION
-    // event since getSession() above already handles it.
+    initAuth();
+
+    // Step 2: onAuthStateChange only handles explicit sign in / sign out events.
+    // INITIAL_SESSION is intentionally ignored — getSession() above handles it.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event: any, session: any) => {
-        // Skip the first event if getSession already ran
-        if (!initialLoadDone.current) return;
+      async (event: any, session: any) => {
+        if (!mounted) return;
 
-        const uid = session?.user?.id ?? null;
-        setUserId(uid);
-        if (uid) {
-          await loadData(uid);
-        } else {
-          // User signed out — clear everything
+        if (event === 'SIGNED_IN') {
+          const uid = session?.user?.id ?? null;
+          setUserId(uid);
+          if (uid) await loadData(uid);
+        } else if (event === 'SIGNED_OUT') {
+          setUserId(null);
           setData(null);
           setLoading(false);
         }
+        // TOKEN_REFRESHED, USER_UPDATED, INITIAL_SESSION — all ignored
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, [loadData]);
 
   const refresh = useCallback(async () => {

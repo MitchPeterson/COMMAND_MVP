@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { supabase } from './lib/supabase';
 import { useHousehold } from './useHousehold';
 import { AuthScreen } from './AuthScreen';
+import { OnboardingFlow } from './OnboardingFlow';
 import { 
   Home, 
   Shield, 
@@ -218,6 +219,8 @@ interface MaintenanceRecord {
 const CommandApp: React.FC = () => {
   const { data, loading, userId } = useHousehold();
   const [activeView, setActiveView] = useState<string>('dashboard');
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean>(false);
+  const isNewUser = !loading && !!userId && !data?.household && !onboardingComplete;
   const [selectedPriority, setSelectedPriority] = useState<Priority | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [dismissedPriorities, setDismissedPriorities] = useState<number[]>([]);
@@ -3719,7 +3722,17 @@ if (!userId && !loading) {
       </div>
     );
   }
-
+if (isNewUser && userId) {
+    return (
+      <OnboardingFlow
+        userId={userId}
+        onComplete={() => {
+          setOnboardingComplete(true);
+          window.location.reload();
+        }}
+      />
+    );
+  }
   return (
     <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100">
       <Header />

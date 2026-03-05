@@ -536,12 +536,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
         <div className="relative z-10 text-center max-w-sm w-full">
           {/* Logo */}
           <div className="mb-10">
-            <img src="/Command_Logo.png" alt="Command" className="h-8 mx-auto" onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-            }} />
-            <div className="text-[#C9A24D] text-xs tracking-[0.4em] font-medium mt-2">
-              COMMAND
-            </div>
+            <img src="/Command_Logo.png" alt="Command" className="h-24 mx-auto" />
           </div>
 
           {/* Headline */}

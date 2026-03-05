@@ -1,6 +1,5 @@
 // src/useHousehold.ts
 // Primary data hook — loads all household data from Supabase
-// Usage: const { data, loading, error, refresh } = useHousehold()
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from './lib/supabase';
@@ -59,7 +58,7 @@ export function useHousehold(): UseHouseholdReturn {
     setError(null);
 
     try {
-      // Do NOT auto-create household — null means new user → OnboardingFlow
+      // No auto-create — null household = new user → OnboardingFlow
       const household = await getHousehold(uid);
 
       if (!household) {
@@ -110,29 +109,48 @@ export function useHousehold(): UseHouseholdReturn {
   }, []);
 
   useEffect(() => {
-    // mounted flag prevents state updates after component unmounts
     let mounted = true;
 
-    // Step 1: getSession() is the single source of truth for the initial load.
-    const initAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!mounted) return;
-
-      const uid = session?.user?.id ?? null;
-      setUserId(uid);
-
-      if (uid) {
-        await loadData(uid);
-      } else {
-        // No session — show login screen
+    // Safety net: if nothing resolves within 8 seconds, stop spinning
+    const safetyTimeout = setTimeout(() => {
+      if (mounted) {
+        console.warn('Auth init timed out — forcing loading to false');
         setLoading(false);
+      }
+    }, 8000);
+
+    const initAuth = async () => {
+      try {
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+        if (!mounted) return;
+
+        if (sessionError) {
+          console.error('getSession error:', sessionError);
+          setLoading(false);
+          clearTimeout(safetyTimeout);
+          return;
+        }
+
+        const uid = session?.user?.id ?? null;
+        setUserId(uid);
+
+        if (uid) {
+          await loadData(uid);
+        } else {
+          setLoading(false);
+        }
+      } catch (err) {
+        console.error('Auth init failed:', err);
+        if (mounted) setLoading(false);
+      } finally {
+        clearTimeout(safetyTimeout);
       }
     };
 
     initAuth();
 
-    // Step 2: onAuthStateChange only handles explicit sign in / sign out events.
-    // INITIAL_SESSION is intentionally ignored — getSession() above handles it.
+    // Only handle explicit sign in / sign out — not INITIAL_SESSION
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: any, session: any) => {
         if (!mounted) return;
@@ -146,12 +164,12 @@ export function useHousehold(): UseHouseholdReturn {
           setData(null);
           setLoading(false);
         }
-        // TOKEN_REFRESHED, USER_UPDATED, INITIAL_SESSION — all ignored
       }
     );
 
     return () => {
       mounted = false;
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   }, [loadData]);

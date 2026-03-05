@@ -132,7 +132,7 @@ export function useHousehold(): UseHouseholdReturn {
     // Subscribe to auth state changes — but skip the initial INITIAL_SESSION
     // event since getSession() above already handles it.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: any, session: any) => {
+      async (_event: any, session: any) => {
         // Skip the first event if getSession already ran
         if (!initialLoadDone.current) return;
 

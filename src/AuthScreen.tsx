@@ -66,7 +66,7 @@ export const AuthScreen: React.FC = () => {
       <div className="min-h-screen bg-[#0F0F10] flex flex-col items-center justify-center px-6">
         <div className="w-full max-w-sm text-center">
 
-          <img src="/Command_Logo.png" alt="Command" className="h-24 mx-auto mb-8" />
+          <img src="/Command_Logo.png" alt="Command" className="w-full mb-8" />
 
           <h1 className="text-[#F6F6F4] text-2xl font-semibold mb-2">
             Your household, under control.
@@ -117,7 +117,7 @@ export const AuthScreen: React.FC = () => {
           Back
         </button>
 
-        <img src="/Command_Logo.png" alt="Command" className="h-16 mb-8" />
+        <img src="/Command_Logo.png" alt="Command" className="w-full mb-8" />
 
         <h2 className="text-[#F6F6F4] text-xl font-semibold mb-1">
           {isSignUp ? 'Create your account' : 'Welcome back'}

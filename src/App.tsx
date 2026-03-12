@@ -1157,6 +1157,53 @@ const CommandApp: React.FC = () => {
     { id: 'credit', icon: CreditCard, title: 'Credit', score: 7.0, status: 'good', summary: '4 credit cards optimized. 5% utilization. $32K+ in rewards value.', keyMetrics: [], items: [] }
   ];
 
+  // ── Live Data: User Identity ──────────────────────────────────────────────
+  const firstName: string = data?.profile?.primary_first_name ?? activePersona.name.split(' ')[0];
+  const lastName: string = data?.profile?.primary_last_name ?? (activePersona.name.split(' ')[1] ?? '');
+  const userInitials: string = firstName && lastName
+    ? `${firstName[0]}${lastName[0]}`.toUpperCase()
+    : firstName ? firstName[0].toUpperCase() : activePersona.initials;
+  const displayName: string = firstName ? `${firstName} ${lastName}`.trim() : activePersona.name;
+
+  // ── Live Data: Priority Actions from Supabase ─────────────────────────────
+  const categoryIconMap: Record<string, LucideIcon> = {
+    'Insurance': Shield, 'Legal': FileText, 'Home': Wrench,
+    'Finances': Wallet, 'Taxes': Calendar, 'Family': Users,
+    'Credit': CreditCard
+  };
+  const livePriorities: Priority[] = (data?.priorityActions ?? [])
+    .filter((a: any) => a.status !== 'dismissed' && a.status !== 'completed')
+    .map((action: any, idx: number) => ({
+      id: idx + 1,
+      title: action.title ?? 'Action Required',
+      category: action.category ?? 'General',
+      impact: action.severity
+        ? ((action.severity.charAt(0).toUpperCase() + action.severity.slice(1)) as Priority['impact'])
+        : ('Medium' as Priority['impact']),
+      urgency: action.due_date ? `Due ${action.due_date}` : 'Review needed',
+      description: action.description ?? '',
+      potentialSavings: action.potential_savings ?? undefined,
+      estimatedCost: action.estimated_cost ?? undefined,
+      icon: categoryIconMap[action.category ?? ''] ?? AlertTriangle,
+      rationale: action.description ?? '',
+      recommendations: []
+    }));
+  // Use DB priority actions when available, fall back to hardcoded demo data
+  const activePrioritiesSource: Priority[] = livePriorities.length > 0 ? livePriorities : priorities;
+
+  // ── Live Data: Section Scores from Supabase ───────────────────────────────
+  const liveSections: HouseholdSection[] = householdSections.map(section => {
+    const dbScore = (data?.sectionScores ?? []).find((s: any) => s.section === section.id);
+    if (!dbScore) return section;
+    const rawScore = typeof dbScore.score === 'number' ? dbScore.score : parseFloat(dbScore.score) || 0;
+    // DB stores 0-100, display as 0-10
+    const displayScore = rawScore > 10 ? Math.round((rawScore / 10) * 10) / 10 : rawScore;
+    return { ...section, score: displayScore };
+  });
+
+  // ── Live Data: Health Score ───────────────────────────────────────────────
+  const liveHealthScore: number = data?.household?.health_score ?? activePersona.score;
+
   const getScoreColor = (score: number): string => {
     if (score >= 8) return 'text-green-500';
     if (score >= 6) return 'text-yellow-500';
@@ -1936,7 +1983,7 @@ const CommandApp: React.FC = () => {
               }`}
               style={{ backgroundColor: '#C9A24D' }}
             >
-              {activePersona.initials}
+              {userInitials}
             </button>
           </div>
 
@@ -2682,16 +2729,22 @@ const CommandApp: React.FC = () => {
   };
 
   // Profile View (simplified for brevity)
-  const ProfileView: React.FC = () => (
+  const ProfileView: React.FC = () => {
+    const householdName = data?.household?.household_name ?? displayName;
+    const city = data?.household?.city ?? '';
+    const state = data?.household?.state ?? '';
+    const locationStr = city && state ? `${city}, ${state}` : city || state || '';
+    return (
     <div className="space-y-6">
       <div><h1 className="text-2xl font-bold text-gray-900 mb-1">Profile Settings</h1><p className="text-gray-600">Manage your account, security, and subscription</p></div>
       <div className="bg-white border border-gray-200 rounded-xl p-6">
         <div className="flex items-center gap-6">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-yellow-600 to-yellow-500 flex items-center justify-center"><span className="text-3xl font-bold text-white">AB</span></div>
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-yellow-600 to-yellow-500 flex items-center justify-center"><span className="text-3xl font-bold text-white">{userInitials}</span></div>
           <div className="flex-1">
-            <h2 className="text-xl font-bold text-gray-900">Adam Bailey</h2>
-            <p className="text-gray-600">Premium Member since January 2024</p>
-            <div className="flex items-center gap-2 mt-2"><span className="px-2.5 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Pro Plan</span><span className="text-sm text-gray-500">â€¢ Household of 4</span></div>
+            <h2 className="text-xl font-bold text-gray-900">{displayName || householdName}</h2>
+            <p className="text-gray-600">Command Member</p>
+            {locationStr && <p className="text-sm text-gray-500 mt-1">{locationStr}</p>}
+            <div className="flex items-center gap-2 mt-2"><span className="px-2.5 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Pro Plan</span></div>
           </div>
           <div className="flex items-center gap-3">
   <button className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 flex items-center gap-2"><Edit3 className="w-4 h-4" />Edit Profile</button>
@@ -2703,21 +2756,22 @@ const CommandApp: React.FC = () => {
         </div>
       </div>
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-semibold text-gray-900">Account Information</h2></div>
+        <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-semibold text-gray-900">Household Information</h2></div>
         <div className="divide-y divide-gray-100">
-          {[{ icon: Mail, label: 'Email Address', value: 'adam.bailey@email.com' }, { icon: Phone, label: 'Phone Number', value: '(612) 555-0147' }, { icon: MapPin, label: 'Address', value: '1847 Oakwood Drive, Savage, MN 55378' }].map((item, idx) => (
-            <div key={idx} className="px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-4"><div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center"><item.icon className="w-5 h-5 text-gray-600" /></div><div><p className="text-sm text-gray-500">{item.label}</p><p className="font-medium text-gray-900">{item.value}</p></div></div>
-              <button className="text-sm font-medium hover:text-yellow-600" style={{ color: '#C9A24D' }}>Change</button>
+          {locationStr ? (
+            <div className="px-6 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4"><div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center"><MapPin className="w-5 h-5 text-gray-600" /></div><div><p className="text-sm text-gray-500">Location</p><p className="font-medium text-gray-900">{locationStr}</p></div></div>
             </div>
-          ))}
+          ) : (
+            <div className="px-6 py-4 text-sm text-gray-400">Complete your onboarding to see household details here.</div>
+          )}
         </div>
       </div>
       <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-semibold text-gray-900">Subscription & Billing</h2></div>
         <div className="p-6">
           <div className="flex items-center justify-between mb-4">
-            <div><div className="flex items-center gap-3 mb-1"><h3 className="text-lg font-bold text-gray-900">Pro Plan</h3><span className="px-2.5 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Active</span></div><p className="text-gray-600">$40/month â€¢ Renews February 15, 2026</p></div>
+            <div><div className="flex items-center gap-3 mb-1"><h3 className="text-lg font-bold text-gray-900">Pro Plan</h3><span className="px-2.5 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Active</span></div><p className="text-gray-600">$40/month</p></div>
             <button className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50">Change Plan</button>
           </div>
           <div className="bg-gray-50 rounded-lg p-4">
@@ -2731,7 +2785,8 @@ const CommandApp: React.FC = () => {
         </div>
       </div>
     </div>
-  );
+    );
+  };
 
   const PriorityDetailView: React.FC<{ priority: Priority }> = ({ priority }) => (
     <div className="space-y-6">
@@ -2815,15 +2870,15 @@ const CommandApp: React.FC = () => {
 
   const DashboardView: React.FC = () => {
     if (selectedPriority) return <PriorityDetailView priority={selectedPriority} />;
-    const activePriorities = priorities.filter(p => !dismissedPriorities.includes(p.id));
-    const dismissedPriorityItems = priorities.filter(p => dismissedPriorities.includes(p.id));
+    const activePriorities = activePrioritiesSource.filter(p => !dismissedPriorities.includes(p.id));
+    const dismissedPriorityItems = activePrioritiesSource.filter(p => dismissedPriorities.includes(p.id));
 
     return (
       <div className="space-y-6">
         <div className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-xl p-6 text-white shadow-lg">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            <div><p className="text-sm text-gray-400 mb-1">Welcome back, {activePersona.name.split(' ')[0]}</p><h2 className="text-base font-medium text-gray-300 mb-2">Overall Household Health</h2><div className="flex items-end gap-2"><span className="text-6xl lg:text-7xl font-bold">{data?.household?.health_score ?? activePersona.score}</span><span className="text-2xl text-gray-400 pb-2">/100</span></div><p className="text-xs text-gray-400 mt-2">{activePersona.score >= 80 ? 'Excellent - household is well optimized' : activePersona.score >= 60 ? 'Good - some areas need attention' : 'Needs attention - multiple areas require action'}</p></div>
-            <div className="flex-1 lg:max-w-xl"><p className="text-xs text-gray-400 mb-3 lg:text-right">Section Scores</p><div className="flex flex-wrap justify-start lg:justify-end gap-1">{householdSections.map(section => <SectionScoreCard key={section.id} section={section} compact />)}</div></div>
+            <div><p className="text-sm text-gray-400 mb-1">Welcome back, {firstName}</p><h2 className="text-base font-medium text-gray-300 mb-2">Overall Household Health</h2><div className="flex items-end gap-2"><span className="text-6xl lg:text-7xl font-bold">{liveHealthScore}</span><span className="text-2xl text-gray-400 pb-2">/100</span></div><p className="text-xs text-gray-400 mt-2">{liveHealthScore >= 80 ? 'Excellent - household is well optimized' : liveHealthScore >= 60 ? 'Good - some areas need attention' : 'Needs attention - multiple areas require action'}</p></div>
+            <div className="flex-1 lg:max-w-xl"><p className="text-xs text-gray-400 mb-3 lg:text-right">Section Scores</p><div className="flex flex-wrap justify-start lg:justify-end gap-1">{liveSections.map(section => <SectionScoreCard key={section.id} section={section} compact />)}</div></div>
           </div>
         </div>
         <div><h2 className="text-xl font-semibold text-gray-900 mb-3">Priority Actions</h2>{activePriorities.length > 0 ? <div className="grid gap-3">{activePriorities.map(priority => <PriorityCard key={priority.id} priority={priority} onClick={() => setSelectedPriority(priority)} onDismiss={(e) => dismissPriority(priority.id, e)} />)}</div> : <div className="bg-green-50 border border-green-200 rounded-xl p-6 text-center"><CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" /><p className="text-green-800 font-medium">All caught up!</p></div>}</div>

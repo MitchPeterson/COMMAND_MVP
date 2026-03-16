@@ -2074,8 +2074,49 @@ const CommandApp: React.FC = () => {
   );
 
   const TimelineSection: React.FC = () => {
-    const upcomingEvents = timelineEvents.filter(e => e.type === 'upcoming').slice(0, 5);
-    const pastEvents = timelineEvents.filter(e => e.type === 'past').slice(0, 4);
+    const liveEvents = data?.timelineEvents ?? [];
+    const today = new Date();
+    const upcomingEvents = liveEvents
+      .filter(e => !e.completed && e.event_date && new Date(e.event_date) >= today)
+      .sort((a, b) => new Date(a.event_date!).getTime() - new Date(b.event_date!).getTime())
+      .slice(0, 5);
+    const pastEvents = liveEvents
+      .filter(e => e.completed || (e.event_date && new Date(e.event_date) < today))
+      .sort((a, b) => new Date(b.event_date ?? '').getTime() - new Date(a.event_date ?? '').getTime())
+      .slice(0, 4);
+    const getCategoryIcon = (category: string | null): LucideIcon => {
+      switch ((category ?? '').toLowerCase()) {
+        case 'insurance': return Shield;
+        case 'taxes': case 'tax': return Calendar;
+        case 'healthcare': case 'health': return Heart;
+        case 'family': return Users;
+        case 'legal': return FileText;
+        case 'home': return Home;
+        default: return Calendar;
+      }
+    };
+    const getEventStatus = (eventType: string | null) => {
+      switch (eventType) {
+        case 'deadline': case 'renewal': return { bg: 'bg-yellow-100', text: 'text-yellow-600' };
+        case 'action': return { bg: 'bg-red-100', text: 'text-red-600' };
+        default: return { bg: 'bg-blue-100', text: 'text-blue-600' };
+      }
+    };
+    const formatDate = (dateStr: string | null) => {
+      if (!dateStr) return '';
+      return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    };
+    if (liveEvents.length === 0) {
+      return (
+        <div className="bg-white border border-gray-200 rounded-xl p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Timeline</h3>
+          <div className="text-center py-8 text-gray-400">
+            <Calendar className="w-10 h-10 mx-auto mb-2 opacity-30" />
+            <p className="text-sm">No timeline events yet. They'll appear here as your household data grows.</p>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="bg-white border border-gray-200 rounded-xl p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4">Timeline</h3>
@@ -2083,16 +2124,17 @@ const CommandApp: React.FC = () => {
           <div>
             <h4 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-2"><AlertCircle className="w-4 h-4" />Upcoming</h4>
             <div className="space-y-3">
-              {upcomingEvents.map(event => {
-                const Icon = event.icon;
+              {upcomingEvents.length === 0 ? <p className="text-sm text-gray-400">No upcoming events</p> : upcomingEvents.map(event => {
+                const Icon = getCategoryIcon(event.category);
+                const style = getEventStatus(event.event_type);
                 return (
                   <div key={event.id} className="flex items-start gap-3">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${event.status === 'warning' ? 'bg-yellow-100' : event.status === 'critical' ? 'bg-red-100' : 'bg-blue-100'}`}>
-                      <Icon className={`w-4 h-4 ${event.status === 'warning' ? 'text-yellow-600' : event.status === 'critical' ? 'text-red-600' : 'text-blue-600'}`} />
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${style.bg}`}>
+                      <Icon className={`w-4 h-4 ${style.text}`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{event.title}</p>
-                      <p className="text-xs text-gray-500">{event.date}</p>
+                      <p className="text-xs text-gray-500">{formatDate(event.event_date)}</p>
                     </div>
                   </div>
                 );
@@ -2102,14 +2144,14 @@ const CommandApp: React.FC = () => {
           <div>
             <h4 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-2"><CheckCircle className="w-4 h-4" />Recent Activity</h4>
             <div className="space-y-3">
-              {pastEvents.map(event => {
-                const Icon = event.icon;
+              {pastEvents.length === 0 ? <p className="text-sm text-gray-400">No recent activity</p> : pastEvents.map(event => {
+                const Icon = getCategoryIcon(event.category);
                 return (
                   <div key={event.id} className="flex items-start gap-3">
                     <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0"><Icon className="w-4 h-4 text-green-600" /></div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{event.title}</p>
-                      <p className="text-xs text-gray-500">{event.date}</p>
+                      <p className="text-xs text-gray-500">{formatDate(event.event_date)}</p>
                     </div>
                   </div>
                 );
@@ -2123,13 +2165,36 @@ const CommandApp: React.FC = () => {
 
   // Legal Section View
   const LegalView: React.FC = () => {
-    if (selectedLegalDoc) {
-      return <LegalDocDetailView doc={selectedLegalDoc} />;
-    }
-
-    const currentDocs = legalDocuments.filter(d => d.status === 'current').length;
-    const needsReview = legalDocuments.filter(d => d.status === 'needs-review' || d.status === 'outdated').length;
-    const notEstablished = legalDocuments.filter(d => d.status === 'not-established').length;
+    const liveLegalDocs = data?.legalDocuments ?? [];
+    const currentDocs = liveLegalDocs.filter(d => d.status === 'current').length;
+    const needsReview = liveLegalDocs.filter(d => d.status === 'needs_review' || d.status === 'outdated').length;
+    const notEstablished = liveLegalDocs.filter(d => d.status === 'not_established').length;
+    const getLegalStatusLabel = (status: string) => {
+      switch (status) {
+        case 'not_established': return 'Not Established';
+        case 'needs_review': return 'Needs Review';
+        case 'outdated': return 'Outdated';
+        default: return 'Current';
+      }
+    };
+    const getLegalStatusColor = (status: string) => {
+      switch (status) {
+        case 'not_established': return 'text-red-600 bg-red-100';
+        case 'needs_review': return 'text-yellow-600 bg-yellow-100';
+        case 'outdated': return 'text-orange-600 bg-orange-100';
+        default: return 'text-green-600 bg-green-100';
+      }
+    };
+    const getLegalIcon = (type: string): LucideIcon => {
+      switch (type) {
+        case 'will': return ScrollText;
+        case 'trust': return FileSignature;
+        case 'healthcare_directive': return Heart;
+        case 'poa': return Scale;
+        case 'beneficiary': return ClipboardList;
+        default: return FileText;
+      }
+    };
 
     return (
       <div className="space-y-6">
@@ -2137,15 +2202,13 @@ const CommandApp: React.FC = () => {
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Legal & Estate</h1>
           <p className="text-gray-600">Keeps your legal documents current, aligned, and ready when it matters.</p>
         </div>
-
-        {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-white border border-gray-200 rounded-xl p-5">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center"><FileText className="w-5 h-5 text-blue-600" /></div>
               <span className="text-sm text-gray-600">Total Documents</span>
             </div>
-            <p className="text-3xl font-bold text-gray-900">{legalDocuments.length}</p>
+            <p className="text-3xl font-bold text-gray-900">{liveLegalDocs.length}</p>
           </div>
           <div className="bg-white border border-gray-200 rounded-xl p-5">
             <div className="flex items-center gap-3 mb-3">
@@ -2170,182 +2233,48 @@ const CommandApp: React.FC = () => {
           </div>
         </div>
 
-        {/* Attorney Contact */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-4">
-              <div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center">
-                <Briefcase className="w-7 h-7 text-gray-600" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">{attorney.name}</h2>
-                <p className="text-gray-600">{attorney.firm}</p>
-                <p className="text-sm text-gray-500">{attorney.specialty}</p>
-                <div className="flex items-center gap-4 mt-3 text-sm">
-                  <a href={`tel:${attorney.phone}`} className="flex items-center gap-1 text-gray-600 hover:text-gray-900">
-                    <Phone className="w-4 h-4" />{attorney.phone}
-                  </a>
-                  <a href={`mailto:${attorney.email}`} className="flex items-center gap-1 hover:text-yellow-600" style={{ color: '#C9A24D' }}>
-                    <Mail className="w-4 h-4" />{attorney.email}
-                  </a>
-                </div>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-500">Last Contact</p>
-              <p className="font-medium text-orange-600">{attorney.lastContact}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Documents List */}
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
             <h2 className="text-lg font-semibold text-gray-900">Estate Documents</h2>
-            <button 
-              onClick={() => setShowDocumentUpload(true)}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-100"
-              style={{ color: '#C9A24D' }}
-            >
+            <button onClick={() => setShowDocumentUpload(true)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-100" style={{ color: '#C9A24D' }}>
               <Plus className="w-4 h-4" />Add Document
             </button>
           </div>
-          <div className="divide-y divide-gray-100">
-            {legalDocuments.map(doc => {
-              const Icon = doc.icon;
-              return (
-                <div 
-                  key={doc.id}
-                  onClick={() => setSelectedLegalDoc(doc)}
-                  className="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getStatusColor(doc.status).split(' ')[1]}`}>
-                        <Icon className={`w-5 h-5 ${getStatusColor(doc.status).split(' ')[0]}`} />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-medium text-gray-900">{doc.name}</h3>
-                          <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${getStatusColor(doc.status)}`}>
-                            {doc.status === 'not-established' ? 'Not Established' : doc.status === 'needs-review' ? 'Needs Review' : doc.status === 'outdated' ? 'Outdated' : 'Current'}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-500">Last updated: {doc.lastUpdated}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {doc.recommendations.length > 0 && (
-                        <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                          {doc.recommendations.length} recommendation{doc.recommendations.length > 1 ? 's' : ''}
-                        </span>
-                      )}
-                      <ChevronRight className="w-5 h-5 text-gray-400" />
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Priority Alert */}
-        <div className="bg-red-50 border border-red-200 rounded-xl p-5">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center flex-shrink-0">
-              <AlertTriangle className="w-5 h-5 text-red-600" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-red-900 mb-1">Revocable Trust Needed</h3>
-              <p className="text-sm text-red-800 mb-3">
-                With a net worth of $2.8M, you should establish a revocable living trust. Without one, your estate 
-                will go through probateâ€”costing an estimated $15,000-$40,000 and becoming public record.
-              </p>
-              <button className="text-sm font-medium text-red-800 hover:text-red-900 flex items-center gap-1">
-                Schedule Attorney Consultation <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Legal Document Detail View
-  const LegalDocDetailView: React.FC<{ doc: LegalDocument }> = ({ doc }) => {
-    const Icon = doc.icon;
-    return (
-      <div className="space-y-6">
-        <button onClick={() => setSelectedLegalDoc(null)} className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
-          <ArrowLeft className="w-4 h-4" /><span className="text-sm font-medium">Back to Legal</span>
-        </button>
-
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <div className="flex items-start justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${getStatusColor(doc.status).split(' ')[1]}`}>
-                <Icon className={`w-7 h-7 ${getStatusColor(doc.status).split(' ')[0]}`} />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">{doc.name}</h1>
-                <p className="text-gray-600">Last updated: {doc.lastUpdated}</p>
-              </div>
-            </div>
-            <span className={`px-3 py-1 text-sm font-medium rounded-full ${getStatusColor(doc.status)}`}>
-              {doc.status === 'not-established' ? 'Not Established' : doc.status === 'needs-review' ? 'Needs Review' : doc.status === 'outdated' ? 'Outdated' : 'Current'}
-            </span>
-          </div>
-
-          <div className="bg-gray-50 rounded-lg p-4 mb-6">
-            <h3 className="font-medium text-gray-900 mb-2">Summary</h3>
-            <p className="text-sm text-gray-700">{doc.summary}</p>
-          </div>
-
-          {doc.recommendations.length > 0 && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-              <div className="flex items-start gap-3 mb-3">
-                <Info className="w-5 h-5 text-blue-600 mt-0.5" />
-                <h3 className="font-semibold text-blue-900">Recommendations</h3>
-              </div>
-              <div className="space-y-2 ml-8">
-                {doc.recommendations.map((rec, index) => (
-                  <div key={index} className="flex items-start gap-2">
-                    <CheckCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <p className="text-sm text-blue-800">{rec}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Document Files */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Documents</h2>
-            <button onClick={() => setShowDocumentUpload(true)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-100" style={{ color: '#C9A24D' }}>
-              <Upload className="w-4 h-4" />Upload
-            </button>
-          </div>
-          {doc.documents.length === 0 ? (
-            <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
-              <File className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-              <p className="text-gray-500">No documents uploaded</p>
-              <button onClick={() => setShowDocumentUpload(true)} className="text-sm font-medium mt-2" style={{ color: '#C9A24D' }}>Upload a document</button>
+          {liveLegalDocs.length === 0 ? (
+            <div className="p-12 text-center">
+              <FileText className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+              <h3 className="font-medium text-gray-500 mb-1">No legal documents yet</h3>
+              <p className="text-sm text-gray-400">Add your will, trust, POA, and other estate documents to track their status.</p>
             </div>
           ) : (
-            <div className="space-y-2">{/* Document list would go here */}</div>
+            <div className="divide-y divide-gray-100">
+              {liveLegalDocs.map(doc => {
+                const Icon = getLegalIcon(doc.type);
+                const colorClass = getLegalStatusColor(doc.status);
+                return (
+                  <div key={doc.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${colorClass.split(' ')[1]}`}>
+                          <Icon className={`w-5 h-5 ${colorClass.split(' ')[0]}`} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-medium text-gray-900">{doc.name}</h3>
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${colorClass}`}>{getLegalStatusLabel(doc.status)}</span>
+                          </div>
+                          <p className="text-sm text-gray-500">Last reviewed: {doc.last_reviewed ?? 'Not on file'}</p>
+                          {doc.attorney && <p className="text-xs text-gray-400">Attorney: {doc.attorney}</p>}
+                        </div>
+                      </div>
+                      <ChevronRight className="w-5 h-5 text-gray-400" />
+                    </div>
+                    {doc.notes && <p className="text-sm text-gray-500 mt-2 ml-14">{doc.notes}</p>}
+                  </div>
+                );
+              })}
+            </div>
           )}
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-3">
-          <button className="flex-1 px-4 py-3 rounded-lg text-white font-medium hover:opacity-90" style={{ backgroundColor: '#C9A24D' }}>
-            <span className="flex items-center justify-center gap-2"><Edit3 className="w-5 h-5" />Schedule Review with Attorney</span>
-          </button>
-          <button className="px-4 py-3 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50">
-            <span className="flex items-center justify-center gap-2"><Download className="w-5 h-5" />Download All</span>
-          </button>
         </div>
       </div>
     );
@@ -2353,517 +2282,89 @@ const CommandApp: React.FC = () => {
 
   // Home Section View
   const HomeView: React.FC = () => {
-    if (selectedAsset) {
-      return <AssetDetailView asset={selectedAsset} />;
-    }
-
-    const totalReplacementValue = homeAssets.reduce((sum, a) => sum + a.estimatedReplacementCost, 0);
-    const needsAttention = homeAssets.filter(a => a.condition === 'fair' || a.condition === 'poor' || a.condition === 'replace-soon').length;
-
-    // Calculate planned expenses by year
-    const plannedExpenses: { year: number; items: { name: string; cost: number }[] }[] = [];
-    homeAssets.forEach(asset => {
-      const yearsRemaining = asset.expectedLifespan - asset.currentAge;
-      const replacementYear = 2026 + yearsRemaining;
-      const existing = plannedExpenses.find(p => p.year === replacementYear);
-      if (existing) {
-        existing.items.push({ name: asset.name, cost: asset.estimatedReplacementCost });
-      } else {
-        plannedExpenses.push({ year: replacementYear, items: [{ name: asset.name, cost: asset.estimatedReplacementCost }] });
-      }
-    });
-    plannedExpenses.sort((a, b) => a.year - b.year);
-
-    const assetCategories = [
-      { id: 'hvac', label: 'HVAC', icon: Thermometer },
-      { id: 'roof', label: 'Roof & Structure', icon: Building },
-      { id: 'plumbing', label: 'Plumbing', icon: Droplets },
-      { id: 'appliance', label: 'Appliances', icon: Refrigerator },
-      { id: 'exterior', label: 'Exterior', icon: Home }
-    ];
-
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Home & Assets</h1>
-          <p className="text-gray-600">Turns reactive maintenance into a proactive, planned system.</p>
-        </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center"><Wrench className="w-5 h-5 text-blue-600" /></div>
-              <span className="text-sm text-gray-600">Assets Tracked</span>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{homeAssets.length}</p>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center"><DollarSign className="w-5 h-5 text-green-600" /></div>
-              <span className="text-sm text-gray-600">Replacement Value</span>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">${totalReplacementValue.toLocaleString()}</p>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center"><AlertTriangle className="w-5 h-5 text-yellow-600" /></div>
-              <span className="text-sm text-gray-600">Needs Attention</span>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{needsAttention}</p>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(201, 162, 77, 0.2)' }}>
-                <Calendar className="w-5 h-5" style={{ color: '#C9A24D' }} />
-              </div>
-              <span className="text-sm text-gray-600">Next Major Expense</span>
-            </div>
-            <p className="text-lg font-bold text-gray-900">HVAC - 2028</p>
-            <p className="text-sm text-gray-500">Est. $8,500</p>
-          </div>
-        </div>
-
-        {/* Assets by Category */}
-        {assetCategories.map(category => {
-          const categoryAssets = homeAssets.filter(a => a.category === category.id);
-          if (categoryAssets.length === 0) return null;
-          const CategoryIcon = category.icon;
-
-          return (
-            <div key={category.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-                <CategoryIcon className="w-5 h-5" style={{ color: '#C9A24D' }} />
-                <h2 className="text-lg font-semibold text-gray-900">{category.label}</h2>
-                <span className="text-sm text-gray-500">({categoryAssets.length})</span>
-              </div>
-              <div className="divide-y divide-gray-100">
-                {categoryAssets.map(asset => {
-                  const Icon = asset.icon;
-                  const percentLife = Math.round((asset.currentAge / asset.expectedLifespan) * 100);
-                  return (
-                    <div key={asset.id} onClick={() => setSelectedAsset(asset)} className="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getConditionColor(asset.condition).split(' ')[1]}`}>
-                            <Icon className={`w-5 h-5 ${getConditionColor(asset.condition).split(' ')[0]}`} />
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-medium text-gray-900">{asset.name}</h3>
-                              <span className={`px-2 py-0.5 text-xs font-medium rounded-full capitalize ${getConditionColor(asset.condition)}`}>{asset.condition.replace('-', ' ')}</span>
-                            </div>
-                            <p className="text-sm text-gray-500">{asset.brand} {asset.model && `â€¢ ${asset.model}`}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-6">
-                          <div className="text-right">
-                            <div className="flex items-center gap-2">
-                              <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                <div className={`h-full rounded-full ${percentLife >= 80 ? 'bg-red-500' : percentLife >= 60 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${Math.min(percentLife, 100)}%` }} />
-                              </div>
-                              <span className="text-xs text-gray-500">{asset.currentAge}/{asset.expectedLifespan} yrs</span>
-                            </div>
-                            <p className="text-sm text-gray-600 mt-1">Replace ~${asset.estimatedReplacementCost.toLocaleString()}</p>
-                          </div>
-                          <ChevronRight className="w-5 h-5 text-gray-400" />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })}
-
-        {/* Add Asset Button */}
-        <button onClick={() => setShowDocumentUpload(true)} className="w-full py-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-yellow-500 hover:text-yellow-600 transition-colors flex items-center justify-center gap-2">
-          <Plus className="w-5 h-5" />Add New Asset
-        </button>
-
-        {/* Expense Timeline - Now at bottom */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Planned Replacement Timeline</h2>
-          <div className="space-y-4">
-            {plannedExpenses.slice(0, 5).map(period => (
-              <div key={period.year} className="flex items-start gap-4">
-                <div className="w-16 text-center">
-                  <span className={`text-lg font-bold ${period.year <= 2028 ? 'text-yellow-600' : 'text-gray-400'}`}>{period.year}</span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex flex-wrap gap-2">
-                    {period.items.map((item, idx) => (
-                      <div key={idx} className={`px-3 py-2 rounded-lg text-sm ${period.year <= 2028 ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50 border border-gray-200'}`}>
-                        <span className="font-medium text-gray-900">{item.name}</span>
-                        <span className="text-gray-500 ml-2">${item.cost.toLocaleString()}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="font-semibold text-gray-900">
-                    ${period.items.reduce((sum, i) => sum + i.cost, 0).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
+        <div><h1 className="text-2xl font-bold text-gray-900 mb-1">Home & Assets</h1><p className="text-gray-600">Turns reactive maintenance into a proactive, planned system.</p></div>
+        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+          <Wrench className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+          <h3 className="font-medium text-gray-500 mb-1">No home assets tracked yet</h3>
+          <p className="text-sm text-gray-400">Add your HVAC, roof, appliances, and other home systems to track maintenance and plan replacements.</p>
         </div>
       </div>
     );
   };
 
-  // Asset Detail View
-  const AssetDetailView: React.FC<{ asset: HomeAsset }> = ({ asset }) => {
-    const Icon = asset.icon;
-    const percentLife = Math.round((asset.currentAge / asset.expectedLifespan) * 100);
-
-    return (
-      <div className="space-y-6">
-        <button onClick={() => setSelectedAsset(null)} className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
-          <ArrowLeft className="w-4 h-4" /><span className="text-sm font-medium">Back to Home</span>
-        </button>
-
-        {/* Asset Header */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <div className="flex items-start justify-between mb-6">
-            <div className="flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${getConditionColor(asset.condition).split(' ')[1]}`}>
-                <Icon className={`w-7 h-7 ${getConditionColor(asset.condition).split(' ')[0]}`} />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-gray-900">{asset.name}</h1>
-                <p className="text-gray-600">{asset.brand} {asset.model}</p>
-              </div>
-            </div>
-            <span className={`px-3 py-1 text-sm font-medium rounded-full capitalize ${getConditionColor(asset.condition)}`}>{asset.condition.replace('-', ' ')}</span>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-xs text-gray-500 mb-1">Installed</p>
-              <p className="font-semibold text-gray-900">{asset.installDate}</p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-xs text-gray-500 mb-1">Age / Lifespan</p>
-              <p className="font-semibold text-gray-900">{asset.currentAge} / {asset.expectedLifespan} years</p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-xs text-gray-500 mb-1">Est. Replacement</p>
-              <p className="font-semibold text-gray-900">${asset.estimatedReplacementCost.toLocaleString()}</p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-xs text-gray-500 mb-1">Warranty</p>
-              <p className={`font-semibold ${asset.warrantyExpires && new Date(asset.warrantyExpires) < new Date() ? 'text-red-600' : 'text-gray-900'}`}>
-                {asset.warrantyExpires || 'N/A'}
-              </p>
-            </div>
-          </div>
-
-          {/* Life Progress Bar */}
-          <div className="mt-6">
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span className="text-gray-600">Estimated Life Remaining</span>
-              <span className="font-medium text-gray-900">{asset.expectedLifespan - asset.currentAge} years</span>
-            </div>
-            <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-              <div className={`h-full rounded-full ${percentLife >= 80 ? 'bg-red-500' : percentLife >= 60 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${Math.min(percentLife, 100)}%` }} />
-            </div>
-          </div>
-        </div>
-
-        {/* Maintenance History */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Maintenance History</h2>
-            <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-100" style={{ color: '#C9A24D' }}>
-              <Plus className="w-4 h-4" />Add Record
-            </button>
-          </div>
-          {asset.maintenanceHistory.length === 0 ? (
-            <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
-              <Wrench className="w-10 h-10 text-gray-300 mx-auto mb-2" />
-              <p className="text-gray-500">No maintenance records</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {asset.maintenanceHistory.map(record => (
-                <div key={record.id} className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                    record.type === 'repair' ? 'bg-orange-100' : record.type === 'replacement' ? 'bg-red-100' : record.type === 'inspection' ? 'bg-blue-100' : 'bg-green-100'
-                  }`}>
-                    <Wrench className={`w-4 h-4 ${
-                      record.type === 'repair' ? 'text-orange-600' : record.type === 'replacement' ? 'text-red-600' : record.type === 'inspection' ? 'text-blue-600' : 'text-green-600'
-                    }`} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">{record.description}</span>
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full capitalize ${
-                        record.type === 'repair' ? 'bg-orange-100 text-orange-800' : record.type === 'replacement' ? 'bg-red-100 text-red-800' : record.type === 'inspection' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                      }`}>{record.type}</span>
-                    </div>
-                    <p className="text-sm text-gray-500">{record.date} {record.provider && `â€¢ ${record.provider}`}</p>
-                    {record.notes && <p className="text-sm text-gray-600 mt-1">{record.notes}</p>}
-                  </div>
-                  <div className="text-right">
-                    <span className="font-semibold text-gray-900">${record.cost}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Documents */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Documents</h2>
-            <button onClick={() => setShowDocumentUpload(true)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-100" style={{ color: '#C9A24D' }}>
-              <Upload className="w-4 h-4" />Upload
-            </button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <button className="p-4 border-2 border-dashed border-gray-200 rounded-lg hover:border-yellow-500 transition-colors text-center">
-              <FileText className="w-6 h-6 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm font-medium text-gray-600">Warranty</p>
-            </button>
-            <button className="p-4 border-2 border-dashed border-gray-200 rounded-lg hover:border-yellow-500 transition-colors text-center">
-              <FileText className="w-6 h-6 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm font-medium text-gray-600">Invoice</p>
-            </button>
-            <button className="p-4 border-2 border-dashed border-gray-200 rounded-lg hover:border-yellow-500 transition-colors text-center">
-              <FileText className="w-6 h-6 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm font-medium text-gray-600">Manual</p>
-            </button>
-          </div>
-        </div>
-
-        {/* Recommendation */}
-        {(asset.condition === 'fair' || asset.condition === 'poor' || asset.condition === 'replace-soon') && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center flex-shrink-0">
-                <Info className="w-5 h-5 text-yellow-600" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-yellow-900 mb-1">Planning Recommendation</h3>
-                <p className="text-sm text-yellow-800">
-                  Based on the age and condition of this {asset.name.toLowerCase()}, we recommend starting a replacement fund. 
-                  Saving ${Math.round(asset.estimatedReplacementCost / ((asset.expectedLifespan - asset.currentAge) * 12))}/month 
-                  would fully fund the replacement by the expected end of life.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // All Documents View
-  const DocumentsView: React.FC = () => {
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">All Documents</h1>
-            <p className="text-gray-600">Your complete document repository with version history</p>
-          </div>
-          <button onClick={() => setShowDocumentUpload(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium hover:opacity-90" style={{ backgroundColor: '#C9A24D' }}>
-            <Upload className="w-4 h-4" />Upload Document
-          </button>
-        </div>
-
-        {/* Search and Filter */}
-        <div className="flex gap-4">
-          <div className="flex-1 relative">
-            <Search className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input type="text" placeholder="Search documents..." className="w-full pl-10 pr-4 py-2 rounded-lg border border-gray-200 focus:ring-2 focus:ring-yellow-500 focus:border-transparent" />
-          </div>
-          <button className="flex items-center gap-2 px-4 py-2 rounded-lg border border-gray-200 hover:bg-gray-50">
-            <Filter className="w-4 h-4 text-gray-500" />
-            <span className="text-gray-700">Filter</span>
-          </button>
-        </div>
-
-        {/* Documents List */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div className="divide-y divide-gray-100">
-            {allDocuments.map(doc => (
-              <div key={doc.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getStatusColor(doc.status).split(' ')[1]}`}>
-                      <doc.icon className={`w-5 h-5 ${getStatusColor(doc.status).split(' ')[0]}`} />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">{doc.name}</h3>
-                      <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <span className="capitalize">{doc.category}</span>
-                        <span>â€¢</span>
-                        <span>{doc.type}</span>
-                        <span>â€¢</span>
-                        <span>Modified {doc.lastModified}</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {doc.versions.length > 1 && (
-                      <button onClick={() => setSelectedDocument(doc)} className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium text-gray-500 hover:bg-gray-100">
-                        <History className="w-3.5 h-3.5" />
-                        {doc.versions.length} versions
-                      </button>
-                    )}
-                    <button className="p-2 hover:bg-gray-100 rounded-lg"><Eye className="w-4 h-4 text-gray-500" /></button>
-                    <button className="p-2 hover:bg-gray-100 rounded-lg"><Download className="w-4 h-4 text-gray-500" /></button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  // Profile View (simplified for brevity)
-  const ProfileView: React.FC = () => {
-    const householdName = data?.household?.household_name ?? displayName;
-    const city = data?.household?.city ?? '';
-    const state = data?.household?.state ?? '';
-    const locationStr = city && state ? `${city}, ${state}` : city || state || '';
-    return (
-    <div className="space-y-6">
-      <div><h1 className="text-2xl font-bold text-gray-900 mb-1">Profile Settings</h1><p className="text-gray-600">Manage your account, security, and subscription</p></div>
-      <div className="bg-white border border-gray-200 rounded-xl p-6">
-        <div className="flex items-center gap-6">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-yellow-600 to-yellow-500 flex items-center justify-center"><span className="text-3xl font-bold text-white">{userInitials}</span></div>
-          <div className="flex-1">
-            <h2 className="text-xl font-bold text-gray-900">{displayName || householdName}</h2>
-            <p className="text-gray-600">Command Member</p>
-            {locationStr && <p className="text-sm text-gray-500 mt-1">{locationStr}</p>}
-            <div className="flex items-center gap-2 mt-2"><span className="px-2.5 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Pro Plan</span></div>
-          </div>
-          <div className="flex items-center gap-3">
-  <button className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 flex items-center gap-2"><Edit3 className="w-4 h-4" />Edit Profile</button>
-  <button
-    onClick={() => supabase.auth.signOut()}
-    className="px-4 py-2 rounded-lg border border-red-200 text-red-600 font-medium hover:bg-red-50"
-  >Sign Out</button>
-</div>
-        </div>
-      </div>
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-semibold text-gray-900">Household Information</h2></div>
-        <div className="divide-y divide-gray-100">
-          {locationStr ? (
-            <div className="px-6 py-4 flex items-center justify-between">
-              <div className="flex items-center gap-4"><div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center"><MapPin className="w-5 h-5 text-gray-600" /></div><div><p className="text-sm text-gray-500">Location</p><p className="font-medium text-gray-900">{locationStr}</p></div></div>
-            </div>
-          ) : (
-            <div className="px-6 py-4 text-sm text-gray-400">Complete your onboarding to see household details here.</div>
-          )}
-        </div>
-      </div>
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-semibold text-gray-900">Subscription & Billing</h2></div>
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div><div className="flex items-center gap-3 mb-1"><h3 className="text-lg font-bold text-gray-900">Pro Plan</h3><span className="px-2.5 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Active</span></div><p className="text-gray-600">$40/month</p></div>
-            <button className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50">Change Plan</button>
-          </div>
-          <div className="bg-gray-50 rounded-lg p-4">
-            <p className="text-sm font-medium text-gray-900 mb-2">Pro Plan includes:</p>
-            <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
-              {['Advanced risk scoring', 'Automation features', 'Annual optimization review', 'Priority support'].map((feature, idx) => (
-                <div key={idx} className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-500" />{feature}</div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-    );
-  };
-
-  const PriorityDetailView: React.FC<{ priority: Priority }> = ({ priority }) => (
-    <div className="space-y-6">
-      <button onClick={() => setSelectedPriority(null)} className="flex items-center gap-2 text-gray-600 hover:text-gray-900"><ArrowLeft className="w-4 h-4" /><span className="text-sm font-medium">Back to Dashboard</span></button>
-      <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-        <div className="flex items-start gap-4 mb-6">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center"><priority.icon className="w-6 h-6" style={{ color: '#C9A24D' }} /></div>
-          <div className="flex-1"><h1 className="text-2xl font-bold text-gray-900 mb-2">{priority.title}</h1><div className="flex items-center gap-3 text-sm text-gray-500"><Clock className="w-4 h-4" />{priority.urgency}</div></div>
-        </div>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6"><div className="flex items-start gap-3"><Info className="w-5 h-5 text-blue-600 mt-0.5" /><div><h3 className="font-semibold text-blue-900 mb-1">Why This Matters</h3><p className="text-sm text-blue-800">{priority.rationale}</p></div></div></div>
-        <div><h3 className="text-lg font-semibold text-gray-900 mb-4">Recommendations</h3><div className="space-y-4">{priority.recommendations.map((rec, index) => (<div key={index} className="bg-white border border-gray-200 rounded-xl p-5"><h4 className="font-semibold text-gray-900 mb-1">{rec.title}</h4>{rec.savings && <div className="text-sm font-semibold mb-2" style={{ color: '#C9A24D' }}>Save ${rec.savings}/year</div>}<p className="text-sm text-gray-600 mb-2">{rec.description}</p><p className="text-sm text-gray-700">{rec.impact}</p></div>))}</div></div>
-      </div>
-    </div>
-  );
-
-  // Insurance View (simplified)
   const InsuranceView: React.FC = () => {
-    if (selectedPolicy) {
-      const Icon = selectedPolicy.icon;
-      const annualPremium = selectedPolicy.premiumFrequency === 'monthly' ? selectedPolicy.premium * 12 : selectedPolicy.premiumFrequency === 'quarterly' ? selectedPolicy.premium * 4 : selectedPolicy.premium;
-      return (
-        <div className="space-y-6">
-          <button onClick={() => setSelectedPolicy(null)} className="flex items-center gap-2 text-gray-600 hover:text-gray-900"><ArrowLeft className="w-4 h-4" /><span className="text-sm font-medium">Back to Insurance</span></button>
-          <div className="bg-white border border-gray-200 rounded-xl p-6">
-            <div className="flex items-start justify-between mb-6">
-              <div className="flex items-center gap-4"><div className={`w-14 h-14 rounded-xl flex items-center justify-center ${selectedPolicy.status === 'action-needed' ? 'bg-red-100' : selectedPolicy.status === 'expiring-soon' ? 'bg-yellow-100' : 'bg-gray-100'}`}><Icon className={`w-7 h-7 ${selectedPolicy.status === 'action-needed' ? 'text-red-600' : selectedPolicy.status === 'expiring-soon' ? 'text-yellow-600' : 'text-gray-600'}`} /></div><div><h1 className="text-2xl font-bold text-gray-900">{selectedPolicy.name}</h1><p className="text-gray-600">{selectedPolicy.carrier}</p></div></div>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[{ label: 'Policy Number', value: selectedPolicy.policyNumber }, { label: 'Annual Premium', value: `$${annualPremium.toLocaleString()}` }, { label: 'Deductible', value: `$${selectedPolicy.deductible.toLocaleString()}` }, { label: 'Renewal Date', value: selectedPolicy.renewalDate }].map((item, idx) => (
-                <div key={idx} className="bg-gray-50 rounded-lg p-4"><p className="text-xs text-gray-500 mb-1">{item.label}</p><p className="font-semibold text-gray-900">{item.value}</p></div>
-              ))}
-            </div>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-6"><h2 className="text-lg font-semibold text-gray-900 mb-4">Coverage Details</h2><div className="space-y-3">{Object.entries(selectedPolicy.details).map(([key, value]) => (<div key={key} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0"><span className="text-gray-600">{key}</span><span className="font-medium text-gray-900">{value}</span></div>))}</div></div>
-          {selectedPolicy.recommendations && selectedPolicy.recommendations.length > 0 && (<div className="bg-blue-50 border border-blue-200 rounded-xl p-6"><div className="flex items-start gap-3 mb-4"><Info className="w-5 h-5 text-blue-600 mt-0.5" /><h2 className="text-lg font-semibold text-blue-900">Recommendations</h2></div><div className="space-y-3">{selectedPolicy.recommendations.map((rec, index) => (<div key={index} className="flex items-start gap-3"><CheckCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" /><p className="text-sm text-blue-800">{rec}</p></div>))}</div></div>)}
-        </div>
-      );
-    }
-
-    const totalAnnualPremium = insurancePolicies.reduce((sum, p) => { const annual = p.premiumFrequency === 'monthly' ? p.premium * 12 : p.premiumFrequency === 'quarterly' ? p.premium * 4 : p.premium; return sum + annual; }, 0);
-    const policyTypes = [{ type: 'home', label: 'Home', icon: Building }, { type: 'auto', label: 'Auto', icon: Car }, { type: 'umbrella', label: 'Umbrella', icon: Umbrella }, { type: 'life', label: 'Life', icon: Heart }];
-
+    const livePolicies = data?.insurancePolicies ?? [];
+    const totalAnnualPremium = livePolicies.reduce((sum, p) => sum + (p.annual_premium ?? 0), 0);
+    const needAttention = livePolicies.filter(p => p.status === 'renewal_soon' || p.status === 'action_needed').length;
+    const getPolicyIcon = (type: string): LucideIcon => {
+      switch (type) {
+        case 'home': return Building; case 'auto': return Car; case 'umbrella': return Umbrella;
+        case 'life': case 'health': return Heart; default: return Shield;
+      }
+    };
+    const getPolicyStatusStyle = (status: string) => {
+      if (status === 'action_needed') return { bg: 'bg-red-100', text: 'text-red-600', badge: 'bg-red-100 text-red-800', label: 'Action Needed' };
+      if (status === 'renewal_soon') return { bg: 'bg-yellow-100', text: 'text-yellow-600', badge: 'bg-yellow-100 text-yellow-800', label: 'Renewal Soon' };
+      return { bg: 'bg-gray-100', text: 'text-gray-600', badge: '', label: '' };
+    };
+    const policyTypeGroups = ['home','auto','umbrella','life','health','disability','other'];
+    const typeLabels: Record<string,string> = {home:'Home',auto:'Auto',umbrella:'Umbrella',life:'Life',health:'Health',disability:'Disability',other:'Other'};
+    const typeIcons: Record<string,LucideIcon> = {home:Building,auto:Car,umbrella:Umbrella,life:Heart,health:Heart,disability:Shield,other:Shield};
     return (
       <div className="space-y-6">
         <div><h1 className="text-2xl font-bold text-gray-900 mb-1">Insurance & Risk</h1><p className="text-gray-600">Maintains a living view of coverage across all policies.</p></div>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white border border-gray-200 rounded-xl p-5"><div className="flex items-center gap-3 mb-3"><div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center"><Shield className="w-5 h-5 text-blue-600" /></div><span className="text-sm text-gray-600">Active Policies</span></div><p className="text-3xl font-bold text-gray-900">{insurancePolicies.length}</p></div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white border border-gray-200 rounded-xl p-5"><div className="flex items-center gap-3 mb-3"><div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center"><Shield className="w-5 h-5 text-blue-600" /></div><span className="text-sm text-gray-600">Active Policies</span></div><p className="text-3xl font-bold text-gray-900">{livePolicies.length}</p></div>
           <div className="bg-white border border-gray-200 rounded-xl p-5"><div className="flex items-center gap-3 mb-3"><div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center"><DollarSign className="w-5 h-5 text-green-600" /></div><span className="text-sm text-gray-600">Annual Premium</span></div><p className="text-3xl font-bold text-gray-900">${totalAnnualPremium.toLocaleString()}</p></div>
-          <div className="bg-white border border-gray-200 rounded-xl p-5"><div className="flex items-center gap-3 mb-3"><div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center"><AlertTriangle className="w-5 h-5 text-yellow-600" /></div><span className="text-sm text-gray-600">Need Attention</span></div><p className="text-3xl font-bold text-gray-900">{insurancePolicies.filter(p => p.status === 'expiring-soon' || p.status === 'action-needed').length}</p></div>
-          <div className="bg-white border border-gray-200 rounded-xl p-5"><div className="flex items-center gap-3 mb-3"><div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(201, 162, 77, 0.2)' }}><TrendingUp className="w-5 h-5" style={{ color: '#C9A24D' }} /></div><span className="text-sm text-gray-600">Potential Savings</span></div><p className="text-3xl font-bold" style={{ color: '#C9A24D' }}>$690<span className="text-lg font-normal text-gray-500">/yr</span></p></div>
+          <div className="bg-white border border-gray-200 rounded-xl p-5"><div className="flex items-center gap-3 mb-3"><div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center"><AlertTriangle className="w-5 h-5 text-yellow-600" /></div><span className="text-sm text-gray-600">Need Attention</span></div><p className="text-3xl font-bold text-gray-900">{needAttention}</p></div>
         </div>
-        {policyTypes.map(({ type, label, icon: TypeIcon }) => {
-          const typePolicies = insurancePolicies.filter(p => p.type === type);
-          if (typePolicies.length === 0) return null;
-          return (
-            <div key={type} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3"><TypeIcon className="w-5 h-5" style={{ color: '#C9A24D' }} /><h2 className="text-lg font-semibold text-gray-900">{label} Insurance</h2></div>
-              <div className="divide-y divide-gray-100">
-                {typePolicies.map(policy => {
-                  const Icon = policy.icon;
-                  const annualPremium = policy.premiumFrequency === 'monthly' ? policy.premium * 12 : policy.premiumFrequency === 'quarterly' ? policy.premium * 4 : policy.premium;
-                  return (
-                    <div key={policy.id} onClick={() => setSelectedPolicy(policy)} className="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${policy.status === 'action-needed' ? 'bg-red-100' : policy.status === 'expiring-soon' ? 'bg-yellow-100' : 'bg-gray-100'}`}><Icon className={`w-5 h-5 ${policy.status === 'action-needed' ? 'text-red-600' : policy.status === 'expiring-soon' ? 'text-yellow-600' : 'text-gray-600'}`} /></div>
-                          <div><div className="flex items-center gap-2"><h3 className="font-medium text-gray-900">{policy.name}</h3>{policy.status !== 'active' && <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${policy.status === 'action-needed' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'}`}>{policy.status === 'action-needed' ? 'Action Needed' : 'Renewal Soon'}</span>}</div><p className="text-sm text-gray-500">{policy.carrier} â€¢ {policy.coverage}</p></div>
+        {livePolicies.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+            <Shield className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+            <h3 className="font-medium text-gray-500 mb-1">No insurance policies yet</h3>
+            <p className="text-sm text-gray-400">Your home, auto, life, and umbrella policies will appear here once added.</p>
+          </div>
+        ) : (
+          <>{policyTypeGroups.map(type => {
+            const typePolicies = livePolicies.filter(p => p.type === type);
+            if (typePolicies.length === 0) return null;
+            const TypeIcon = typeIcons[type] ?? Shield;
+            return (
+              <div key={type} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3"><TypeIcon className="w-5 h-5" style={{ color: '#C9A24D' }} /><h2 className="text-lg font-semibold text-gray-900">{typeLabels[type] ?? type} Insurance</h2></div>
+                <div className="divide-y divide-gray-100">
+                  {typePolicies.map(policy => {
+                    const Icon = getPolicyIcon(policy.type);
+                    const style = getPolicyStatusStyle(policy.status);
+                    return (
+                      <div key={policy.id} className="px-6 py-4 hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${style.bg}`}><Icon className={`w-5 h-5 ${style.text}`} /></div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-medium text-gray-900 capitalize">{policy.type} Insurance</h3>
+                                {style.label && <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${style.badge}`}>{style.label}</span>}
+                              </div>
+                              <p className="text-sm text-gray-500">{policy.carrier ?? 'Carrier not set'}{policy.policy_number ? ` · ${policy.policy_number}` : ''}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            {policy.annual_premium && <p className="font-semibold text-gray-900">${policy.annual_premium.toLocaleString()}/yr</p>}
+                            {policy.renewal_date && <p className="text-xs text-gray-500">Renews {policy.renewal_date}</p>}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-6"><div className="text-right"><p className="font-semibold text-gray-900">${annualPremium.toLocaleString()}/yr</p><p className="text-xs text-gray-500">Renews {policy.renewalDate}</p></div><ChevronRight className="w-5 h-5 text-gray-400" /></div>
+                        {policy.notes && <p className="text-sm text-gray-500 mt-2 ml-14">{policy.notes}</p>}
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}</>
+        )}
       </div>
     );
   };
@@ -2890,857 +2391,122 @@ const CommandApp: React.FC = () => {
 
   // Tax Section View
   const TaxView: React.FC = () => {
-    const totalIncome = taxDocuments.filter(d => ['w2', '1099'].includes(d.type) && d.amount).reduce((sum, d) => sum + (d.amount || 0), 0);
-    const totalContributions = charitableContributions.reduce((sum, c) => sum + c.amount, 0);
-    const totalBusinessExpenses = businessExpenses.reduce((sum, e) => sum + e.amount, 0);
-    const potentialSavings = taxRecommendations.reduce((sum, r) => sum + (r.potentialSavings || 0), 0);
-    const pendingDocs = taxDocuments.filter(d => d.status === 'pending').length;
-
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Tax Planning</h1>
-          <p className="text-gray-600">Planning, filing coordination, and record retention to streamline filings and optimize strategy.</p>
-        </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Gross Income — links to Finances to update income */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center"><DollarSign className="w-5 h-5 text-blue-600" /></div>
-              <span className="text-sm text-gray-600">2025 Gross Income</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">${totalIncome.toLocaleString()}</p>
-            <button
-              onClick={() => setActiveView('finances')}
-              className="mt-2 text-xs font-medium hover:underline"
-              style={{ color: '#C9A24D' }}
-            >
-              Update income →
-            </button>
-          </div>
-          {/* Charitable Giving — scrolls to contributions section */}
-          <button
-            className="bg-white border border-gray-200 rounded-xl p-5 text-left hover:border-green-300 hover:shadow-sm transition-all cursor-pointer"
-            onClick={() => document.getElementById('charitable-contributions')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center"><Heart className="w-5 h-5 text-green-600" /></div>
-              <span className="text-sm text-gray-600">Charitable Giving</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">${totalContributions.toLocaleString()}</p>
-            <p className="mt-2 text-xs text-gray-400">Click to add / upload contributions</p>
-          </button>
-          {/* Business Expenses — scrolls to expenses section */}
-          <button
-            className="bg-white border border-gray-200 rounded-xl p-5 text-left hover:border-purple-300 hover:shadow-sm transition-all cursor-pointer"
-            onClick={() => document.getElementById('business-expenses')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
-          >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center"><Briefcase className="w-5 h-5 text-purple-600" /></div>
-              <span className="text-sm text-gray-600">Business Expenses</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">${totalBusinessExpenses.toLocaleString()}</p>
-            <p className="mt-2 text-xs text-gray-400">Click to add / upload expenses</p>
-          </button>
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(201, 162, 77, 0.2)' }}>
-                <TrendingUp className="w-5 h-5" style={{ color: '#C9A24D' }} />
-              </div>
-              <span className="text-sm text-gray-600">Potential Savings</span>
-            </div>
-            <p className="text-2xl font-bold" style={{ color: '#C9A24D' }}>${potentialSavings.toLocaleString()}</p>
-          </div>
-        </div>
-
-        {/* CPA Contact */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-4">
-              <div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center">
-                <Briefcase className="w-7 h-7 text-gray-600" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold text-gray-900">{cpaTaxProfessional.name}</h2>
-                <p className="text-gray-600">{cpaTaxProfessional.firm}</p>
-                <div className="flex items-center gap-4 mt-3 text-sm">
-                  <a href={`tel:${cpaTaxProfessional.phone}`} className="flex items-center gap-1 text-gray-600 hover:text-gray-900">
-                    <Phone className="w-4 h-4" />{cpaTaxProfessional.phone}
-                  </a>
-                  <a href={`mailto:${cpaTaxProfessional.email}`} className="flex items-center gap-1 hover:text-yellow-600" style={{ color: '#C9A24D' }}>
-                    <Mail className="w-4 h-4" />{cpaTaxProfessional.email}
-                  </a>
-                </div>
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="text-sm text-gray-500">Last Filing</p>
-              <p className="font-medium text-green-600">{cpaTaxProfessional.lastFiling}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Tax Recommendations */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Tax Optimization Recommendations</h2>
-            <span className="text-sm text-gray-500">{taxRecommendations.filter(r => !dismissedTaxRecs.includes(r.id)).length} opportunities</span>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {taxRecommendations.filter(rec => !dismissedTaxRecs.includes(rec.id)).map(rec => (
-              <div key={rec.id} className="px-6 py-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-4">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${rec.priority === 'high' ? 'bg-red-100' : rec.priority === 'medium' ? 'bg-yellow-100' : 'bg-blue-100'}`}>
-                      <TrendingUp className={`w-5 h-5 ${rec.priority === 'high' ? 'text-red-600' : rec.priority === 'medium' ? 'text-yellow-600' : 'text-blue-600'}`} />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium text-gray-900">{rec.title}</h3>
-                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full capitalize ${rec.priority === 'high' ? 'bg-red-100 text-red-800' : rec.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-blue-100 text-blue-800'}`}>{rec.priority}</span>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">{rec.description}</p>
-                      {rec.deadline && <p className="text-xs text-gray-500 mt-1">Deadline: {rec.deadline}</p>}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3 ml-4 flex-shrink-0">
-                    {rec.potentialSavings && rec.potentialSavings > 0 && (
-                      <p className="font-semibold" style={{ color: '#C9A24D' }}>Save ${rec.potentialSavings.toLocaleString()}</p>
-                    )}
-                    <button
-                      onClick={() => setDismissedTaxRecs(prev => [...prev, rec.id])}
-                      className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-                      title="Dismiss"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {taxRecommendations.every(r => dismissedTaxRecs.includes(r.id)) && (
-              <div className="px-6 py-8 text-center text-gray-400 text-sm">
-                All recommendations dismissed.{' '}
-                <button onClick={() => setDismissedTaxRecs([])} className="underline hover:text-gray-600">Restore all</button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Tax Law Updates */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h2 className="text-lg font-semibold text-gray-900">Tax Law Updates for 2025</h2>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {taxLawUpdates.map(update => (
-              <div key={update.id} className="px-6 py-4">
-                <div className="flex items-start gap-4">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${update.impact === 'positive' ? 'bg-green-100' : update.impact === 'negative' ? 'bg-red-100' : 'bg-gray-100'}`}>
-                    <AlertCircle className={`w-5 h-5 ${update.impact === 'positive' ? 'text-green-600' : update.impact === 'negative' ? 'text-red-600' : 'text-gray-600'}`} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-medium text-gray-900">{update.title}</h3>
-                      {update.actionRequired && <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Action Required</span>}
-                    </div>
-                    <p className="text-sm text-gray-600 mt-1">{update.summary}</p>
-                    <p className="text-xs text-gray-500 mt-1">Effective: {update.effectiveDate}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Tax Documents */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Tax Documents</h2>
-              {pendingDocs > 0 && <p className="text-sm text-yellow-600">{pendingDocs} document(s) still pending</p>}
-            </div>
-            <button onClick={() => setShowDocumentUpload(true)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-100" style={{ color: '#C9A24D' }}>
-              <Upload className="w-4 h-4" />Upload Document
-            </button>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {taxDocuments.map(doc => (
-              <div key={doc.id} className="px-6 py-3 hover:bg-gray-50 cursor-pointer">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${doc.status === 'pending' ? 'bg-yellow-100' : doc.status === 'received' ? 'bg-green-100' : doc.status === 'filed' ? 'bg-blue-100' : 'bg-gray-100'}`}>
-                      <FileText className={`w-4 h-4 ${doc.status === 'pending' ? 'text-yellow-600' : doc.status === 'received' ? 'text-green-600' : doc.status === 'filed' ? 'text-blue-600' : 'text-gray-600'}`} />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900 text-sm">{doc.name}</h3>
-                      <p className="text-xs text-gray-500">{doc.source || doc.year}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    {doc.amount && <span className="text-sm font-medium text-gray-900">${doc.amount.toLocaleString()}</span>}
-                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full capitalize ${doc.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : doc.status === 'received' ? 'bg-green-100 text-green-800' : doc.status === 'filed' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'}`}>{doc.status}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Charitable Contributions */}
-        <div id="charitable-contributions" className="bg-white border border-gray-200 rounded-xl overflow-hidden scroll-mt-6">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Charitable Contributions</h2>
-              <p className="text-sm text-gray-500">Tax Year 2025 • {charitableContributions.length} donations</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <button onClick={() => setShowAddContribution(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700">
-                <Plus className="w-3.5 h-3.5" /> Add Entry
-              </button>
-              <button onClick={() => setShowUploadTaxDoc('contributions')} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg text-white transition-colors" style={{ backgroundColor: '#C9A24D' }}>
-                <Upload className="w-3.5 h-3.5" /> Upload Doc
-              </button>
-            </div>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {charitableContributions.map(contrib => (
-              <div key={contrib.id} className="px-6 py-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center">
-                      <Heart className="w-4 h-4 text-green-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900 text-sm">{contrib.organization}</h3>
-                      <p className="text-xs text-gray-500">{contrib.date} â€¢ {contrib.type}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium text-gray-900">${contrib.amount.toLocaleString()}</span>
-                    {contrib.acknowledged ? (
-                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800">Acknowledged</span>
-                    ) : (
-                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Needs Receipt</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* 1099 Business Expenses */}
-        <div id="business-expenses" className="bg-white border border-gray-200 rounded-xl overflow-hidden scroll-mt-6">
-          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Consulting Business Expenses (1099)</h2>
-              <p className="text-sm text-gray-500">Side business deductions for Schedule C</p>
-            </div>
-            <div className="flex items-center gap-3">
-              <button onClick={() => setShowAddExpense(true)} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors text-gray-700">
-                <Plus className="w-3.5 h-3.5" /> Add Entry
-              </button>
-              <button onClick={() => setShowUploadTaxDoc('expenses')} className="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg text-white transition-colors" style={{ backgroundColor: '#C9A24D' }}>
-                <Upload className="w-3.5 h-3.5" /> Upload Doc
-              </button>
-            </div>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {businessExpenses.map(expense => (
-              <div key={expense.id} className="px-6 py-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center">
-                      <Briefcase className="w-4 h-4 text-purple-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900 text-sm">{expense.category}</h3>
-                      <p className="text-xs text-gray-500">{expense.description}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-medium text-gray-900">${expense.amount.toLocaleString()}</span>
-                    {expense.receipt ? (
-                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800">Receipt</span>
-                    ) : (
-                      <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-800">No Receipt</span>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="px-6 py-4 bg-gray-50 border-t border-gray-100">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-600">Estimated Tax Savings (24% bracket)</span>
-              <span className="font-semibold" style={{ color: '#C9A24D' }}>${Math.round(totalBusinessExpenses * 0.24).toLocaleString()}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Key Deadlines */}
-        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center flex-shrink-0">
-              <Calendar className="w-5 h-5 text-yellow-600" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-yellow-900 mb-2">Upcoming Tax Deadlines</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <p className="font-medium text-yellow-900">Q1 Estimated Payment</p>
-                  <p className="text-yellow-700">April 15, 2026</p>
-                </div>
-                <div>
-                  <p className="font-medium text-yellow-900">Tax Filing Deadline</p>
-                  <p className="text-yellow-700">April 15, 2026</p>
-                </div>
-                <div>
-                  <p className="font-medium text-yellow-900">Extension Deadline</p>
-                  <p className="text-yellow-700">October 15, 2026</p>
-                </div>
-              </div>
-            </div>
-          </div>
+        <div><h1 className="text-2xl font-bold text-gray-900 mb-1">Tax Planning</h1><p className="text-gray-600">Planning, filing coordination, and record retention.</p></div>
+        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+          <Calendar className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+          <h3 className="font-medium text-gray-500 mb-1">Tax planning coming soon</h3>
+          <p className="text-sm text-gray-400">Upload tax documents, track charitable contributions, and manage business expenses here.</p>
         </div>
       </div>
     );
   };
 
-  // Family & Life Administration View
   const FamilyView: React.FC = () => {
-    const totalCollegeSavings = collegePlans.reduce((sum, p) => sum + p.currentSavings, 0);
-    const totalCollegeTarget = collegePlans.reduce((sum, p) => sum + p.estimatedCost, 0);
-
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Family & Life Administration</h1>
-          <p className="text-gray-600">Tracks major milestones and proactively prompts updates across all domains.</p>
-        </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center"><Users className="w-5 h-5 text-blue-600" /></div>
-              <span className="text-sm text-gray-600">Family Members</span>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{familyMembers.length}</p>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center"><Heart className="w-5 h-5 text-purple-600" /></div>
-              <span className="text-sm text-gray-600">Aging Parents</span>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{agingParents.length}</p>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center"><GraduationCap className="w-5 h-5 text-green-600" /></div>
-              <span className="text-sm text-gray-600">College Savings</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">${totalCollegeSavings.toLocaleString()}</p>
-            <p className="text-xs text-gray-500">of ${totalCollegeTarget.toLocaleString()} goal</p>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(201, 162, 77, 0.2)' }}>
-                <Calendar className="w-5 h-5" style={{ color: '#C9A24D' }} />
-              </div>
-              <span className="text-sm text-gray-600">Upcoming Events</span>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{upcomingLifeEvents.length}</p>
-          </div>
-        </div>
-
-        {/* Family Members */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h2 className="text-lg font-semibold text-gray-900">Household Members</h2>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {familyMembers.map(member => (
-              <div key={member.id} className="px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
-                      <span className="text-lg font-bold text-gray-600">{member.name.split(' ').map(n => n[0]).join('')}</span>
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">{member.name}</h3>
-                      <p className="text-sm text-gray-500">{member.relationship} â€¢ Age {member.age}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    {member.milestones.filter(m => m.type === 'upcoming').length > 0 && (
-                      <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                        {member.milestones.filter(m => m.type === 'upcoming').length} upcoming
-                      </span>
-                    )}
-                  </div>
-                </div>
-                {member.milestones.filter(m => m.type === 'upcoming').length > 0 && (
-                  <div className="mt-3 ml-16 space-y-2">
-                    {member.milestones.filter(m => m.type === 'upcoming').slice(0, 2).map(milestone => (
-                      <div key={milestone.id} className="flex items-center gap-2 text-sm">
-                        <Calendar className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-600">{milestone.title}</span>
-                        <span className="text-gray-400">â€¢</span>
-                        <span className="text-gray-500">{milestone.date}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* College Planning */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
-              <GraduationCap className="w-5 h-5" style={{ color: '#C9A24D' }} />
-              College Financial Planning
-            </h2>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {collegePlans.map((plan, idx) => {
-              const progress = Math.round((plan.currentSavings / plan.estimatedCost) * 100);
-              const yearsUntil = plan.targetYear - 2026;
-              return (
-                <div key={idx} className="px-6 py-5">
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <h3 className="font-medium text-gray-900">{plan.childName}</h3>
-                      <p className="text-sm text-gray-500">Target: {plan.targetYear} ({yearsUntil} years)</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-500">{plan.accountType}</p>
-                      {plan.onTrack ? (
-                        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-800">On Track</span>
-                      ) : (
-                        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Review Needed</span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-gray-600">Progress</span>
-                      <span className="font-medium text-gray-900">${plan.currentSavings.toLocaleString()} of ${plan.estimatedCost.toLocaleString()}</span>
-                    </div>
-                    <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                      <div className="h-full rounded-full" style={{ width: `${progress}%`, backgroundColor: '#C9A24D' }} />
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>{progress}% funded</span>
-                      <span>Contributing ${plan.monthlyContribution}/month</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Aging Parents */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h2 className="text-lg font-semibold text-gray-900">Aging Parents</h2>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {agingParents.map((parent, idx) => (
-              <div key={idx} className="px-6 py-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center">
-                      <Heart className="w-5 h-5 text-purple-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900">{parent.name}</h3>
-                      <p className="text-sm text-gray-500">{parent.relationship} â€¢ Age {parent.age} â€¢ {parent.location}</p>
-                      <p className="text-sm text-gray-600 mt-1">{parent.notes}</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${parent.healthStatus === 'Good' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
-                      {parent.healthStatus}
-                    </span>
-                    <p className="text-xs text-gray-500 mt-1">Last visit: {parent.lastVisit}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Life Events Timeline */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Upcoming Life Events & Impacts</h2>
-          <div className="space-y-4">
-            {upcomingLifeEvents.map(event => (
-              <div key={event.id} className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(201, 162, 77, 0.2)' }}>
-                  <Calendar className="w-5 h-5" style={{ color: '#C9A24D' }} />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <h3 className="font-medium text-gray-900">{event.event}</h3>
-                    <span className="text-sm text-gray-500">{event.date}</span>
-                  </div>
-                  <p className="text-sm text-gray-600 mt-1">{event.impact}</p>
-                  <span className={`inline-block mt-2 px-2 py-0.5 text-xs font-medium rounded-full capitalize ${
-                    event.category === 'insurance' ? 'bg-blue-100 text-blue-800' : 
-                    event.category === 'legal' ? 'bg-purple-100 text-purple-800' : 
-                    event.category === 'financial' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
-                  }`}>{event.category}</span>
-                </div>
-              </div>
-            ))}
-          </div>
+        <div><h1 className="text-2xl font-bold text-gray-900 mb-1">Family & Life Administration</h1><p className="text-gray-600">Tracks major milestones and proactively prompts updates across all domains.</p></div>
+        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+          <Users className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+          <h3 className="font-medium text-gray-500 mb-1">Family details not set up yet</h3>
+          <p className="text-sm text-gray-400">Add family members, track milestones, and manage college savings here.</p>
         </div>
       </div>
     );
   };
 
-  // Credit & Rewards View
   const CreditView: React.FC = () => {
-    const totalCreditLimit = creditCards.reduce((sum, c) => sum + c.creditLimit, 0);
-    const totalBalance = creditCards.reduce((sum, c) => sum + c.currentBalance, 0);
-    const totalRewardsValue = creditCards.reduce((sum, c) => sum + (c.rewardsType.includes('points') ? c.rewardsBalance * 0.015 : c.rewardsBalance), 0);
-    const utilizationRate = Math.round((totalBalance / totalCreditLimit) * 100);
-    const monthlyOptimizationSavings = creditRecommendations.reduce((sum, r) => sum + (r.monthlySavings || 0), 0);
-
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Credit & Rewards Optimization</h1>
-          <p className="text-gray-600">Maximizes value through smarter card selection and spending alignment.</p>
-        </div>
-
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center"><CreditCard className="w-5 h-5 text-blue-600" /></div>
-              <span className="text-sm text-gray-600">Active Cards</span>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{creditCards.length}</p>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center"><Sparkles className="w-5 h-5 text-green-600" /></div>
-              <span className="text-sm text-gray-600">Rewards Value</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">${Math.round(totalRewardsValue).toLocaleString()}</p>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${utilizationRate < 30 ? 'bg-green-100' : utilizationRate < 50 ? 'bg-yellow-100' : 'bg-red-100'}`}>
-                <Target className={`w-5 h-5 ${utilizationRate < 30 ? 'text-green-600' : utilizationRate < 50 ? 'text-yellow-600' : 'text-red-600'}`} />
-              </div>
-              <span className="text-sm text-gray-600">Utilization</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{utilizationRate}%</p>
-            <p className="text-xs text-gray-500">of ${totalCreditLimit.toLocaleString()}</p>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(201, 162, 77, 0.2)' }}>
-                <TrendingUp className="w-5 h-5" style={{ color: '#C9A24D' }} />
-              </div>
-              <span className="text-sm text-gray-600">Monthly Opportunity</span>
-            </div>
-            <p className="text-2xl font-bold" style={{ color: '#C9A24D' }}>+${monthlyOptimizationSavings.toFixed(0)}</p>
-          </div>
-        </div>
-
-        {/* Credit Cards */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h2 className="text-lg font-semibold text-gray-900">Your Credit Cards</h2>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {creditCards.map(card => (
-              <div key={card.id} className="px-6 py-4">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-4">
-                    <div className={`w-12 h-8 rounded flex items-center justify-center text-white text-xs font-bold ${
-                      card.issuer === 'Chase' ? 'bg-blue-600' : card.issuer === 'Amex' ? 'bg-blue-800' : 'bg-gray-600'
-                    }`}>
-                      {card.issuer.substring(0, 4).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="font-medium text-gray-900">{card.name}</h3>
-                        {card.annualFee > 0 && <span className="text-xs text-gray-500">${card.annualFee}/yr</span>}
-                      </div>
-                      <p className="text-sm text-gray-500">{card.rewardsRate}</p>
-                      <div className="flex items-center gap-2 mt-1">
-                        {card.bestFor.slice(0, 3).map((use, idx) => (
-                          <span key={idx} className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600">{use}</span>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-semibold text-gray-900">${card.currentBalance.toLocaleString()}</p>
-                    <p className="text-xs text-gray-500">of ${card.creditLimit.toLocaleString()}</p>
-                    <p className="text-xs mt-1" style={{ color: '#C9A24D' }}>
-                      {card.rewardsType.includes('points') ? `${card.rewardsBalance.toLocaleString()} pts` : `$${card.rewardsBalance}`}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Spending Optimization */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h2 className="text-lg font-semibold text-gray-900">Spending Optimization</h2>
-            <p className="text-sm text-gray-500">Are you using the right card for each category?</p>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {spendingOptimization.map((cat, idx) => (
-              <div key={idx} className="px-6 py-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${cat.optimized ? 'bg-green-100' : 'bg-yellow-100'}`}>
-                      {cat.optimized ? <CheckCircle className="w-4 h-4 text-green-600" /> : <AlertTriangle className="w-4 h-4 text-yellow-600" />}
-                    </div>
-                    <div>
-                      <h3 className="font-medium text-gray-900 text-sm">{cat.category}</h3>
-                      <p className="text-xs text-gray-500">${cat.monthlyAvg}/mo avg</p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-gray-900">{cat.bestCard}</p>
-                    {!cat.optimized && (
-                      <p className="text-xs text-green-600">+${(cat.potentialRewards - cat.actualRewards).toFixed(2)}/mo potential</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Recommendations */}
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h2 className="text-lg font-semibold text-gray-900">Optimization Recommendations</h2>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {creditRecommendations.map(rec => (
-              <div key={rec.id} className="px-6 py-4">
-                <div className="flex items-start gap-4">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${rec.priority === 'high' ? 'bg-green-100' : rec.priority === 'medium' ? 'bg-blue-100' : 'bg-gray-100'}`}>
-                    <Zap className={`w-5 h-5 ${rec.priority === 'high' ? 'text-green-600' : rec.priority === 'medium' ? 'text-blue-600' : 'text-gray-600'}`} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-medium text-gray-900">{rec.title}</h3>
-                      {rec.monthlySavings && <span className="text-sm font-medium" style={{ color: '#C9A24D' }}>+${rec.monthlySavings}/mo</span>}
-                    </div>
-                    <p className="text-sm text-gray-600 mt-1">{rec.description}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+        <div><h1 className="text-2xl font-bold text-gray-900 mb-1">Credit & Rewards Optimization</h1><p className="text-gray-600">Maximizes value through smarter card selection and spending alignment.</p></div>
+        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+          <CreditCard className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+          <h3 className="font-medium text-gray-500 mb-1">No credit cards added yet</h3>
+          <p className="text-sm text-gray-400">Add your credit cards to optimize rewards and track spending.</p>
         </div>
       </div>
     );
   };
 
-  // Finances & Budget View
   const FinancesView: React.FC = () => {
-    const totalBudgeted = monthlyBudget.reduce((sum, b) => sum + b.budgeted, 0);
-    const totalActual = monthlyBudget.reduce((sum, b) => sum + b.actual, 0);
-    const variance = totalBudgeted - totalActual;
-    const maxBudget = Math.max(...monthlyBudget.map(b => Math.max(b.budgeted, b.actual)));
-
     return (
       <div className="space-y-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Finances & Budget</h1>
-          <p className="text-gray-600">Executive-level view of cash flow, commitments, and upcoming decisions.</p>
+        <div><h1 className="text-2xl font-bold text-gray-900 mb-1">Finances & Budget</h1><p className="text-gray-600">Executive-level view of cash flow, commitments, and upcoming decisions.</p></div>
+        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+          <Wallet className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+          <h3 className="font-medium text-gray-500 mb-1">Budget tracking not set up yet</h3>
+          <p className="text-sm text-gray-400">Connect your accounts or add budget categories to track income, spending, and savings rate.</p>
         </div>
+      </div>
+    );
+  };
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center"><DollarSign className="w-5 h-5 text-blue-600" /></div>
-              <span className="text-sm text-gray-600">Monthly Income</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">${financialSummary.monthlyIncome.toLocaleString()}</p>
+
+  // All Documents View
+  const DocumentsView: React.FC = () => {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-1">All Documents</h1>
+            <p className="text-gray-600">Your complete document repository</p>
           </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${variance >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
-                {variance >= 0 ? <TrendingUp className="w-5 h-5 text-green-600" /> : <TrendingDown className="w-5 h-5 text-red-600" />}
-              </div>
-              <span className="text-sm text-gray-600">Budget Variance</span>
-            </div>
-            <p className={`text-2xl font-bold ${variance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {variance >= 0 ? '+' : ''}{variance < 0 ? '-' : ''}${Math.abs(variance).toLocaleString()}
-            </p>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center"><PiggyBank className="w-5 h-5 text-green-600" /></div>
-              <span className="text-sm text-gray-600">Savings Rate</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{financialSummary.savingsRate}%</p>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(201, 162, 77, 0.2)' }}>
-                <Shield className="w-5 h-5" style={{ color: '#C9A24D' }} />
-              </div>
-              <span className="text-sm text-gray-600">Emergency Fund</span>
-            </div>
-            <p className="text-2xl font-bold text-gray-900">{financialSummary.monthsOfExpenses.toFixed(1)} mo</p>
-            <p className="text-xs text-gray-500">${financialSummary.emergencyFund.toLocaleString()}</p>
-          </div>
+          <button onClick={() => setShowDocumentUpload(true)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-white font-medium hover:opacity-90" style={{ backgroundColor: '#C9A24D' }}>
+            <Upload className="w-4 h-4" />Upload Document
+          </button>
         </div>
+        <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+          <Folder className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+          <h3 className="font-medium text-gray-500 mb-1">No documents uploaded yet</h3>
+          <p className="text-sm text-gray-400">Upload insurance policies, legal documents, warranties, and more.</p>
+        </div>
+      </div>
+    );
+  };
 
-        {/* Budget vs Actual Chart */}
+  // Profile View
+  const ProfileView: React.FC = () => {
+    const locationStr = (() => {
+      const city = data?.household?.city ?? data?.profile?.city ?? '';
+      const state = data?.household?.state ?? data?.profile?.state ?? '';
+      return city && state ? `${city}, ${state}` : city || state || '';
+    })();
+    return (
+      <div className="space-y-6">
+        <div><h1 className="text-2xl font-bold text-gray-900 mb-1">Profile Settings</h1><p className="text-gray-600">Manage your account, security, and subscription</p></div>
         <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Budget vs. Actual - January 2026</h2>
-              <p className="text-sm text-gray-500">Spending by category</p>
+          <div className="flex items-center gap-6">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-yellow-600 to-yellow-500 flex items-center justify-center"><span className="text-3xl font-bold text-white">{userInitials}</span></div>
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-gray-900">{displayName}</h2>
+              <p className="text-gray-600">Command Member</p>
+              {locationStr && <p className="text-sm text-gray-500 mt-1">{locationStr}</p>}
+              <div className="flex items-center gap-2 mt-2"><span className="px-2.5 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">Pro Plan</span></div>
             </div>
-            <div className="flex items-center gap-6 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#C9A24D' }}></div>
-                <span className="text-gray-600">Budget</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-gray-400"></div>
-                <span className="text-gray-600">Actual</span>
-              </div>
-            </div>
-          </div>
-          
-          {/* Chart */}
-          <div className="space-y-4">
-            {monthlyBudget.map((item, idx) => {
-              const budgetWidth = (item.budgeted / maxBudget) * 100;
-              const actualWidth = (item.actual / maxBudget) * 100;
-              const isOver = item.actual > item.budgeted;
-              const Icon = item.icon;
-              return (
-                <div key={idx} className="group">
-                  <div className="flex items-center gap-4 mb-2">
-                    <div className="w-28 flex items-center gap-2">
-                      <Icon className="w-4 h-4 text-gray-500" />
-                      <span className="text-sm font-medium text-gray-700">{item.category}</span>
-                    </div>
-                    <div className="flex-1">
-                      <div className="relative h-8">
-                        {/* Budget bar (background) */}
-                        <div 
-                          className="absolute top-1 h-3 rounded-full opacity-30"
-                          style={{ width: `${budgetWidth}%`, backgroundColor: item.color }}
-                        />
-                        {/* Actual bar (foreground) */}
-                        <div 
-                          className={`absolute top-1 h-3 rounded-full transition-all ${isOver ? 'ring-2 ring-red-300' : ''}`}
-                          style={{ width: `${actualWidth}%`, backgroundColor: item.color }}
-                        />
-                        {/* Budget marker line */}
-                        <div 
-                          className="absolute top-0 h-5 w-0.5 bg-gray-800"
-                          style={{ left: `${budgetWidth}%` }}
-                        />
-                      </div>
-                    </div>
-                    <div className="w-32 text-right">
-                      <span className={`text-sm font-medium ${isOver ? 'text-red-600' : 'text-gray-900'}`}>
-                        ${item.actual.toLocaleString()}
-                      </span>
-                      <span className="text-sm text-gray-400"> / ${item.budgeted.toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Totals */}
-          <div className="mt-6 pt-4 border-t border-gray-200">
-            <div className="flex items-center justify-between">
-              <span className="font-semibold text-gray-900">Total</span>
-              <div className="text-right">
-                <span className={`font-semibold ${totalActual > totalBudgeted ? 'text-red-600' : 'text-gray-900'}`}>
-                  ${totalActual.toLocaleString()}
-                </span>
-                <span className="text-gray-400"> / ${totalBudgeted.toLocaleString()}</span>
-              </div>
+            <div className="flex items-center gap-3">
+              <button className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50 flex items-center gap-2"><Edit3 className="w-4 h-4" />Edit Profile</button>
+              <button onClick={() => supabase.auth.signOut()} className="px-4 py-2 rounded-lg border border-red-200 text-red-600 font-medium hover:bg-red-50">Sign Out</button>
             </div>
           </div>
         </div>
-
-        {/* Upcoming Obligations */}
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h2 className="text-lg font-semibold text-gray-900">Upcoming Obligations</h2>
-          </div>
-          <div className="divide-y divide-gray-100">
-            {upcomingObligations.map(ob => (
-              <div key={ob.id} className="px-6 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                    ob.type === 'tax' ? 'bg-purple-100' : ob.type === 'insurance' ? 'bg-blue-100' : ob.type === 'family' ? 'bg-pink-100' : 'bg-gray-100'
-                  }`}>
-                    <Calendar className={`w-5 h-5 ${
-                      ob.type === 'tax' ? 'text-purple-600' : ob.type === 'insurance' ? 'text-blue-600' : ob.type === 'family' ? 'text-pink-600' : 'text-gray-600'
-                    }`} />
-                  </div>
-                  <div>
-                    <h3 className="font-medium text-gray-900">{ob.description}</h3>
-                    <p className="text-sm text-gray-500">Due: {ob.dueDate}</p>
-                  </div>
-                </div>
-                <span className="font-semibold text-gray-900">${ob.amount.toLocaleString()}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Recommendations */}
-        {financialRecommendations.length > 0 && (
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0">
-                <Info className="w-5 h-5 text-blue-600" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-blue-900 mb-2">Recommendations</h3>
-                <div className="space-y-2">
-                  {financialRecommendations.map(rec => (
-                    <div key={rec.id} className="flex items-start gap-2">
-                      <CheckCircle className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                      <div>
-                        <span className="text-sm font-medium text-blue-900">{rec.title}:</span>
-                        <span className="text-sm text-blue-800 ml-1">{rec.description}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+          <div className="px-6 py-4 border-b border-gray-100"><h2 className="text-lg font-semibold text-gray-900">Subscription & Billing</h2></div>
+          <div className="p-6">
+            <div className="flex items-center justify-between mb-4">
+              <div><div className="flex items-center gap-3 mb-1"><h3 className="text-lg font-bold text-gray-900">Pro Plan</h3><span className="px-2.5 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">Active</span></div><p className="text-gray-600">$40/month</p></div>
+              <button className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 font-medium hover:bg-gray-50">Change Plan</button>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4">
+              <p className="text-sm font-medium text-gray-900 mb-2">Pro Plan includes:</p>
+              <div className="grid grid-cols-2 gap-2 text-sm text-gray-600">
+                {['Advanced risk scoring', 'Automation features', 'Annual optimization review', 'Priority support'].map((feature, idx) => (
+                  <div key={idx} className="flex items-center gap-2"><CheckCircle className="w-4 h-4 text-green-500" />{feature}</div>
+                ))}
               </div>
             </div>
           </div>
-        )}
+        </div>
       </div>
     );
   };

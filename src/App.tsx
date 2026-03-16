@@ -27,21 +27,14 @@ import {
   Building,
   Umbrella,
   Heart,
-  Mail,
-  Phone,
-  MapPin,
   Edit3,
   Plus,
   AlertTriangle,
   DollarSign,
   Upload,
-  File,
   Folder,
-  History,
   Download,
   Eye,
-  Search,
-  Filter,
   Zap,
   Thermometer,
   Droplets,
@@ -49,18 +42,14 @@ import {
   Flame,
   ScrollText,
   Scale,
-  Briefcase,
   FileSignature,
   ClipboardList,
   CircleDot,
   CreditCard,
   Wallet,
-  GraduationCap,
   ShoppingCart,
   Utensils,
   Tv,
-  Sparkles,
-  Target,
   PiggyBank,
   TrendingDown,
   LucideIcon
@@ -225,12 +214,12 @@ const CommandApp: React.FC = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
   const [dismissedPriorities, setDismissedPriorities] = useState<number[]>([]);
   const [showDismissed, setShowDismissed] = useState<boolean>(false);
-  const [selectedPolicy, setSelectedPolicy] = useState<InsurancePolicy | null>(null);
-  const [selectedLegalDoc, setSelectedLegalDoc] = useState<LegalDocument | null>(null);
-  const [selectedAsset, setSelectedAsset] = useState<HomeAsset | null>(null);
+  // const [selectedPolicy, setSelectedPolicy] = useState<InsurancePolicy | null>(null);
+  // const [selectedLegalDoc, setSelectedLegalDoc] = useState<LegalDocument | null>(null);
+  // const [selectedAsset, setSelectedAsset] = useState<HomeAsset | null>(null);
   const [showDocumentUpload, setShowDocumentUpload] = useState<boolean>(false);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
-  const [dismissedTaxRecs, setDismissedTaxRecs] = useState<string[]>([]);
+  // const [dismissedTaxRecs, setDismissedTaxRecs] = useState<string[]>([]);
   const [showAddContribution, setShowAddContribution] = useState<boolean>(false);
   const [showAddExpense, setShowAddExpense] = useState<boolean>(false);
   const [showUploadTaxDoc, setShowUploadTaxDoc] = useState<'contributions' | 'expenses' | null>(null);
@@ -284,7 +273,7 @@ const CommandApp: React.FC = () => {
   };
 
   // Attorney Information
-  const attorney: Attorney = {
+  const _attorney: Attorney = {
     name: 'Jennifer Morrison',
     firm: 'Morrison & Associates Law',
     specialty: 'Estate Planning & Trust Law',
@@ -295,7 +284,7 @@ const CommandApp: React.FC = () => {
   };
 
   // Legal Documents Data
-  const legalDocuments: LegalDocument[] = [
+  const _legalDocuments: LegalDocument[] = [
     {
       id: 'will-1',
       name: 'Last Will and Testament',
@@ -379,7 +368,7 @@ const CommandApp: React.FC = () => {
   ];
 
   // Home Assets Data
-  const homeAssets: HomeAsset[] = [
+  const _homeAssets: HomeAsset[] = [
     {
       id: 'hvac-1',
       name: 'HVAC System',
@@ -531,7 +520,7 @@ const CommandApp: React.FC = () => {
   ];
 
   // All Documents (for global document view)
-  const allDocuments: Document[] = [
+  const _allDocuments: Document[] = [
     {
       id: 'doc-1',
       name: 'Last Will and Testament - Bailey Family',
@@ -648,7 +637,7 @@ const CommandApp: React.FC = () => {
     actionRequired: boolean;
   }
 
-  const taxDocuments: TaxDocument[] = [
+  const _taxDocuments: TaxDocument[] = [
     { id: 'td-1', name: 'W-2 - Primary Employment', year: 2025, type: 'w2', status: 'received', source: 'Acme Corp', amount: 285000 },
     { id: 'td-2', name: 'W-2 - Spouse Employment', year: 2025, type: 'w2', status: 'received', source: 'Metro Health', amount: 40000 },
     { id: 'td-3', name: '1099-INT - Bank Interest', year: 2025, type: '1099', status: 'received', source: 'Chase Bank', amount: 1250 },
@@ -661,7 +650,7 @@ const CommandApp: React.FC = () => {
     { id: 'td-10', name: '2024 State Return (MN)', year: 2024, type: 'return', status: 'filed' }
   ];
 
-  const [charitableContributions, setCharitableContributions] = useState<CharitableContribution[]>([
+  const [_charitableContributions, _setCharitableContributions] = useState<CharitableContribution[]>([
     { id: 'cc-1', organization: 'United Way', date: 'Dec 15, 2025', amount: 5000, type: 'cash', acknowledged: true, taxDeductible: true },
     { id: 'cc-2', organization: 'St. Jude Children\'s Hospital', date: 'Nov 20, 2025', amount: 2500, type: 'cash', acknowledged: true, taxDeductible: true },
     { id: 'cc-3', organization: 'Local Food Shelf', date: 'Oct 5, 2025', amount: 1000, type: 'cash', acknowledged: true, taxDeductible: true },
@@ -669,7 +658,7 @@ const CommandApp: React.FC = () => {
     { id: 'cc-5', organization: 'Habitat for Humanity', date: 'Aug 15, 2025', amount: 500, type: 'goods', acknowledged: false, taxDeductible: true }
   ]);
 
-  const [businessExpenses, setBusinessExpenses] = useState<BusinessExpense[]>([
+  const [_businessExpenses, _setBusinessExpenses] = useState<BusinessExpense[]>([
     { id: 'be-1', category: 'Home Office', description: 'Dedicated office space (150 sq ft)', amount: 1800, date: '2025', deductible: true, receipt: true },
     { id: 'be-2', category: 'Software', description: 'Adobe Creative Suite, Zoom Pro', amount: 850, date: '2025', deductible: true, receipt: true },
     { id: 'be-3', category: 'Professional Development', description: 'Industry conference & courses', amount: 2200, date: '2025', deductible: true, receipt: true },
@@ -679,7 +668,7 @@ const CommandApp: React.FC = () => {
     { id: 'be-7', category: 'Travel', description: 'Client meetings, mileage', amount: 1850, date: '2025', deductible: true, receipt: true }
   ]);
 
-  const taxRecommendations: TaxRecommendation[] = [
+  const _taxRecommendations: TaxRecommendation[] = [
     { id: 'tr-1', title: 'Maximize 401(k) Contributions', description: 'You contributed $20,500 in 2025. The limit is $23,000. Consider increasing to capture additional $2,500 in tax-deferred savings.', potentialSavings: 875, priority: 'high', deadline: 'Dec 31, 2026' },
     { id: 'tr-2', title: 'Consider Backdoor Roth IRA', description: 'Your income exceeds Roth IRA limits. A backdoor Roth conversion could provide tax-free growth.', potentialSavings: 0, priority: 'medium' },
     { id: 'tr-3', title: 'Harvest Investment Losses', description: 'You have $12,000 in unrealized losses that could offset gains and reduce tax liability.', potentialSavings: 2400, priority: 'high', deadline: 'Dec 31, 2026' },
@@ -688,14 +677,14 @@ const CommandApp: React.FC = () => {
     { id: 'tr-6', title: 'Review Estimated Tax Payments', description: 'Your consulting income requires quarterly estimates. Ensure Q1 2026 payment is adequate to avoid penalties.', priority: 'high', deadline: 'Apr 15, 2026' }
   ];
 
-  const taxLawUpdates: TaxLawUpdate[] = [
+  const _taxLawUpdates: TaxLawUpdate[] = [
     { id: 'tl-1', title: 'SALT Deduction Cap Extended', effectiveDate: '2025', impact: 'negative', summary: 'The $10,000 cap on state and local tax (SALT) deductions continues through 2025. This affects your property tax and state income tax deductions.', actionRequired: false },
     { id: 'tl-2', title: 'Standard Deduction Increase', effectiveDate: '2025', impact: 'positive', summary: 'Standard deduction for married filing jointly increased to $29,200. Compare against your itemized deductions to optimize.', actionRequired: true },
     { id: 'tl-3', title: '1099-K Reporting Threshold', effectiveDate: '2025', impact: 'neutral', summary: 'Payment platforms must report transactions over $5,000 (down from $20,000). May receive additional 1099-K forms.', actionRequired: false },
     { id: 'tl-4', title: 'Clean Vehicle Tax Credit', effectiveDate: '2025', impact: 'positive', summary: 'If purchasing an electric vehicle, credits up to $7,500 are available. Your Tesla may have qualified for the used EV credit.', actionRequired: true }
   ];
 
-  const cpaTaxProfessional = {
+  const _cpaTaxProfessional = {
     name: 'Michael Chen, CPA',
     firm: 'Chen & Associates Tax Advisors',
     phone: '(612) 555-3400',
@@ -734,7 +723,7 @@ const CommandApp: React.FC = () => {
     onTrack: boolean;
   }
 
-  const familyMembers: FamilyMember[] = [
+  const _familyMembers: FamilyMember[] = [
     {
       id: 'fm-1',
       name: 'Adam Bailey',
@@ -778,18 +767,18 @@ const CommandApp: React.FC = () => {
     }
   ];
 
-  const agingParents = [
+  const _agingParents = [
     { name: 'Robert Bailey', relationship: 'Father', age: 72, location: 'Rochester, MN', healthStatus: 'Good', lastVisit: 'Jan 2026', notes: 'Annual checkup scheduled for March' },
     { name: 'Linda Bailey', relationship: 'Mother', age: 70, location: 'Rochester, MN', healthStatus: 'Good', lastVisit: 'Jan 2026', notes: 'Considering downsizing in 2-3 years' },
     { name: 'Margaret Thompson', relationship: 'Mother-in-law', age: 68, location: 'Minneapolis, MN', healthStatus: 'Fair', lastVisit: 'Dec 2025', notes: 'Managing arthritis, may need additional support' }
   ];
 
-  const collegePlans: CollegePlan[] = [
+  const _collegePlans: CollegePlan[] = [
     { childName: 'Emma Bailey', targetYear: 2031, estimatedCost: 200000, currentSavings: 45000, monthlyContribution: 800, accountType: '529 Plan', onTrack: true },
     { childName: 'Jack Bailey', targetYear: 2034, estimatedCost: 220000, currentSavings: 28000, monthlyContribution: 600, accountType: '529 Plan', onTrack: true }
   ];
 
-  const upcomingLifeEvents = [
+  const _upcomingLifeEvents = [
     { id: 'le-1', event: 'Emma turns 13', date: 'Sep 10, 2026', impact: 'Consider teen auto insurance rider', category: 'insurance' },
     { id: 'le-2', event: 'Adam turns 45', date: 'May 15, 2026', impact: 'Life insurance rate review, estate plan check', category: 'legal' },
     { id: 'le-3', event: 'Emma starts high school', date: 'Sep 2027', impact: 'College planning acceleration, extracurricular budget', category: 'financial' },
@@ -826,7 +815,7 @@ const CommandApp: React.FC = () => {
     optimized: boolean;
   }
 
-  const creditCards: CreditCard[] = [
+  const _creditCards: CreditCard[] = [
     {
       id: 'cc-1',
       name: 'Sapphire Reserve',
@@ -897,7 +886,7 @@ const CommandApp: React.FC = () => {
     }
   ];
 
-  const spendingOptimization: SpendingCategory[] = [
+  const _spendingOptimization: SpendingCategory[] = [
     { category: 'Groceries', monthlyAvg: 1200, bestCard: 'Blue Cash Preferred', currentCard: 'Blue Cash Preferred', potentialRewards: 72, actualRewards: 72, optimized: true },
     { category: 'Dining', monthlyAvg: 600, bestCard: 'Sapphire Reserve', currentCard: 'Sapphire Reserve', potentialRewards: 54, actualRewards: 54, optimized: true },
     { category: 'Gas', monthlyAvg: 350, bestCard: 'Blue Cash Preferred', currentCard: 'Freedom Unlimited', potentialRewards: 21, actualRewards: 5.25, optimized: false },
@@ -906,7 +895,7 @@ const CommandApp: React.FC = () => {
     { category: 'Subscriptions', monthlyAvg: 250, bestCard: 'Blue Cash Preferred', currentCard: 'Sapphire Reserve', potentialRewards: 15, actualRewards: 2.50, optimized: false }
   ];
 
-  const creditRecommendations = [
+  const _creditRecommendations = [
     { id: 'cr-1', title: 'Use Blue Cash Preferred for Gas', description: 'Switch gas purchases from Freedom to Blue Cash for 6% vs 1.5% back', monthlySavings: 15.75, priority: 'high' },
     { id: 'cr-2', title: 'Consolidate Online Shopping', description: 'Use Freedom Unlimited for all online purchases to maximize 1.5% cashback', monthlySavings: 4, priority: 'medium' },
     { id: 'cr-3', title: 'Move Streaming to Blue Cash', description: 'Transfer streaming services to Blue Cash Preferred for 6% vs 1%', monthlySavings: 12.50, priority: 'medium' },
@@ -922,7 +911,7 @@ const CommandApp: React.FC = () => {
     color: string;
   }
 
-  const monthlyBudget: BudgetCategory[] = [
+  const _monthlyBudget: BudgetCategory[] = [
     { category: 'Housing', icon: Home, budgeted: 3500, actual: 3450, color: '#C9A24D' },
     { category: 'Transportation', icon: Car, budgeted: 800, actual: 920, color: '#6366F1' },
     { category: 'Groceries', icon: ShoppingCart, budgeted: 1200, actual: 1180, color: '#10B981' },
@@ -935,7 +924,7 @@ const CommandApp: React.FC = () => {
     { category: 'Other', icon: DollarSign, budgeted: 500, actual: 540, color: '#64748B' }
   ];
 
-  const financialSummary = {
+  const _financialSummary = {
     monthlyIncome: 27083, // $325k / 12
     totalBudgeted: 11350,
     totalActual: 11600,
@@ -945,7 +934,7 @@ const CommandApp: React.FC = () => {
     monthsOfExpenses: 3.9
   };
 
-  const upcomingObligations = [
+  const _upcomingObligations = [
     { id: 'ob-1', description: 'Q1 Estimated Tax Payment', amount: 12500, dueDate: 'Apr 15, 2026', type: 'tax' },
     { id: 'ob-2', description: 'Property Tax (1st half)', amount: 4100, dueDate: 'May 15, 2026', type: 'tax' },
     { id: 'ob-3', description: 'Emma Summer Camp Deposit', amount: 1500, dueDate: 'Mar 1, 2026', type: 'family' },
@@ -953,14 +942,14 @@ const CommandApp: React.FC = () => {
     { id: 'ob-5', description: 'Car Registration Renewal', amount: 450, dueDate: 'Jun 30, 2026', type: 'auto' }
   ];
 
-  const financialRecommendations = [
+  const _financialRecommendations = [
     { id: 'fr-1', title: 'Top off Emergency Fund', description: 'Add $5,000 to reach 4-month expense target', priority: 'medium' },
     { id: 'fr-2', title: 'Review Dining Budget', description: 'Consistently over budget by 20%. Consider adjusting to $700/month.', priority: 'low' },
     { id: 'fr-3', title: 'Entertainment Overspend', description: 'Over budget 3 of last 4 months. Review subscriptions.', priority: 'low' }
   ];
 
   // Insurance Policies Data
-  const insurancePolicies: InsurancePolicy[] = [
+  const _insurancePolicies: InsurancePolicy[] = [
     {
       id: 'home-1',
       type: 'home',
@@ -1135,7 +1124,7 @@ const CommandApp: React.FC = () => {
     }
   ];
 
-  const timelineEvents: TimelineEvent[] = [
+  const _timelineEvents: TimelineEvent[] = [
     { id: 1, date: 'Feb 2, 2026', title: 'Auto Insurance Renewal', category: 'Insurance', type: 'upcoming', icon: Shield, status: 'warning' },
     { id: 2, date: 'Feb 15, 2026', title: 'Q1 Estimated Tax Payment Due', category: 'Taxes', type: 'upcoming', icon: Calendar, status: 'info' },
     { id: 3, date: 'Mar 1, 2026', title: 'Home Insurance Renewal', category: 'Insurance', type: 'upcoming', icon: Shield, status: 'info' },
@@ -1216,7 +1205,7 @@ const CommandApp: React.FC = () => {
     return 'border-red-500';
   };
 
-  const getConditionColor = (condition: string): string => {
+  const _getConditionColor = (condition: string): string => {
     switch (condition) {
       case 'excellent': return 'text-green-600 bg-green-100';
       case 'good': return 'text-blue-600 bg-blue-100';
@@ -1227,7 +1216,7 @@ const CommandApp: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string): string => {
+  const _getStatusColor = (status: string): string => {
     switch (status) {
       case 'current': return 'text-green-600 bg-green-100';
       case 'needs-review': return 'text-yellow-600 bg-yellow-100';
@@ -2368,6 +2357,22 @@ const CommandApp: React.FC = () => {
       </div>
     );
   };
+
+  const PriorityDetailView: React.FC<{ priority: Priority }> = ({ priority }) => (
+    <div className="space-y-6">
+      <button onClick={() => setSelectedPriority(null)} className="flex items-center gap-2 text-gray-600 hover:text-gray-900"><ArrowLeft className="w-4 h-4" /><span className="text-sm font-medium">Back to Dashboard</span></button>
+      <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
+        <div className="flex items-start gap-4 mb-6">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center"><priority.icon className="w-6 h-6" style={{ color: '#C9A24D' }} /></div>
+          <div className="flex-1"><h1 className="text-2xl font-bold text-gray-900 mb-2">{priority.title}</h1><div className="flex items-center gap-3 text-sm text-gray-500"><Clock className="w-4 h-4" />{priority.urgency}</div></div>
+        </div>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6"><div className="flex items-start gap-3"><Info className="w-5 h-5 text-blue-600 mt-0.5" /><div><h3 className="font-semibold text-blue-900 mb-1">Why This Matters</h3><p className="text-sm text-blue-800">{priority.rationale}</p></div></div></div>
+        {priority.recommendations.length > 0 && (
+          <div><h3 className="text-lg font-semibold text-gray-900 mb-4">Recommendations</h3><div className="space-y-4">{priority.recommendations.map((rec, index) => (<div key={index} className="bg-white border border-gray-200 rounded-xl p-5"><h4 className="font-semibold text-gray-900 mb-1">{rec.title}</h4>{rec.savings && <div className="text-sm font-semibold mb-2" style={{ color: '#C9A24D' }}>Save ${rec.savings}/year</div>}<p className="text-sm text-gray-600 mb-2">{rec.description}</p><p className="text-sm text-gray-700">{rec.impact}</p></div>))}</div></div>
+        )}
+      </div>
+    </div>
+  );
 
   const DashboardView: React.FC = () => {
     if (selectedPriority) return <PriorityDetailView priority={selectedPriority} />;

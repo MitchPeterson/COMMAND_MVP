@@ -113,6 +113,16 @@ interface HouseholdSection {
   items: SectionItem[];
 }
 
+interface TimelineEvent {
+  id: number;
+  date: string;
+  title: string;
+  category: string;
+  type: 'upcoming' | 'past';
+  icon: LucideIcon;
+  status?: 'warning' | 'info' | 'success' | 'critical';
+}
+
 interface InsurancePolicy {
   id: string;
   type: 'home' | 'auto' | 'umbrella' | 'life' | 'health';
@@ -167,6 +177,16 @@ interface LegalDocument {
   icon: LucideIcon;
 }
 
+interface Attorney {
+  name: string;
+  firm: string;
+  specialty: string;
+  phone: string;
+  email: string;
+  address: string;
+  lastContact: string;
+}
+
 interface HomeAsset {
   id: string;
   name: string;
@@ -193,6 +213,17 @@ interface MaintenanceRecord {
   cost: number;
   provider?: string;
   notes?: string;
+}
+
+interface DevPersona {
+  id: string;
+  name: string;
+  initials: string;
+  title: string;
+  hhi: string;
+  netWorth: string;
+  score: number;
+  description: string;
 }
 
 interface TaxDocument {
@@ -244,15 +275,14 @@ interface TaxLawUpdate {
   actionRequired: boolean;
 }
 
-interface DevPersona {
+interface Milestone {
   id: string;
-  name: string;
-  initials: string;
   title: string;
-  hhi: string;
-  netWorth: string;
-  score: number;
-  description: string;
+  date: string;
+  type: 'past' | 'upcoming';
+  category: 'education' | 'health' | 'legal' | 'financial' | 'life';
+  triggersReview: string[];
+  status?: 'completed' | 'pending' | 'action-needed';
 }
 
 interface FamilyMember {
@@ -262,16 +292,6 @@ interface FamilyMember {
   birthDate: string;
   age: number;
   milestones: Milestone[];
-}
-
-interface Milestone {
-  id: string;
-  title: string;
-  date: string;
-  type: 'past' | 'upcoming';
-  category: 'education' | 'health' | 'legal' | 'financial' | 'life';
-  triggersReview: string[];
-  status?: 'completed' | 'pending' | 'action-needed';
 }
 
 interface CollegePlan {

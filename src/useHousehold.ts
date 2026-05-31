@@ -7,12 +7,16 @@ import {
   getHousehold,
   getInsurancePolicies,
   getLegalDocuments,
+  getAssets,
+  getMaintenanceRecords,
   getPriorityActions,
   getTimelineEvents,
   getSectionScores,
   type Household,
   type InsurancePolicy,
   type LegalDocument,
+  type Asset,
+  type MaintenanceRecord,
   type PriorityAction,
   type TimelineEvent,
   type SectionScore,
@@ -24,6 +28,8 @@ export interface HouseholdData {
   profile: HouseholdProfile | null;
   insurancePolicies: InsurancePolicy[];
   legalDocuments: LegalDocument[];
+  assets: Asset[];
+  maintenanceRecords: MaintenanceRecord[];
   priorityActions: PriorityAction[];
   timelineEvents: TimelineEvent[];
   sectionScores: SectionScore[];
@@ -42,6 +48,8 @@ const EMPTY_DATA: HouseholdData = {
   profile: null,
   insurancePolicies: [],
   legalDocuments: [],
+  assets: [],
+  maintenanceRecords: [],
   priorityActions: [],
   timelineEvents: [],
   sectionScores: [],
@@ -73,6 +81,8 @@ export function useHousehold(): UseHouseholdReturn {
         profile,
         insurancePolicies,
         legalDocuments,
+        assets,
+        maintenanceRecords,
         priorityActions,
         timelineEvents,
         sectionScores,
@@ -85,6 +95,8 @@ export function useHousehold(): UseHouseholdReturn {
           .then(({ data }) => data as HouseholdProfile | null),
         getInsurancePolicies(hid),
         getLegalDocuments(hid),
+        getAssets(hid),
+        getMaintenanceRecords(hid),
         getPriorityActions(hid),
         getTimelineEvents(hid),
         getSectionScores(hid),
@@ -95,6 +107,8 @@ export function useHousehold(): UseHouseholdReturn {
         profile,
         insurancePolicies,
         legalDocuments,
+        assets,
+        maintenanceRecords,
         priorityActions,
         timelineEvents,
         sectionScores,

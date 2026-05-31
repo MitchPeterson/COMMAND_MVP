@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { supabase } from './lib/supabase';
+import { supabase, type Asset as DbAsset, type MaintenanceRecord as DbMaintenanceRecord } from './lib/supabase';
 import { useHousehold } from './useHousehold';
 import { AuthScreen } from './AuthScreen';
 import { 
@@ -187,34 +187,6 @@ interface Attorney {
   lastContact: string;
 }
 
-interface HomeAsset {
-  id: string;
-  name: string;
-  category: 'hvac' | 'roof' | 'appliance' | 'plumbing' | 'electrical' | 'exterior' | 'other';
-  brand?: string;
-  model?: string;
-  installDate: string;
-  expectedLifespan: number;
-  currentAge: number;
-  condition: 'excellent' | 'good' | 'fair' | 'poor' | 'replace-soon';
-  estimatedReplacementCost: number;
-  warrantyExpires?: string;
-  lastServiceDate?: string;
-  documents: Document[];
-  maintenanceHistory: MaintenanceRecord[];
-  icon: LucideIcon;
-}
-
-interface MaintenanceRecord {
-  id: string;
-  date: string;
-  type: 'repair' | 'maintenance' | 'inspection' | 'replacement';
-  description: string;
-  cost: number;
-  provider?: string;
-  notes?: string;
-}
-
 interface DevPersona {
   id: string;
   name: string;
@@ -349,7 +321,7 @@ const CommandApp: React.FC = () => {
   const [showDismissed, setShowDismissed] = useState<boolean>(false);
   const [selectedPolicy, setSelectedPolicy] = useState<InsurancePolicy | null>(null);
   const [selectedLegalDoc, setSelectedLegalDoc] = useState<LegalDocument | null>(null);
-  const [selectedAsset, setSelectedAsset] = useState<HomeAsset | null>(null);
+  const [selectedAsset, setSelectedAsset] = useState<DbAsset | null>(null);
   const [showDocumentUpload, setShowDocumentUpload] = useState<boolean>(false);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [dismissedTaxRecs, setDismissedTaxRecs] = useState<string[]>([]);
@@ -487,158 +459,6 @@ const CommandApp: React.FC = () => {
       ],
       documents: [],
       icon: ClipboardList
-    }
-  ];
-
-  // Home Assets Data
-  const homeAssets: HomeAsset[] = [
-    {
-      id: 'hvac-1',
-      name: 'HVAC System',
-      category: 'hvac',
-      brand: 'Carrier',
-      model: 'Infinity 24ANB1',
-      installDate: 'June 2012',
-      expectedLifespan: 18,
-      currentAge: 14,
-      condition: 'fair',
-      estimatedReplacementCost: 8500,
-      warrantyExpires: 'June 2022',
-      lastServiceDate: 'October 2025',
-      documents: [],
-      maintenanceHistory: [
-        { id: 'm1', date: 'Oct 15, 2025', type: 'maintenance', description: 'Annual inspection and tune-up', cost: 189, provider: 'Comfort Systems' },
-        { id: 'm2', date: 'Jul 3, 2025', type: 'repair', description: 'Capacitor replacement', cost: 285, provider: 'Comfort Systems' },
-        { id: 'm3', date: 'Oct 10, 2024', type: 'maintenance', description: 'Annual inspection', cost: 175, provider: 'Comfort Systems' }
-      ],
-      icon: Thermometer
-    },
-    {
-      id: 'roof-1',
-      name: 'Roof',
-      category: 'roof',
-      brand: 'GAF',
-      model: 'Timberline HDZ',
-      installDate: 'August 2022',
-      expectedLifespan: 30,
-      currentAge: 3,
-      condition: 'excellent',
-      estimatedReplacementCost: 18000,
-      warrantyExpires: 'August 2052',
-      lastServiceDate: 'August 2024',
-      documents: [],
-      maintenanceHistory: [
-        { id: 'm1', date: 'Aug 20, 2024', type: 'inspection', description: 'Annual roof inspection', cost: 0, provider: 'ABC Roofing', notes: 'No issues found' }
-      ],
-      icon: Building
-    },
-    {
-      id: 'waterheater-1',
-      name: 'Water Heater',
-      category: 'plumbing',
-      brand: 'Rheem',
-      model: 'Performance Plus 50 Gal',
-      installDate: 'March 2018',
-      expectedLifespan: 12,
-      currentAge: 8,
-      condition: 'good',
-      estimatedReplacementCost: 1800,
-      warrantyExpires: 'March 2024',
-      lastServiceDate: 'November 2024',
-      documents: [],
-      maintenanceHistory: [
-        { id: 'm1', date: 'Nov 5, 2024', type: 'maintenance', description: 'Anode rod inspection and tank flush', cost: 125, provider: 'Pro Plumbing' }
-      ],
-      icon: Droplets
-    },
-    {
-      id: 'furnace-1',
-      name: 'Furnace',
-      category: 'hvac',
-      brand: 'Carrier',
-      model: '59TP6',
-      installDate: 'June 2012',
-      expectedLifespan: 20,
-      currentAge: 14,
-      condition: 'good',
-      estimatedReplacementCost: 4500,
-      warrantyExpires: 'June 2022',
-      lastServiceDate: 'October 2025',
-      documents: [],
-      maintenanceHistory: [
-        { id: 'm1', date: 'Oct 15, 2025', type: 'maintenance', description: 'Annual inspection (with AC)', cost: 0, provider: 'Comfort Systems' }
-      ],
-      icon: Flame
-    },
-    {
-      id: 'fridge-1',
-      name: 'Refrigerator',
-      category: 'appliance',
-      brand: 'Samsung',
-      model: 'RF28R7551SR',
-      installDate: 'December 2020',
-      expectedLifespan: 15,
-      currentAge: 5,
-      condition: 'excellent',
-      estimatedReplacementCost: 2800,
-      warrantyExpires: 'December 2025',
-      lastServiceDate: undefined,
-      documents: [],
-      maintenanceHistory: [],
-      icon: Refrigerator
-    },
-    {
-      id: 'washer-1',
-      name: 'Washer & Dryer',
-      category: 'appliance',
-      brand: 'LG',
-      model: 'WM4000HWA / DLEX4000W',
-      installDate: 'January 2021',
-      expectedLifespan: 12,
-      currentAge: 5,
-      condition: 'excellent',
-      estimatedReplacementCost: 2200,
-      warrantyExpires: 'January 2026',
-      lastServiceDate: undefined,
-      documents: [],
-      maintenanceHistory: [],
-      icon: CircleDot
-    },
-    {
-      id: 'dishwasher-1',
-      name: 'Dishwasher',
-      category: 'appliance',
-      brand: 'Bosch',
-      model: 'SHPM88Z75N',
-      installDate: 'March 2019',
-      expectedLifespan: 12,
-      currentAge: 7,
-      condition: 'good',
-      estimatedReplacementCost: 1200,
-      warrantyExpires: 'March 2021',
-      lastServiceDate: undefined,
-      documents: [],
-      maintenanceHistory: [],
-      icon: Droplets
-    },
-    {
-      id: 'garage-1',
-      name: 'Garage Door Opener',
-      category: 'exterior',
-      brand: 'LiftMaster',
-      model: '8500W',
-      installDate: 'May 2018',
-      expectedLifespan: 15,
-      currentAge: 7,
-      condition: 'good',
-      estimatedReplacementCost: 650,
-      warrantyExpires: 'May 2023',
-      lastServiceDate: 'June 2024',
-      documents: [],
-      maintenanceHistory: [
-        { id: 'm1', date: 'Jun 10, 2024', type: 'maintenance', description: 'Lubrication and safety check', cost: 85, provider: 'Precision Door' }
-      ],
-      icon: Home
     }
   ];
 
@@ -1165,17 +985,6 @@ const CommandApp: React.FC = () => {
     if (score >= 8) return 'border-green-500';
     if (score >= 6) return 'border-yellow-500';
     return 'border-red-500';
-  };
-
-  const getConditionColor = (condition: string): string => {
-    switch (condition) {
-      case 'excellent': return 'text-green-600 bg-green-100';
-      case 'good': return 'text-blue-600 bg-blue-100';
-      case 'fair': return 'text-yellow-600 bg-yellow-100';
-      case 'poor': return 'text-orange-600 bg-orange-100';
-      case 'replace-soon': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
-    }
   };
 
   const getStatusColor = (status: string): string => {
@@ -2303,35 +2112,50 @@ const CommandApp: React.FC = () => {
   };
 
   // Home Section View
+  const ASSET_TYPE_META: Record<DbAsset['type'], { label: string; icon: LucideIcon }> = {
+    real_estate: { label: 'Real Estate', icon: Building },
+    vehicle: { label: 'Vehicles', icon: Car },
+    investment: { label: 'Investments', icon: TrendingUp },
+    retirement: { label: 'Retirement', icon: Wallet },
+    business: { label: 'Business', icon: Briefcase },
+    other: { label: 'Other', icon: Home },
+  };
+
+  const ASSET_TYPE_ORDER: DbAsset['type'][] = ['real_estate', 'vehicle', 'investment', 'retirement', 'business', 'other'];
+
+  const fmtMoney = (n: number | null | undefined): string =>
+    n == null ? '—' : `$${n.toLocaleString()}`;
+
+  const fmtDate = (d: string | null | undefined): string =>
+    d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : '—';
+
+  const getMaintStatusStyle = (status: string): string => {
+    switch (status) {
+      case 'overdue': return 'bg-red-100 text-red-700';
+      case 'upcoming': return 'bg-yellow-100 text-yellow-700';
+      case 'in_progress': return 'bg-blue-100 text-blue-700';
+      case 'completed': return 'bg-green-100 text-green-700';
+      default: return 'bg-gray-100 text-gray-700';
+    }
+  };
+
   const HomeView: React.FC = () => {
+    const assets = data?.assets ?? [];
+    const maintenance = data?.maintenanceRecords ?? [];
+
     if (selectedAsset) {
       return <AssetDetailView asset={selectedAsset} />;
     }
 
-    const totalReplacementValue = homeAssets.reduce((sum, a) => sum + a.estimatedReplacementCost, 0);
-    const needsAttention = homeAssets.filter(a => a.condition === 'fair' || a.condition === 'poor' || a.condition === 'replace-soon').length;
+    const totalValue = assets.reduce((sum, a) => sum + (a.current_value ?? 0), 0);
+    const openMaintenance = maintenance.filter(m => m.status === 'overdue' || m.status === 'upcoming' || m.status === 'in_progress');
+    const overdueCount = maintenance.filter(m => m.status === 'overdue').length;
 
-    // Calculate planned expenses by year
-    const plannedExpenses: { year: number; items: { name: string; cost: number }[] }[] = [];
-    homeAssets.forEach(asset => {
-      const yearsRemaining = asset.expectedLifespan - asset.currentAge;
-      const replacementYear = 2026 + yearsRemaining;
-      const existing = plannedExpenses.find(p => p.year === replacementYear);
-      if (existing) {
-        existing.items.push({ name: asset.name, cost: asset.estimatedReplacementCost });
-      } else {
-        plannedExpenses.push({ year: replacementYear, items: [{ name: asset.name, cost: asset.estimatedReplacementCost }] });
-      }
-    });
-    plannedExpenses.sort((a, b) => a.year - b.year);
-
-    const assetCategories = [
-      { id: 'hvac', label: 'HVAC', icon: Thermometer },
-      { id: 'roof', label: 'Roof & Structure', icon: Building },
-      { id: 'plumbing', label: 'Plumbing', icon: Droplets },
-      { id: 'appliance', label: 'Appliances', icon: Refrigerator },
-      { id: 'exterior', label: 'Exterior', icon: Home }
-    ];
+    // Maintenance sorted so overdue surfaces first, then upcoming/in-progress, then completed
+    const statusRank: Record<string, number> = { overdue: 0, upcoming: 1, in_progress: 2, completed: 3 };
+    const sortedMaintenance = [...maintenance].sort(
+      (a, b) => (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9)
+    );
 
     return (
       <div className="space-y-6">
@@ -2347,128 +2171,148 @@ const CommandApp: React.FC = () => {
               <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center"><Wrench className="w-5 h-5 text-blue-600" /></div>
               <span className="text-sm text-gray-600">Assets Tracked</span>
             </div>
-            <p className="text-3xl font-bold text-gray-900">{homeAssets.length}</p>
+            <p className="text-3xl font-bold text-gray-900">{assets.length}</p>
           </div>
           <div className="bg-white border border-gray-200 rounded-xl p-5">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center"><DollarSign className="w-5 h-5 text-green-600" /></div>
-              <span className="text-sm text-gray-600">Replacement Value</span>
+              <span className="text-sm text-gray-600">Total Value</span>
             </div>
-            <p className="text-3xl font-bold text-gray-900">${totalReplacementValue.toLocaleString()}</p>
-          </div>
-          <div className="bg-white border border-gray-200 rounded-xl p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center"><AlertTriangle className="w-5 h-5 text-yellow-600" /></div>
-              <span className="text-sm text-gray-600">Needs Attention</span>
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{needsAttention}</p>
+            <p className="text-3xl font-bold text-gray-900">{fmtMoney(totalValue)}</p>
           </div>
           <div className="bg-white border border-gray-200 rounded-xl p-5">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: 'rgba(201, 162, 77, 0.2)' }}>
                 <Calendar className="w-5 h-5" style={{ color: '#C9A24D' }} />
               </div>
-              <span className="text-sm text-gray-600">Next Major Expense</span>
+              <span className="text-sm text-gray-600">Open Maintenance</span>
             </div>
-            <p className="text-lg font-bold text-gray-900">HVAC - 2028</p>
-            <p className="text-sm text-gray-500">Est. $8,500</p>
+            <p className="text-3xl font-bold text-gray-900">{openMaintenance.length}</p>
+          </div>
+          <div className="bg-white border border-gray-200 rounded-xl p-5">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center"><AlertTriangle className="w-5 h-5 text-yellow-600" /></div>
+              <span className="text-sm text-gray-600">Overdue</span>
+            </div>
+            <p className="text-3xl font-bold text-gray-900">{overdueCount}</p>
           </div>
         </div>
 
-        {/* Assets by Category */}
-        {assetCategories.map(category => {
-          const categoryAssets = homeAssets.filter(a => a.category === category.id);
-          if (categoryAssets.length === 0) return null;
-          const CategoryIcon = category.icon;
+        {/* Assets by Type */}
+        {assets.length === 0 ? (
+          <div className="bg-white border border-gray-200 rounded-xl p-12 text-center">
+            <Wrench className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+            <h3 className="font-medium text-gray-500 mb-1">No assets tracked yet</h3>
+            <p className="text-sm text-gray-400">Add your home, vehicles, and investments to start tracking their value and upkeep.</p>
+          </div>
+        ) : (
+          ASSET_TYPE_ORDER.map(type => {
+            const typeAssets = assets.filter(a => a.type === type);
+            if (typeAssets.length === 0) return null;
+            const meta = ASSET_TYPE_META[type];
+            const TypeIcon = meta.icon;
 
-          return (
-            <div key={category.id} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
-                <CategoryIcon className="w-5 h-5" style={{ color: '#C9A24D' }} />
-                <h2 className="text-lg font-semibold text-gray-900">{category.label}</h2>
-                <span className="text-sm text-gray-500">({categoryAssets.length})</span>
-              </div>
-              <div className="divide-y divide-gray-100">
-                {categoryAssets.map(asset => {
-                  const Icon = asset.icon;
-                  const percentLife = Math.round((asset.currentAge / asset.expectedLifespan) * 100);
-                  return (
+            return (
+              <div key={type} className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-3">
+                  <TypeIcon className="w-5 h-5" style={{ color: '#C9A24D' }} />
+                  <h2 className="text-lg font-semibold text-gray-900">{meta.label}</h2>
+                  <span className="text-sm text-gray-500">({typeAssets.length})</span>
+                </div>
+                <div className="divide-y divide-gray-100">
+                  {typeAssets.map(asset => (
                     <div key={asset.id} onClick={() => setSelectedAsset(asset)} className="px-6 py-4 hover:bg-gray-50 cursor-pointer transition-colors">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getConditionColor(asset.condition).split(' ')[1]}`}>
-                            <Icon className={`w-5 h-5 ${getConditionColor(asset.condition).split(' ')[0]}`} />
+                          <div className="w-10 h-10 rounded-lg bg-gray-100 flex items-center justify-center">
+                            <TypeIcon className="w-5 h-5 text-gray-600" />
                           </div>
                           <div>
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-medium text-gray-900">{asset.name}</h3>
-                              <span className={`px-2 py-0.5 text-xs font-medium rounded-full capitalize ${getConditionColor(asset.condition)}`}>{asset.condition.replace('-', ' ')}</span>
-                            </div>
-                            <p className="text-sm text-gray-500">{asset.brand} {asset.model && `â€¢ ${asset.model}`}</p>
+                            <h3 className="font-medium text-gray-900">{asset.name}</h3>
+                            <p className="text-sm text-gray-500">
+                              {asset.purchase_date ? `Acquired ${fmtDate(asset.purchase_date)}` : meta.label}
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-6">
                           <div className="text-right">
-                            <div className="flex items-center gap-2">
-                              <div className="w-24 h-2 bg-gray-200 rounded-full overflow-hidden">
-                                <div className={`h-full rounded-full ${percentLife >= 80 ? 'bg-red-500' : percentLife >= 60 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${Math.min(percentLife, 100)}%` }} />
-                              </div>
-                              <span className="text-xs text-gray-500">{asset.currentAge}/{asset.expectedLifespan} yrs</span>
-                            </div>
-                            <p className="text-sm text-gray-600 mt-1">Replace ~${asset.estimatedReplacementCost.toLocaleString()}</p>
+                            <p className="font-semibold text-gray-900">{fmtMoney(asset.current_value)}</p>
+                            <p className="text-xs text-gray-500">Current value</p>
                           </div>
                           <ChevronRight className="w-5 h-5 text-gray-400" />
                         </div>
                       </div>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
 
         {/* Add Asset Button */}
         <button onClick={() => setShowDocumentUpload(true)} className="w-full py-4 border-2 border-dashed border-gray-300 rounded-xl text-gray-500 hover:border-yellow-500 hover:text-yellow-600 transition-colors flex items-center justify-center gap-2">
           <Plus className="w-5 h-5" />Add New Asset
         </button>
 
-        {/* Expense Timeline - Now at bottom */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Planned Replacement Timeline</h2>
-          <div className="space-y-4">
-            {plannedExpenses.slice(0, 5).map(period => (
-              <div key={period.year} className="flex items-start gap-4">
-                <div className="w-16 text-center">
-                  <span className={`text-lg font-bold ${period.year <= 2028 ? 'text-yellow-600' : 'text-gray-400'}`}>{period.year}</span>
-                </div>
-                <div className="flex-1">
-                  <div className="flex flex-wrap gap-2">
-                    {period.items.map((item, idx) => (
-                      <div key={idx} className={`px-3 py-2 rounded-lg text-sm ${period.year <= 2028 ? 'bg-yellow-50 border border-yellow-200' : 'bg-gray-50 border border-gray-200'}`}>
-                        <span className="font-medium text-gray-900">{item.name}</span>
-                        <span className="text-gray-500 ml-2">${item.cost.toLocaleString()}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="font-semibold text-gray-900">
-                    ${period.items.reduce((sum, i) => sum + i.cost, 0).toLocaleString()}
-                  </span>
-                </div>
-              </div>
-            ))}
+        {/* Maintenance */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-gray-900">Maintenance</h2>
           </div>
+          {maintenance.length === 0 ? (
+            <div className="p-12 text-center">
+              <Wrench className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+              <h3 className="font-medium text-gray-500 mb-1">No maintenance scheduled</h3>
+              <p className="text-sm text-gray-400">Upcoming and overdue upkeep across your assets will appear here.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {sortedMaintenance.map(record => {
+                const linkedAsset = assets.find(a => a.id === record.asset_id);
+                const dateLabel = record.status === 'completed'
+                  ? (record.completed_date ? `Completed ${fmtDate(record.completed_date)}` : 'Completed')
+                  : (record.due_date ? `Due ${fmtDate(record.due_date)}` : 'No date set');
+                return (
+                  <div key={record.id} className="px-6 py-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${getMaintStatusStyle(record.status)}`}>
+                          <Wrench className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-medium text-gray-900">{record.title}</h3>
+                            <span className={`px-2 py-0.5 text-xs font-medium rounded-full capitalize ${getMaintStatusStyle(record.status)}`}>
+                              {record.status.replace('_', ' ')}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-500">
+                            {dateLabel}
+                            {linkedAsset && ` · ${linkedAsset.name}`}
+                            {record.vendor && ` · ${record.vendor}`}
+                          </p>
+                        </div>
+                      </div>
+                      {record.cost != null && (
+                        <span className="font-semibold text-gray-900">{fmtMoney(record.cost)}</span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     );
   };
 
   // Asset Detail View
-  const AssetDetailView: React.FC<{ asset: HomeAsset }> = ({ asset }) => {
-    const Icon = asset.icon;
-    const percentLife = Math.round((asset.currentAge / asset.expectedLifespan) * 100);
+  const AssetDetailView: React.FC<{ asset: DbAsset }> = ({ asset }) => {
+    const meta = ASSET_TYPE_META[asset.type];
+    const Icon = meta.icon;
+    const records: DbMaintenanceRecord[] = (data?.maintenanceRecords ?? []).filter(m => m.asset_id === asset.id);
 
     return (
       <div className="space-y-6">
@@ -2480,48 +2324,37 @@ const CommandApp: React.FC = () => {
         <div className="bg-white border border-gray-200 rounded-xl p-6">
           <div className="flex items-start justify-between mb-6">
             <div className="flex items-center gap-4">
-              <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${getConditionColor(asset.condition).split(' ')[1]}`}>
-                <Icon className={`w-7 h-7 ${getConditionColor(asset.condition).split(' ')[0]}`} />
+              <div className="w-14 h-14 rounded-xl bg-gray-100 flex items-center justify-center">
+                <Icon className="w-7 h-7 text-gray-600" />
               </div>
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">{asset.name}</h1>
-                <p className="text-gray-600">{asset.brand} {asset.model}</p>
+                <p className="text-gray-600">{meta.label}</p>
               </div>
             </div>
-            <span className={`px-3 py-1 text-sm font-medium rounded-full capitalize ${getConditionColor(asset.condition)}`}>{asset.condition.replace('-', ' ')}</span>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-xs text-gray-500 mb-1">Installed</p>
-              <p className="font-semibold text-gray-900">{asset.installDate}</p>
+              <p className="text-xs text-gray-500 mb-1">Current Value</p>
+              <p className="font-semibold text-gray-900">{fmtMoney(asset.current_value)}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-xs text-gray-500 mb-1">Age / Lifespan</p>
-              <p className="font-semibold text-gray-900">{asset.currentAge} / {asset.expectedLifespan} years</p>
+              <p className="text-xs text-gray-500 mb-1">Purchase Price</p>
+              <p className="font-semibold text-gray-900">{fmtMoney(asset.purchase_price)}</p>
             </div>
             <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-xs text-gray-500 mb-1">Est. Replacement</p>
-              <p className="font-semibold text-gray-900">${asset.estimatedReplacementCost.toLocaleString()}</p>
-            </div>
-            <div className="bg-gray-50 rounded-lg p-4">
-              <p className="text-xs text-gray-500 mb-1">Warranty</p>
-              <p className={`font-semibold ${asset.warrantyExpires && new Date(asset.warrantyExpires) < new Date() ? 'text-red-600' : 'text-gray-900'}`}>
-                {asset.warrantyExpires || 'N/A'}
-              </p>
+              <p className="text-xs text-gray-500 mb-1">Acquired</p>
+              <p className="font-semibold text-gray-900">{fmtDate(asset.purchase_date)}</p>
             </div>
           </div>
 
-          {/* Life Progress Bar */}
-          <div className="mt-6">
-            <div className="flex items-center justify-between text-sm mb-2">
-              <span className="text-gray-600">Estimated Life Remaining</span>
-              <span className="font-medium text-gray-900">{asset.expectedLifespan - asset.currentAge} years</span>
+          {asset.notes && (
+            <div className="bg-gray-50 rounded-lg p-4 mt-4">
+              <h3 className="font-medium text-gray-900 mb-2">Notes</h3>
+              <p className="text-sm text-gray-700">{asset.notes}</p>
             </div>
-            <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-              <div className={`h-full rounded-full ${percentLife >= 80 ? 'bg-red-500' : percentLife >= 60 ? 'bg-yellow-500' : 'bg-green-500'}`} style={{ width: `${Math.min(percentLife, 100)}%` }} />
-            </div>
-          </div>
+          )}
         </div>
 
         {/* Maintenance History */}
@@ -2532,83 +2365,43 @@ const CommandApp: React.FC = () => {
               <Plus className="w-4 h-4" />Add Record
             </button>
           </div>
-          {asset.maintenanceHistory.length === 0 ? (
+          {records.length === 0 ? (
             <div className="text-center py-8 border-2 border-dashed border-gray-200 rounded-lg">
               <Wrench className="w-10 h-10 text-gray-300 mx-auto mb-2" />
               <p className="text-gray-500">No maintenance records</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {asset.maintenanceHistory.map(record => (
-                <div key={record.id} className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                    record.type === 'repair' ? 'bg-orange-100' : record.type === 'replacement' ? 'bg-red-100' : record.type === 'inspection' ? 'bg-blue-100' : 'bg-green-100'
-                  }`}>
-                    <Wrench className={`w-4 h-4 ${
-                      record.type === 'repair' ? 'text-orange-600' : record.type === 'replacement' ? 'text-red-600' : record.type === 'inspection' ? 'text-blue-600' : 'text-green-600'
-                    }`} />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium text-gray-900">{record.description}</span>
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full capitalize ${
-                        record.type === 'repair' ? 'bg-orange-100 text-orange-800' : record.type === 'replacement' ? 'bg-red-100 text-red-800' : record.type === 'inspection' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                      }`}>{record.type}</span>
+              {records.map(record => {
+                const dateLabel = record.status === 'completed'
+                  ? (record.completed_date ? `Completed ${fmtDate(record.completed_date)}` : 'Completed')
+                  : (record.due_date ? `Due ${fmtDate(record.due_date)}` : 'No date set');
+                return (
+                  <div key={record.id} className="flex items-start gap-4 p-4 bg-gray-50 rounded-lg">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${getMaintStatusStyle(record.status)}`}>
+                      <Wrench className="w-4 h-4" />
                     </div>
-                    <p className="text-sm text-gray-500">{record.date} {record.provider && `â€¢ ${record.provider}`}</p>
-                    {record.notes && <p className="text-sm text-gray-600 mt-1">{record.notes}</p>}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-900">{record.title}</span>
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded-full capitalize ${getMaintStatusStyle(record.status)}`}>
+                          {record.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-500">{dateLabel} {record.vendor && `· ${record.vendor}`}</p>
+                      {record.notes && <p className="text-sm text-gray-600 mt-1">{record.notes}</p>}
+                    </div>
+                    {record.cost != null && (
+                      <div className="text-right">
+                        <span className="font-semibold text-gray-900">{fmtMoney(record.cost)}</span>
+                      </div>
+                    )}
                   </div>
-                  <div className="text-right">
-                    <span className="font-semibold text-gray-900">${record.cost}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
-
-        {/* Documents */}
-        <div className="bg-white border border-gray-200 rounded-xl p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Documents</h2>
-            <button onClick={() => setShowDocumentUpload(true)} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium hover:bg-gray-100" style={{ color: '#C9A24D' }}>
-              <Upload className="w-4 h-4" />Upload
-            </button>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <button className="p-4 border-2 border-dashed border-gray-200 rounded-lg hover:border-yellow-500 transition-colors text-center">
-              <FileText className="w-6 h-6 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm font-medium text-gray-600">Warranty</p>
-            </button>
-            <button className="p-4 border-2 border-dashed border-gray-200 rounded-lg hover:border-yellow-500 transition-colors text-center">
-              <FileText className="w-6 h-6 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm font-medium text-gray-600">Invoice</p>
-            </button>
-            <button className="p-4 border-2 border-dashed border-gray-200 rounded-lg hover:border-yellow-500 transition-colors text-center">
-              <FileText className="w-6 h-6 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm font-medium text-gray-600">Manual</p>
-            </button>
-          </div>
-        </div>
-
-        {/* Recommendation */}
-        {(asset.condition === 'fair' || asset.condition === 'poor' || asset.condition === 'replace-soon') && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-5">
-            <div className="flex items-start gap-4">
-              <div className="w-10 h-10 rounded-lg bg-yellow-100 flex items-center justify-center flex-shrink-0">
-                <Info className="w-5 h-5 text-yellow-600" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-yellow-900 mb-1">Planning Recommendation</h3>
-                <p className="text-sm text-yellow-800">
-                  Based on the age and condition of this {asset.name.toLowerCase()}, we recommend starting a replacement fund. 
-                  Saving ${Math.round(asset.estimatedReplacementCost / ((asset.expectedLifespan - asset.currentAge) * 12))}/month 
-                  would fully fund the replacement by the expected end of life.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   };

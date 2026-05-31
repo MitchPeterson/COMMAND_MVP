@@ -303,6 +303,34 @@ export async function getLegalDocuments(householdId: string): Promise<LegalDocum
   return data ?? [];
 }
 
+export async function getAssets(householdId: string): Promise<Asset[]> {
+  const { data, error } = await supabase
+    .from('assets')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('type');
+
+  if (error) {
+    console.error('Error fetching assets:', error);
+    return [];
+  }
+  return data ?? [];
+}
+
+export async function getMaintenanceRecords(householdId: string): Promise<MaintenanceRecord[]> {
+  const { data, error } = await supabase
+    .from('maintenance_records')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('due_date');
+
+  if (error) {
+    console.error('Error fetching maintenance records:', error);
+    return [];
+  }
+  return data ?? [];
+}
+
 export async function getPriorityActions(householdId: string): Promise<PriorityAction[]> {
   const { data, error } = await supabase
     .from('priority_actions')

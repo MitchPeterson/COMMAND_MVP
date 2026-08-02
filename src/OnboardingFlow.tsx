@@ -405,20 +405,25 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
         primary_name: `${form.firstName}${form.lastName ? ' ' + form.lastName : ''}`,
         primary_first_name: form.firstName,
         primary_last_name: form.lastName,
-         partner_name: form.spousePartner === 'yes' ? `${form.spouseFirstName}${form.spouseLastName ? ' ' + form.spouseLastName : ''}` : null,
-         spouse_first_name: form.spouseFirstName || null,
-         city: form.city || null,
-         state: form.state || null,
-         home_ownership: form.homeOwnership || null,
-         home_value: homeValueNum,
-         year_built: form.yearBuilt ? parseInt(form.yearBuilt) : null,
-         household_income: incomeNum,
-         net_worth: netWorthNum,
-         emergency_fund_status: form.emergencyFund || null,
-         num_children: form.children.length,
+        partner_name: form.spousePartner === 'yes' ? `${form.spouseFirstName}${form.spouseLastName ? ' ' + form.spouseLastName : ''}` : null,
+        spouse_first_name: form.spouseFirstName || null,
+        city: form.city || null,
+        state: form.state || null,
+        home_ownership: form.homeOwnership || null,
+        home_value: homeValueNum,
+        year_built: form.yearBuilt ? parseInt(form.yearBuilt) : null,
+        household_income: incomeNum,
+        net_worth: netWorthNum,
+        emergency_fund_status: form.emergencyFund || null,
+        num_children: form.children.length,
         life_insurance_review: form.lifeInsuranceReview || null,
         hvac_age: form.hvacAge || null,
         roof_age: form.roofAge || null,
+        has_aging_parents: form.agingParents === 'yes',
+        upcoming_life_events: form.upcomingLifeEvents.length > 0 ? form.upcomingLifeEvents : null,
+        has_will: form.hasWill || null,
+        has_trust: form.hasTrust || null,
+        has_umbrella: form.hasUmbrella || null,
       });
       if (profileError) throw profileError;
 
@@ -431,7 +436,6 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
       );
       if (sectionScoresError) throw sectionScoresError;
 
-      // 4. Create initial priority actions based on answers
       const actions: any[] = [];
 
       if (form.hasWill === 'no') {
@@ -456,15 +460,15 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
         });
       }
 
-      if (form.hasUmbrella === 'no') {
+      if (form.hasUmbrella === 'no' || form.hasUmbrella === 'unsure') {
         actions.push({
           household_id: householdId,
-          title: 'Add umbrella liability insurance',
+          title: 'Review umbrella liability coverage',
           category: 'Insurance',
           severity: 'high',
           status: 'open',
           source: 'system',
-          description: 'You have no umbrella policy. A $1–2M policy costs ~$200–400/year and protects your net worth.',
+          description: 'Umbrella insurance can protect savings and assets from liability claims beyond home and auto policies.',
         });
       }
 
@@ -502,6 +506,332 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
           source: 'system',
           description: 'Your emergency fund is below the recommended 3-month minimum. This is a foundational financial risk.',
         });
+      }
+
+      if (form.agingParents === 'yes') {
+        actions.push({
+          household_id: householdId,
+          title: 'Plan caregiving support',
+          category: 'Family',
+          severity: 'medium',
+          status: 'open',
+          source: 'system',
+          description: 'Caring for aging parents may require financial planning and legal documents like powers of attorney.',
+        });
+      }
+
+      const monthlyIncome = incomeNum ? Math.round(incomeNum / 12) : null;
+      const monthlyExpenses = monthlyIncome ? Math.round(monthlyIncome * 0.72) : null;
+      const emergencyFundMonths = form.emergencyFund === 'over6' ? 8 : form.emergencyFund === '3to6' ? 4 : form.emergencyFund === 'under3' ? 2 : 0;
+      const savingsRate = form.emergencyFund === 'over6' ? 30 : form.emergencyFund === '3to6' ? 20 : form.emergencyFund === 'under3' ? 12 : 6;
+
+      const financeAccountsToInsert = [
+        {
+          household_id: householdId,
+          account_name: 'Everyday Checking',
+          account_type: 'Checking',
+          institution: 'Command Bank',
+          balance: monthlyIncome ? Math.round(monthlyIncome * 1.1) : 0,
+          as_of_date: new Date().toISOString().slice(0, 10),
+        },
+        {
+          household_id: householdId,
+          account_name: 'Savings',
+          account_type: 'Savings',
+          institution: 'Command Bank',
+          balance: monthlyIncome ? Math.round(monthlyIncome * emergencyFundMonths) : 0,
+          as_of_date: new Date().toISOString().slice(0, 10),
+        },
+      ];
+
+      const creditCardsToInsert = [
+        {
+          household_id: householdId,
+          card_name: 'Everyday Rewards',
+          issuer: 'Command Visa',
+          credit_limit: monthlyIncome ? Math.round(monthlyIncome * 3) : 10000,
+          current_balance: monthlyIncome ? Math.round(monthlyIncome * 0.4) : 2000,
+          utilization_pct: 40,
+          rewards_type: 'Cash back',
+          rewards_value_ytd: 120,
+          annual_fee: 0,
+        },
+      ];
+
+      if (monthlyIncome && monthlyIncome > 20000) {
+        creditCardsToInsert.push({
+          household_id: householdId,
+          card_name: 'Premium Travel',
+          issuer: 'Command Mastercard',
+          credit_limit: Math.round(monthlyIncome * 5),
+          current_balance: Math.round(monthlyIncome * 0.35),
+          utilization_pct: 35,
+          rewards_type: 'Travel points',
+          rewards_value_ytd: 420,
+          annual_fee: 195,
+        });
+      }
+
+      const taxDocumentsToInsert = [
+        {
+          household_id: householdId,
+          name: `${new Date().getFullYear() - 1} Tax return`,
+          tax_year: new Date().getFullYear() - 1,
+          doc_type: '1040',
+          status: 'filed',
+          due_date: `${new Date().getFullYear()}-04-15`,
+          amount: incomeNum ? Math.round(incomeNum * 0.12) : null,
+          source: 'CPA',
+        },
+      ];
+
+      const taxRecommendationsToInsert = [] as Array<{
+        household_id: string;
+        title: string;
+        description: string | null;
+        potential_savings: number | null;
+        priority: string;
+        deadline: string;
+      }>;
+
+      if (form.homeOwnership === 'own') {
+        taxRecommendationsToInsert.push({
+          household_id: householdId,
+          title: 'Review mortgage interest deduction',
+          description: 'Homeownership may qualify you for mortgage interest and property tax deductions.',
+          potential_savings: 1200,
+          priority: 'high',
+          deadline: `${new Date().getFullYear()}-04-15`,
+        });
+      }
+
+      if (form.children.length > 0) {
+        taxRecommendationsToInsert.push({
+          household_id: householdId,
+          title: 'Open a college savings account',
+          description: '529 contributions can grow tax-free and may qualify for state tax benefits.',
+          potential_savings: 800,
+          priority: 'medium',
+          deadline: `${new Date().getFullYear()}-12-31`,
+        });
+      }
+
+      if (form.emergencyFund === 'none' || form.emergencyFund === 'under3') {
+        taxRecommendationsToInsert.push({
+          household_id: householdId,
+          title: 'Increase retirement contributions',
+          description: 'Maxing out retirement accounts reduces taxable income and builds long-term security.',
+          potential_savings: 1500,
+          priority: 'medium',
+          deadline: `${new Date().getFullYear()}-12-31`,
+        });
+      }
+
+      const insurancePoliciesToInsert: Array<{
+        household_id: string;
+        type: 'home' | 'auto' | 'umbrella' | 'life' | 'health' | 'disability' | 'other';
+        carrier: string | null;
+        policy_number: string | null;
+        coverage_amount: number | null;
+        annual_premium: number | null;
+        deductible: number | null;
+        renewal_date: string | null;
+        status: 'active' | 'renewal_soon' | 'action_needed' | 'expired' | 'inactive';
+        notes: string | null;
+      }> = [];
+
+      if (form.homeOwnership === 'own') {
+        insurancePoliciesToInsert.push({
+          household_id: householdId,
+          type: 'home',
+          carrier: 'Command Home',
+          policy_number: 'HME-1847-01',
+          coverage_amount: homeValueNum,
+          annual_premium: homeValueNum ? Math.round(homeValueNum * 0.0055) : 2200,
+          deductible: 1500,
+          renewal_date: `${new Date().getFullYear() + 1}-03-14`,
+          status: 'active',
+          notes: 'Standard homeowner policy with water backup coverage.',
+        });
+      }
+
+      insurancePoliciesToInsert.push({
+        household_id: householdId,
+        type: 'auto',
+        carrier: 'Command Auto',
+        policy_number: 'AUTO-4621-09',
+        coverage_amount: 50000,
+        annual_premium: 1200,
+        deductible: 1000,
+        renewal_date: `${new Date().getFullYear() + 1}-08-20`,
+        status: 'active',
+        notes: 'Primary auto policy for family vehicles.',
+      });
+
+      if (form.hasUmbrella === 'yes') {
+        insurancePoliciesToInsert.push({
+          household_id: householdId,
+          type: 'umbrella',
+          carrier: 'Command Umbrella',
+          policy_number: 'UMB-8123-05',
+          coverage_amount: 2000000,
+          annual_premium: 275,
+          deductible: 0,
+          renewal_date: `${new Date().getFullYear() + 1}-09-30`,
+          status: 'active',
+          notes: 'Umbrella liability coverage for home and auto.',
+        });
+      }
+
+      const legalDocumentsToInsert = [] as Array<{
+        household_id: string;
+        name: string;
+        type: 'will' | 'trust' | 'poa' | 'healthcare_directive' | 'beneficiary' | 'prenup' | 'other';
+        status: 'current' | 'needs_review' | 'outdated' | 'not_established';
+        last_reviewed: string | null;
+        attorney: string | null;
+        notes: string | null;
+      }>;
+
+      legalDocumentsToInsert.push({
+        household_id: householdId,
+        name: 'Last will and testament',
+        type: 'will',
+        status: form.hasWill === 'yes' ? 'current' : form.hasWill === 'outdated' ? 'outdated' : 'not_established',
+        last_reviewed: form.hasWill === 'yes' ? `${new Date().getFullYear() - 1}-06-01` : null,
+        attorney: 'Hamilton & Co.',
+        notes: form.hasWill === 'no' ? 'No will has been established.' : 'Reviewed within the last year.',
+      });
+
+      legalDocumentsToInsert.push({
+        household_id: householdId,
+        name: 'Revocable living trust',
+        type: 'trust',
+        status: form.hasTrust === 'yes' ? 'current' : 'not_established',
+        last_reviewed: form.hasTrust === 'yes' ? `${new Date().getFullYear() - 2}-11-10` : null,
+        attorney: 'Hamilton & Co.',
+        notes: form.hasTrust === 'yes' ? 'Trust is in place.' : 'Recommended if you want to avoid probate.',
+      });
+
+      if (form.agingParents === 'yes') {
+        legalDocumentsToInsert.push({
+          household_id: householdId,
+          name: 'Durable power of attorney',
+          type: 'poa',
+          status: 'not_established',
+          last_reviewed: null,
+          attorney: 'Hamilton & Co.',
+          notes: 'Needed for eldercare planning and authority management.',
+        });
+      }
+
+      const timelineEventsToInsert = [] as Array<{
+        household_id: string;
+        title: string;
+        category: string | null;
+        event_type: 'deadline' | 'renewal' | 'review' | 'info' | 'completed' | 'action';
+        event_date: string | null;
+        completed: boolean;
+        notes: string | null;
+      }>;
+
+      if (form.hasWill !== 'yes') {
+        timelineEventsToInsert.push({
+          household_id: householdId,
+          title: 'Review will status',
+          category: 'legal',
+          event_type: 'deadline',
+          event_date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+          completed: false,
+          notes: 'Schedule time with an estate attorney.',
+        });
+      }
+      if (form.emergencyFund === 'none' || form.emergencyFund === 'under3') {
+        timelineEventsToInsert.push({
+          household_id: householdId,
+          title: 'Boost emergency fund',
+          category: 'finances',
+          event_type: 'review',
+          event_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+          completed: false,
+          notes: 'Target 3–6 months of expenses.',
+        });
+      }
+      if (form.hvacAge === 'over15') {
+        timelineEventsToInsert.push({
+          household_id: householdId,
+          title: 'Schedule HVAC inspection',
+          category: 'home',
+          event_type: 'review',
+          event_date: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+          completed: false,
+          notes: 'Older HVAC systems benefit from a pre-season inspection.',
+        });
+      }
+
+      const budgetSummaryToInsert = monthlyIncome !== null ? {
+        household_id: householdId,
+        monthly_income: monthlyIncome,
+        monthly_expenses: monthlyExpenses,
+        savings_rate: savingsRate,
+        emergency_fund_months: emergencyFundMonths,
+        period_month: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-01`,
+      } : null;
+
+      if (financeAccountsToInsert.length > 0) {
+        const { error: financeError } = await supabase
+          .from('finance_accounts')
+          .insert(financeAccountsToInsert);
+        if (financeError) throw financeError;
+      }
+
+      if (budgetSummaryToInsert) {
+        const { error: budgetError } = await supabase
+          .from('budget_summary')
+          .insert(budgetSummaryToInsert);
+        if (budgetError) throw budgetError;
+      }
+
+      if (creditCardsToInsert.length > 0) {
+        const { error: creditError } = await supabase
+          .from('credit_cards')
+          .insert(creditCardsToInsert);
+        if (creditError) throw creditError;
+      }
+
+      if (taxDocumentsToInsert.length > 0) {
+        const { error: taxDocsError } = await supabase
+          .from('tax_documents')
+          .insert(taxDocumentsToInsert);
+        if (taxDocsError) throw taxDocsError;
+      }
+
+      if (taxRecommendationsToInsert.length > 0) {
+        const { error: taxRecError } = await supabase
+          .from('tax_recommendations')
+          .insert(taxRecommendationsToInsert);
+        if (taxRecError) throw taxRecError;
+      }
+
+      if (insurancePoliciesToInsert.length > 0) {
+        const { error: insuranceError } = await supabase
+          .from('insurance_policies')
+          .insert(insurancePoliciesToInsert);
+        if (insuranceError) throw insuranceError;
+      }
+
+      if (legalDocumentsToInsert.length > 0) {
+        const { error: legalError } = await supabase
+          .from('legal_documents')
+          .insert(legalDocumentsToInsert);
+        if (legalError) throw legalError;
+      }
+
+      if (timelineEventsToInsert.length > 0) {
+        const { error: timelineError } = await supabase
+          .from('timeline_events')
+          .insert(timelineEventsToInsert);
+        if (timelineError) throw timelineError;
       }
 
       const familyMembersToInsert = [] as Array<{

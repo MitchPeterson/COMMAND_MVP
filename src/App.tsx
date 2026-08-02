@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useHousehold } from './useHousehold';
 import { AuthScreen } from './AuthScreen';
 import { OnboardingFlow } from './OnboardingFlow';
@@ -18,6 +18,11 @@ function App() {
   const { data, loading, userId, refresh } = useHousehold();
   const [activeView, setActiveView] = useState<string>('dashboard');
 
+  const handleOnboardingComplete = useCallback(async () => {
+    await refresh();
+    setActiveView('dashboard');
+  }, [refresh]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-cmd-black flex items-center justify-center">
@@ -33,7 +38,7 @@ function App() {
   }
 
   if (!data?.household) {
-    return <OnboardingFlow userId={userId} onComplete={() => { void refresh(); }} />;
+    return <OnboardingFlow userId={userId} onComplete={handleOnboardingComplete} />;
   }
 
   const renderView = () => {
@@ -65,7 +70,12 @@ function App() {
 
   return (
     <div className="min-h-screen flex bg-cmd-black text-cmd-offwhite">
-      <Sidebar activeView={activeView} onNavigate={setActiveView} />
+      <Sidebar
+        activeView={activeView}
+        onNavigate={setActiveView}
+        userName={data?.profile?.primary_name ?? data?.profile?.primary_first_name ?? data?.household?.name ?? 'Your account'}
+        userLocation={data?.profile ? `${data.profile.city}, ${data.profile.state}` : 'Household'}
+      />
       <main className="flex-1 bg-cmd-charcoal/90 p-6">{renderView()}</main>
     </div>
   );

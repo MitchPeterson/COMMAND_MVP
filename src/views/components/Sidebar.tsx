@@ -27,9 +27,11 @@ const navItems = [
 interface SidebarProps {
   activeView: string;
   onNavigate: (view: string) => void;
+  userName?: string;
+  userLocation?: string;
 }
 
-export function Sidebar({ activeView, onNavigate }: SidebarProps) {
+export function Sidebar({ activeView, onNavigate, userName, userLocation }: SidebarProps) {
   return (
     <aside className="flex h-screen w-[200px] flex-col bg-cmd-black border-r border-cmd-border">
       <div className="flex items-center gap-3 border-b border-cmd-border px-5 py-5">
@@ -74,11 +76,11 @@ export function Sidebar({ activeView, onNavigate }: SidebarProps) {
           }`}
         >
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cmd-gold/15 text-cmd-gold">
-            AB
+            {userName ? userName.slice(0, 2).toUpperCase() : 'AC'}
           </div>
           <div className="min-w-0">
-            <div className="truncate text-sm font-semibold text-cmd-offwhite">Adam Bailey</div>
-            <div className="truncate text-xs text-cmd-muted">Savage, MN</div>
+            <div className="truncate text-sm font-semibold text-cmd-offwhite">{userName ?? 'Your account'}</div>
+            <div className="truncate text-xs text-cmd-muted">{userLocation ?? 'Household'}</div>
           </div>
         </button>
       </div>

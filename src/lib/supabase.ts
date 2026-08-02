@@ -69,6 +69,41 @@ export interface Database {
         Insert: Omit<SectionScore, 'id'>;
         Update: Partial<Omit<SectionScore, 'id'>>;
       };
+      finance_accounts: {
+        Row: FinanceAccount;
+        Insert: Omit<FinanceAccount, 'id' | 'created_at'>;
+        Update: Partial<Omit<FinanceAccount, 'id'>>;
+      };
+      budget_summary: {
+        Row: BudgetSummary;
+        Insert: Omit<BudgetSummary, 'id' | 'created_at'>;
+        Update: Partial<Omit<BudgetSummary, 'id'>>;
+      };
+      tax_documents: {
+        Row: TaxDocument;
+        Insert: Omit<TaxDocument, 'id' | 'created_at'>;
+        Update: Partial<Omit<TaxDocument, 'id'>>;
+      };
+      tax_recommendations: {
+        Row: TaxRecommendation;
+        Insert: Omit<TaxRecommendation, 'id' | 'created_at'>;
+        Update: Partial<Omit<TaxRecommendation, 'id'>>;
+      };
+      family_members: {
+        Row: FamilyMember;
+        Insert: Omit<FamilyMember, 'id' | 'created_at'>;
+        Update: Partial<Omit<FamilyMember, 'id'>>;
+      };
+      family_milestones: {
+        Row: FamilyMilestone;
+        Insert: Omit<FamilyMilestone, 'id' | 'created_at'>;
+        Update: Partial<Omit<FamilyMilestone, 'id'>>;
+      };
+      credit_cards: {
+        Row: CreditCard;
+        Insert: Omit<CreditCard, 'id' | 'created_at'>;
+        Update: Partial<Omit<CreditCard, 'id'>>;
+      };
     };
   };
 }
@@ -243,6 +278,87 @@ export interface SectionScore {
   updated_at: string;
 }
 
+export interface FinanceAccount {
+  id: string;
+  household_id: string;
+  account_name: string;
+  account_type: string;
+  institution: string | null;
+  balance: number | null;
+  as_of_date: string | null;
+  created_at: string;
+}
+
+export interface BudgetSummary {
+  id: string;
+  household_id: string;
+  monthly_income: number | null;
+  monthly_expenses: number | null;
+  savings_rate: number | null;
+  emergency_fund_months: number | null;
+  period_month: string | null;
+  created_at: string;
+}
+
+export interface TaxDocument {
+  id: string;
+  household_id: string;
+  name: string;
+  tax_year: number;
+  doc_type: string;
+  status: string;
+  due_date: string | null;
+  amount: number | null;
+  source: string | null;
+  created_at: string;
+}
+
+export interface TaxRecommendation {
+  id: string;
+  household_id: string;
+  title: string;
+  description: string | null;
+  potential_savings: number | null;
+  priority: string | null;
+  deadline: string | null;
+  created_at: string;
+}
+
+export interface FamilyMember {
+  id: string;
+  household_id: string;
+  name: string;
+  relationship: string;
+  birth_date: string | null;
+  created_at: string;
+}
+
+export interface FamilyMilestone {
+  id: string;
+  family_member_id: string;
+  household_id: string;
+  title: string;
+  event_date: string | null;
+  status: string | null;
+  category: string | null;
+  triggers_review: string[] | null;
+  created_at: string;
+}
+
+export interface CreditCard {
+  id: string;
+  household_id: string;
+  card_name: string;
+  issuer: string | null;
+  credit_limit: number | null;
+  current_balance: number | null;
+  utilization_pct: number | null;
+  rewards_type: string | null;
+  rewards_value_ytd: number | null;
+  annual_fee: number | null;
+  created_at: string;
+}
+
 // ============================================================
 // DATA ACCESS FUNCTIONS
 // ============================================================
@@ -298,6 +414,20 @@ export async function getLegalDocuments(householdId: string): Promise<LegalDocum
 
   if (error) {
     console.error('Error fetching legal documents:', error);
+    return [];
+  }
+  return data ?? [];
+}
+
+export async function getDocuments(householdId: string): Promise<Document[]> {
+  const { data, error } = await supabase
+    .from('documents')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('uploaded_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching documents:', error);
     return [];
   }
   return data ?? [];
@@ -371,6 +501,116 @@ export async function getSectionScores(householdId: string): Promise<SectionScor
     return [];
   }
   return data ?? [];
+}
+
+export async function getFinanceAccounts(householdId: string): Promise<FinanceAccount[]> {
+  const { data, error } = await supabase
+    .from('finance_accounts')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('account_name');
+
+  if (error) {
+    console.error('Error fetching finance accounts:', error);
+    return [];
+  }
+  return data ?? [];
+}
+
+export async function getBudgetSummary(householdId: string): Promise<BudgetSummary | null> {
+  const { data, error } = await supabase
+    .from('budget_summary')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('period_month', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (error) {
+    if (error.code !== 'PGRST116') console.error('Error fetching budget summary:', error);
+    return null;
+  }
+  return data;
+}
+
+export async function getTaxDocuments(householdId: string): Promise<TaxDocument[]> {
+  const { data, error } = await supabase
+    .from('tax_documents')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('tax_year', { ascending: false })
+    .order('name');
+
+  if (error) {
+    console.error('Error fetching tax documents:', error);
+    return [];
+  }
+  return data ?? [];
+}
+
+export async function getTaxRecommendations(householdId: string): Promise<TaxRecommendation[]> {
+  const { data, error } = await supabase
+    .from('tax_recommendations')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('priority');
+
+  if (error) {
+    console.error('Error fetching tax recommendations:', error);
+    return [];
+  }
+  return data ?? [];
+}
+
+export async function getFamilyMembers(householdId: string): Promise<FamilyMember[]> {
+  const { data, error } = await supabase
+    .from('family_members')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('name');
+
+  if (error) {
+    console.error('Error fetching family members:', error);
+    return [];
+  }
+  return data ?? [];
+}
+
+export async function getFamilyMilestones(householdId: string): Promise<FamilyMilestone[]> {
+  const { data, error } = await supabase
+    .from('family_milestones')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('event_date');
+
+  if (error) {
+    console.error('Error fetching family milestones:', error);
+    return [];
+  }
+  return data ?? [];
+}
+
+export async function getCreditCards(householdId: string): Promise<CreditCard[]> {
+  const { data, error } = await supabase
+    .from('credit_cards')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('issuer');
+
+  if (error) {
+    console.error('Error fetching credit cards:', error);
+    return [];
+  }
+  return data ?? [];
+}
+
+export async function signOut(): Promise<boolean> {
+  const { error } = await supabase.auth.signOut();
+  if (error) {
+    console.error('Error signing out:', error);
+    return false;
+  }
+  return true;
 }
 
 export async function dismissAction(actionId: string): Promise<boolean> {

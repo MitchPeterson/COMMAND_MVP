@@ -1,5 +1,6 @@
 import React from 'react';
 import { useHousehold } from '../useHousehold';
+import { UploadDropzone } from '../components/UploadDropzone';
 import { Wallet, PieChart, TrendingUp, FileText } from 'lucide-react';
 
 export function FinancesView() {
@@ -23,6 +24,14 @@ export function FinancesView() {
             <span className="ml-2 rounded-full bg-cmd-border px-2 py-1 text-xs text-cmd-offwhite">{accounts.length}</span>
           </div>
         </div>
+      </section>
+
+      <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
+        <UploadDropzone
+          contextLabel="Finance document upload"
+          buttonLabel="Upload finance document"
+          className="mb-6"
+        />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-3">

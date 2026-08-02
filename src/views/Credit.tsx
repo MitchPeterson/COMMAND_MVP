@@ -1,5 +1,6 @@
 import React from 'react';
 import { useHousehold } from '../useHousehold';
+import { UploadDropzone } from '../components/UploadDropzone';
 import { CreditCard, Percent, Shield, Star } from 'lucide-react';
 
 export function CreditView() {
@@ -56,6 +57,14 @@ export function CreditView() {
           </p>
           <p className="mt-2 text-sm text-cmd-muted">Year-to-date rewards value</p>
         </div>
+      </section>
+
+      <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
+        <UploadDropzone
+          contextLabel="Credit document upload"
+          buttonLabel="Upload credit document"
+          className="mb-6"
+        />
       </section>
 
       <section className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-6">

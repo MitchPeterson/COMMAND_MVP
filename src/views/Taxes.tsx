@@ -1,5 +1,6 @@
 import React from 'react';
 import { useHousehold } from '../useHousehold';
+import { UploadDropzone } from '../components/UploadDropzone';
 import { FileText, Shield, Calendar, CheckCircle } from 'lucide-react';
 
 export function TaxesView() {
@@ -58,7 +59,12 @@ export function TaxesView() {
         )}
       </section>
 
-      <section className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-6">
+      <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
+        <UploadDropzone
+          contextLabel="Tax document upload"
+          buttonLabel="Upload tax document"
+          className="mb-6"
+        />
         <div className="mb-6 flex items-center justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Tax documents</p>

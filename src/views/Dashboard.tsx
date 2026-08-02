@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { useHousehold } from '../useHousehold';
+import { UploadDropzone } from '../components/UploadDropzone';
 import {
   Shield,
   FileText,
@@ -161,6 +162,11 @@ export function DashboardView() {
           </section>
 
           <section className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-6">
+            <UploadDropzone
+              contextLabel="Global document upload"
+              buttonLabel="Add a document"
+              className="mb-6"
+            />
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Section status</p>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useHousehold } from '../useHousehold';
+import { UploadDropzone } from '../components/UploadDropzone';
 import { Shield, HeartPulse, Sparkles } from 'lucide-react';
 
 function formatCurrency(value: number | null | undefined) {
@@ -25,6 +26,11 @@ export function InsuranceView() {
       </section>
 
       <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
+        <UploadDropzone
+          contextLabel="Insurance document upload"
+          buttonLabel="Upload insurance document"
+          className="mb-6"
+        />
         {policies.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-cmd-border bg-cmd-black/50 p-8 text-center text-cmd-muted">
             No insurance policies connected yet.

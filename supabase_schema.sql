@@ -155,6 +155,7 @@ CREATE TABLE documents (
   file_path TEXT, -- Supabase Storage path
   file_size INTEGER,
   mime_type TEXT,
+  status TEXT DEFAULT 'uploaded' CHECK (status IN ('uploaded', 'processed', 'error')),
   uploaded_at TIMESTAMPTZ DEFAULT NOW(),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -163,7 +164,7 @@ CREATE TABLE documents (
 -- DOCUMENT EXTRACTIONS (Staging data from OCR / model extraction)
 -- ============================================================
 CREATE TABLE document_extractions (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   household_id UUID REFERENCES households(id) ON DELETE CASCADE NOT NULL,
   document_id UUID REFERENCES documents(id) ON DELETE CASCADE NOT NULL,
   detected_type TEXT NOT NULL CHECK (detected_type IN ('mortgage_statement', 'insurance_dec_page', 'credit_card_statement', 'bank_statement', 'tax_document', 'paystub', 'unknown')),

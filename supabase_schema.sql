@@ -175,6 +175,90 @@ CREATE TABLE section_scores (
 );
 
 -- ============================================================
+-- New tables for Finances, Tax, Family, Credit
+-- ============================================================
+CREATE TABLE finance_accounts (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  household_id UUID REFERENCES households(id) ON DELETE CASCADE NOT NULL,
+  account_name TEXT NOT NULL,
+  account_type TEXT NOT NULL,
+  institution TEXT,
+  balance NUMERIC,
+  as_of_date DATE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE budget_summary (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  household_id UUID REFERENCES households(id) ON DELETE CASCADE NOT NULL,
+  monthly_income NUMERIC,
+  monthly_expenses NUMERIC,
+  savings_rate NUMERIC,
+  emergency_fund_months NUMERIC,
+  period_month DATE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE tax_documents (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  household_id UUID REFERENCES households(id) ON DELETE CASCADE NOT NULL,
+  name TEXT NOT NULL,
+  tax_year INT NOT NULL,
+  doc_type TEXT NOT NULL,
+  status TEXT NOT NULL,
+  due_date DATE,
+  amount NUMERIC,
+  source TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE tax_recommendations (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  household_id UUID REFERENCES households(id) ON DELETE CASCADE NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  potential_savings NUMERIC,
+  priority TEXT,
+  deadline DATE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE family_members (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  household_id UUID REFERENCES households(id) ON DELETE CASCADE NOT NULL,
+  name TEXT NOT NULL,
+  relationship TEXT NOT NULL,
+  birth_date DATE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE family_milestones (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  family_member_id UUID REFERENCES family_members(id) ON DELETE CASCADE NOT NULL,
+  household_id UUID REFERENCES households(id) ON DELETE CASCADE NOT NULL,
+  title TEXT NOT NULL,
+  event_date DATE,
+  status TEXT,
+  category TEXT,
+  triggers_review TEXT[],
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE TABLE credit_cards (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  household_id UUID REFERENCES households(id) ON DELETE CASCADE NOT NULL,
+  card_name TEXT NOT NULL,
+  issuer TEXT,
+  credit_limit NUMERIC,
+  current_balance NUMERIC,
+  utilization_pct NUMERIC,
+  rewards_type TEXT,
+  rewards_value_ytd NUMERIC,
+  annual_fee NUMERIC,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================
 -- ROW LEVEL SECURITY (RLS)
 -- Users can only see their own household data
 -- ============================================================
@@ -212,11 +296,18 @@ CREATE POLICY "Household members only" ON priority_actions FOR ALL USING (househ
 CREATE POLICY "Household members only" ON timeline_events FOR ALL USING (household_owner(household_id));
 CREATE POLICY "Household members only" ON documents FOR ALL USING (household_owner(household_id));
 CREATE POLICY "Household members only" ON section_scores FOR ALL USING (household_owner(household_id));
+CREATE POLICY "Household members only" ON finance_accounts FOR ALL USING (household_owner(household_id));
+CREATE POLICY "Household members only" ON budget_summary FOR ALL USING (household_owner(household_id));
+CREATE POLICY "Household members only" ON tax_documents FOR ALL USING (household_owner(household_id));
+CREATE POLICY "Household members only" ON tax_recommendations FOR ALL USING (household_owner(household_id));
+CREATE POLICY "Household members only" ON family_members FOR ALL USING (household_owner(household_id));
+CREATE POLICY "Household members only" ON family_milestones FOR ALL USING (household_owner(household_id));
+CREATE POLICY "Household members only" ON credit_cards FOR ALL USING (household_owner(household_id));
 
 -- ============================================================
 -- SEED DATA — Adam Bailey demo household
 -- Run AFTER creating a user in Supabase Auth
--- Replace 'YOUR_USER_ID' with the actual auth.users UUID
+-- Replace 'YOUR_HOUSEHOLD_ID' with the actual household UUID
 -- ============================================================
 
 -- Uncomment and run after setup:

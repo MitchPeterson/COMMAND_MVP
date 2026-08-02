@@ -1,10 +1,11 @@
 import React from 'react';
 import { useHousehold } from '../useHousehold';
 import { UploadDropzone } from '../components/UploadDropzone';
+import { uploadDocumentAsset, invokeDocumentExtraction } from '../lib/supabase';
 import { CreditCard, Percent, Shield, Star } from 'lucide-react';
 
 export function CreditView() {
-  const { data } = useHousehold();
+  const { data, refresh } = useHousehold();
   const cards = data?.creditCards ?? [];
 
   const averageUtilization = cards.length
@@ -64,6 +65,14 @@ export function CreditView() {
           contextLabel="Credit document upload"
           buttonLabel="Upload credit document"
           className="mb-6"
+          onUpload={async (file) => {
+            if (!data?.household?.id) return;
+            const document = await uploadDocumentAsset(data.household.id, file, 'credit');
+            if (document) {
+              await invokeDocumentExtraction(document.id);
+              await refresh();
+            }
+          }}
         />
       </section>
 

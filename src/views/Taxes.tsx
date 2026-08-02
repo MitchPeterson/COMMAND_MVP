@@ -1,10 +1,11 @@
 import React from 'react';
 import { useHousehold } from '../useHousehold';
 import { UploadDropzone } from '../components/UploadDropzone';
+import { uploadDocumentAsset, invokeDocumentExtraction } from '../lib/supabase';
 import { FileText, Shield, Calendar, CheckCircle } from 'lucide-react';
 
 export function TaxesView() {
-  const { data } = useHousehold();
+  const { data, refresh } = useHousehold();
   const documents = data?.taxDocuments ?? [];
   const recommendations = data?.taxRecommendations ?? [];
 
@@ -64,6 +65,14 @@ export function TaxesView() {
           contextLabel="Tax document upload"
           buttonLabel="Upload tax document"
           className="mb-6"
+          onUpload={async (file) => {
+            if (!data?.household?.id) return;
+            const document = await uploadDocumentAsset(data.household.id, file, 'tax');
+            if (document) {
+              await invokeDocumentExtraction(document.id);
+              await refresh();
+            }
+          }}
         />
         <div className="mb-6 flex items-center justify-between gap-4">
           <div>

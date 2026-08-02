@@ -1,6 +1,8 @@
 import React, { useMemo } from 'react';
 import { useHousehold } from '../useHousehold';
 import { UploadDropzone } from '../components/UploadDropzone';
+import { DocumentExtractionReview } from '../components/DocumentExtractionReview';
+import { uploadDocumentAsset, invokeDocumentExtraction } from '../lib/supabase';
 import {
   Shield,
   FileText,
@@ -71,7 +73,7 @@ function getScoreState(score: number | null | undefined) {
 }
 
 export function DashboardView() {
-  const { data } = useHousehold();
+  const { data, refresh } = useHousehold();
 
   const healthScore = data?.household?.health_score ?? null;
   const sectionScores = useMemo(
@@ -166,6 +168,19 @@ export function DashboardView() {
               contextLabel="Global document upload"
               buttonLabel="Add a document"
               className="mb-6"
+              onUpload={async (file) => {
+                if (!data?.household?.id) return;
+                const document = await uploadDocumentAsset(data.household.id, file, 'general');
+                if (document) {
+                  await invokeDocumentExtraction(document.id);
+                  await refresh();
+                }
+              }}
+            />
+            <DocumentExtractionReview
+              householdId={data?.household?.id ?? ''}
+              extractions={data?.documentExtractions ?? []}
+              onChange={refresh}
             />
             <div className="mb-6 flex items-center justify-between">
               <div>

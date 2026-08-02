@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useHousehold } from '../useHousehold';
 import { signOut } from '../lib/supabase';
+import pkg from '../../package.json';
 import { UserCircle2, ArrowLeftRight, MapPin, Shield, Sparkles } from 'lucide-react';
 
 function formatCurrency(value: number | null | undefined) {
@@ -95,6 +96,26 @@ export function ProfileView() {
           </div>
         </div>
         <p className="mt-4 text-sm text-cmd-muted">Use the sign-out button above to return to the auth screen and start a fresh household.</p>
+      </section>
+
+      <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
+        <div className="flex items-center gap-3 text-cmd-gold">
+          <Shield className="h-5 w-5" />
+          <div>
+            <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">About</p>
+            <h2 className="mt-2 text-2xl font-semibold text-cmd-offwhite">App version</h2>
+          </div>
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <div className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-5">
+            <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Current version</p>
+            <p className="mt-3 text-xl font-semibold text-cmd-offwhite">{pkg.version}</p>
+          </div>
+          <div className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-5">
+            <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Legacy mode</p>
+            <p className="mt-3 text-xl font-semibold text-cmd-offwhite">Old interface still available</p>
+          </div>
+        </div>
       </section>
     </div>
   );

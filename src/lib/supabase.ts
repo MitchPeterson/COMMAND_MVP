@@ -7,6 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
+const storageBucket = (import.meta.env.VITE_SUPABASE_STORAGE_BUCKET as string) ?? 'raw-uploads';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
@@ -266,6 +267,7 @@ export interface Document {
   file_path: string | null;
   file_size: number | null;
   mime_type: string | null;
+  status: 'uploaded' | 'processed' | 'error';
   uploaded_at: string;
   created_at: string;
 }
@@ -457,6 +459,199 @@ export async function getDocuments(householdId: string): Promise<Document[]> {
     return [];
   }
   return data ?? [];
+}
+
+export async function uploadDocumentAsset(householdId: string, file: File, category: string): Promise<Document | null> {
+  const normalizedCategory = category || 'general';
+  const uploadPath = `${householdId}/${Date.now()}-${file.name}`;
+
+  const { error: uploadError } = await supabase.storage.from(storageBucket).upload(uploadPath, file, {
+    cacheControl: '3600',
+    upsert: false,
+  });
+
+  if (uploadError) {
+    console.error('Error uploading file to storage:', uploadError);
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from('documents')
+    .insert([
+      {
+        household_id: householdId,
+        name: file.name,
+        category: normalizedCategory,
+        file_path: uploadPath,
+        file_size: file.size,
+        mime_type: file.type,
+      },
+    ])
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating document record:', error);
+    return null;
+  }
+  return data;
+}
+
+export async function invokeDocumentExtraction(documentId: string): Promise<boolean> {
+  const { error } = await supabase.functions.invoke('extract-document', {
+    body: JSON.stringify({ document_id: documentId }),
+  });
+  if (error) {
+    console.error('Error invoking extraction function:', error);
+    return false;
+  }
+  return true;
+}
+
+function parseNumber(value: string | null | undefined): number | null {
+  if (!value) return null;
+  const parsed = Number(value.toString().replace(/[^0-9.\-]/g, ''));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizePolicyType(type: string | null | undefined): InsurancePolicyType {
+  const normalized = type?.toLowerCase().trim();
+  if (normalized === 'home' || normalized === 'auto' || normalized === 'umbrella' || normalized === 'life' || normalized === 'health' || normalized === 'disability') {
+    return normalized;
+  }
+  return 'other';
+}
+
+export async function confirmDocumentExtraction(
+  extractionId: string,
+  correctedFields: Record<string, string | number | null>,
+  detectedType: DocumentType,
+  householdId: string,
+  documentId: string
+): Promise<boolean> {
+  const insertResult = async () => {
+    switch (detectedType) {
+      case 'insurance_dec_page': {
+        const { carrier, policy_type, policy_number, coverage_amount, premium, renewal_date } = correctedFields;
+        const { error } = await supabase.from('insurance_policies').insert([
+          {
+            household_id: householdId,
+            type: normalizePolicyType(policy_type as string | undefined),
+            carrier: carrier as string | null,
+            policy_number: policy_number as string | null,
+            coverage_amount: parseNumber(coverage_amount as string | null),
+            annual_premium: parseNumber(premium as string | null),
+            renewal_date: (renewal_date as string) || null,
+            status: 'active',
+          },
+        ]);
+        return error == null;
+      }
+      case 'credit_card_statement': {
+        const { issuer, card_name_last4, current_balance, credit_limit } = correctedFields;
+        const cardName = card_name_last4 ? `${issuer ?? 'Card'} ${card_name_last4}` : (issuer as string | null) ?? 'Credit card';
+        const { error } = await supabase.from('credit_cards').insert([
+          {
+            household_id: householdId,
+            card_name: cardName,
+            issuer: issuer as string | null,
+            credit_limit: parseNumber(credit_limit as string | null),
+            current_balance: parseNumber(current_balance as string | null),
+          },
+        ]);
+        return error == null;
+      }
+      case 'bank_statement': {
+        const { institution, account_type, balance, as_of_date } = correctedFields;
+        const { error } = await supabase.from('finance_accounts').insert([
+          {
+            household_id: householdId,
+            account_name: `${institution ?? 'Bank'} ${account_type ?? 'Account'}`,
+            account_type: (account_type as string) ?? 'bank',
+            institution: institution as string | null,
+            balance: parseNumber(balance as string | null),
+            as_of_date: (as_of_date as string) || null,
+          },
+        ]);
+        return error == null;
+      }
+      case 'tax_document': {
+        const { doc_type, tax_year, source, amount } = correctedFields;
+        const { error } = await supabase.from('tax_documents').insert([
+          {
+            household_id: householdId,
+            name: `${doc_type ?? 'Tax'} ${tax_year ?? ''}`,
+            tax_year: Number(tax_year) || null,
+            doc_type: (doc_type as string) || 'other',
+            status: 'uploaded',
+            amount: parseNumber(amount as string | null),
+            source: source as string | null,
+          },
+        ]);
+        return error == null;
+      }
+      case 'mortgage_statement': {
+        const { lender, current_balance, interest_rate, monthly_payment } = correctedFields;
+        const { error } = await supabase.from('finance_accounts').insert([
+          {
+            household_id: householdId,
+            account_name: `${lender ?? 'Mortgage'} Loan`,
+            account_type: 'mortgage',
+            institution: lender as string | null,
+            balance: parseNumber(current_balance as string | null),
+            as_of_date: null,
+          },
+        ]);
+        return error == null;
+      }
+      case 'paystub': {
+        const { employer, net_pay } = correctedFields;
+        const { error } = await supabase.from('finance_accounts').insert([
+          {
+            household_id: householdId,
+            account_name: `${employer ?? 'Employer'} Paystub`,
+            account_type: 'paystub',
+            institution: employer as string | null,
+            balance: parseNumber(net_pay as string | null),
+            as_of_date: null,
+          },
+        ]);
+        return error == null;
+      }
+      default:
+        return true;
+    }
+  };
+
+  const success = await insertResult();
+  if (!success) {
+    console.error('Failed to insert extraction target data for type', detectedType);
+    return false;
+  }
+
+  const { error } = await supabase
+    .from('document_extractions')
+    .update({ status: 'confirmed' })
+    .eq('id', extractionId);
+
+  if (error) {
+    console.error('Failed to update extraction status:', error);
+    return false;
+  }
+
+  return true;
+}
+
+export async function discardDocumentExtraction(extractionId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('document_extractions')
+    .update({ status: 'discarded' })
+    .eq('id', extractionId);
+  if (error) {
+    console.error('Failed to discard extraction:', error);
+    return false;
+  }
+  return true;
 }
 
 export async function getDocumentExtractions(householdId: string): Promise<DocumentExtraction[]> {

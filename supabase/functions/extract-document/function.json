@@ -1,0 +1,7 @@
+{
+  "name": "extract-document",
+  "version": "1.0.0",
+  "runtime": "deno",
+  "type": "http",
+  "entrypoint": "function.ts"
+}

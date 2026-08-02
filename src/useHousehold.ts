@@ -12,6 +12,14 @@ import {
   getPriorityActions,
   getTimelineEvents,
   getSectionScores,
+  getFinanceAccounts,
+  getBudgetSummary,
+  getTaxDocuments,
+  getTaxRecommendations,
+  getFamilyMembers,
+  getFamilyMilestones,
+  getCreditCards,
+  getDocuments,
   type Household,
   type InsurancePolicy,
   type LegalDocument,
@@ -21,6 +29,14 @@ import {
   type TimelineEvent,
   type SectionScore,
   type HouseholdProfile,
+  type FinanceAccount,
+  type BudgetSummary,
+  type TaxDocument,
+  type TaxRecommendation,
+  type FamilyMember,
+  type FamilyMilestone,
+  type CreditCard,
+  type Document as StoredDocument,
 } from './lib/supabase';
 
 export interface HouseholdData {
@@ -33,6 +49,14 @@ export interface HouseholdData {
   priorityActions: PriorityAction[];
   timelineEvents: TimelineEvent[];
   sectionScores: SectionScore[];
+  financeAccounts: FinanceAccount[];
+  budgetSummary: BudgetSummary | null;
+  taxDocuments: TaxDocument[];
+  taxRecommendations: TaxRecommendation[];
+  familyMembers: FamilyMember[];
+  familyMilestones: FamilyMilestone[];
+  creditCards: CreditCard[];
+  documents: StoredDocument[];
 }
 
 export interface UseHouseholdReturn {
@@ -53,6 +77,14 @@ const EMPTY_DATA: HouseholdData = {
   priorityActions: [],
   timelineEvents: [],
   sectionScores: [],
+  financeAccounts: [],
+  budgetSummary: null,
+  taxDocuments: [],
+  taxRecommendations: [],
+  familyMembers: [],
+  familyMilestones: [],
+  creditCards: [],
+  documents: [],
 };
 
 export function useHousehold(): UseHouseholdReturn {
@@ -86,6 +118,14 @@ export function useHousehold(): UseHouseholdReturn {
         priorityActions,
         timelineEvents,
         sectionScores,
+        financeAccounts,
+        budgetSummary,
+        taxDocuments,
+        taxRecommendations,
+        familyMembers,
+        familyMilestones,
+        creditCards,
+        documents,
       ] = await Promise.all([
         supabase
           .from('household_profile')
@@ -100,6 +140,14 @@ export function useHousehold(): UseHouseholdReturn {
         getPriorityActions(hid),
         getTimelineEvents(hid),
         getSectionScores(hid),
+        getFinanceAccounts(hid),
+        getBudgetSummary(hid),
+        getTaxDocuments(hid),
+        getTaxRecommendations(hid),
+        getFamilyMembers(hid),
+        getFamilyMilestones(hid),
+        getCreditCards(hid),
+        getDocuments(hid),
       ]);
 
       setData({
@@ -112,6 +160,14 @@ export function useHousehold(): UseHouseholdReturn {
         priorityActions,
         timelineEvents,
         sectionScores,
+        financeAccounts,
+        budgetSummary,
+        taxDocuments,
+        taxRecommendations,
+        familyMembers,
+        familyMilestones,
+        creditCards,
+        documents,
       });
     } catch (err) {
       console.error('Failed to load household data:', err);
@@ -164,12 +220,11 @@ export function useHousehold(): UseHouseholdReturn {
 
     initAuth();
 
-    // Only handle explicit sign in / sign out — not INITIAL_SESSION
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: any, session: any) => {
         if (!mounted) return;
 
-        if (event === 'SIGNED_IN') {
+        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
           const uid = session?.user?.id ?? null;
           setUserId(uid);
           if (uid) await loadData(uid);

@@ -220,12 +220,11 @@ export function useHousehold(): UseHouseholdReturn {
 
     initAuth();
 
-    // Only handle explicit sign in / sign out — not INITIAL_SESSION
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event: any, session: any) => {
         if (!mounted) return;
 
-        if (event === 'SIGNED_IN') {
+        if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
           const uid = session?.user?.id ?? null;
           setUserId(uid);
           if (uid) await loadData(uid);

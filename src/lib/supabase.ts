@@ -64,6 +64,11 @@ export interface Database {
         Insert: Omit<Document, 'id' | 'created_at' | 'uploaded_at'>;
         Update: Partial<Omit<Document, 'id'>>;
       };
+      document_extractions: {
+        Row: DocumentExtraction;
+        Insert: Omit<DocumentExtraction, 'id' | 'created_at'>;
+        Update: Partial<Omit<DocumentExtraction, 'id'>>;
+      };
       section_scores: {
         Row: SectionScore;
         Insert: Omit<SectionScore, 'id'>;
@@ -265,6 +270,27 @@ export interface Document {
   created_at: string;
 }
 
+export type ExtractionConfidence = 'high' | 'medium' | 'low';
+export type DocumentType =
+  | 'mortgage_statement'
+  | 'insurance_dec_page'
+  | 'credit_card_statement'
+  | 'bank_statement'
+  | 'tax_document'
+  | 'paystub'
+  | 'unknown';
+
+export interface DocumentExtraction {
+  id: string;
+  household_id: string;
+  document_id: string;
+  detected_type: DocumentType;
+  confidence: ExtractionConfidence | null;
+  extracted_fields: Json;
+  status: 'pending_review' | 'confirmed' | 'discarded';
+  created_at: string;
+}
+
 export type SectionKey = 'advisory' | 'insurance' | 'legal' | 'family' | 'home' | 'tax' | 'healthcare' | 'finances' | 'credit';
 export type SectionStatus = 'good' | 'review' | 'action_needed';
 
@@ -428,6 +454,20 @@ export async function getDocuments(householdId: string): Promise<Document[]> {
 
   if (error) {
     console.error('Error fetching documents:', error);
+    return [];
+  }
+  return data ?? [];
+}
+
+export async function getDocumentExtractions(householdId: string): Promise<DocumentExtraction[]> {
+  const { data, error } = await supabase
+    .from('document_extractions')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching document extractions:', error);
     return [];
   }
   return data ?? [];

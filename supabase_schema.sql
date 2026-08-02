@@ -160,6 +160,20 @@ CREATE TABLE documents (
 );
 
 -- ============================================================
+-- DOCUMENT EXTRACTIONS (Staging data from OCR / model extraction)
+-- ============================================================
+CREATE TABLE document_extractions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  household_id UUID REFERENCES households(id) ON DELETE CASCADE NOT NULL,
+  document_id UUID REFERENCES documents(id) ON DELETE CASCADE NOT NULL,
+  detected_type TEXT NOT NULL CHECK (detected_type IN ('mortgage_statement', 'insurance_dec_page', 'credit_card_statement', 'bank_statement', 'tax_document', 'paystub', 'unknown')),
+  confidence TEXT CHECK (confidence IN ('high', 'medium', 'low')),
+  extracted_fields JSONB NOT NULL,
+  status TEXT NOT NULL DEFAULT 'pending_review' CHECK (status IN ('pending_review', 'confirmed', 'discarded')),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================================
 -- SECTION SCORES
 -- Per-pillar health scores (1-9 pillars)
 -- ============================================================
@@ -271,6 +285,7 @@ ALTER TABLE maintenance_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE priority_actions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE timeline_events ENABLE ROW LEVEL SECURITY;
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE document_extractions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE section_scores ENABLE ROW LEVEL SECURITY;
 
 -- Households: users own their household
@@ -295,6 +310,7 @@ CREATE POLICY "Household members only" ON maintenance_records FOR ALL USING (hou
 CREATE POLICY "Household members only" ON priority_actions FOR ALL USING (household_owner(household_id));
 CREATE POLICY "Household members only" ON timeline_events FOR ALL USING (household_owner(household_id));
 CREATE POLICY "Household members only" ON documents FOR ALL USING (household_owner(household_id));
+CREATE POLICY "Household members only" ON document_extractions FOR ALL USING (household_owner(household_id));
 CREATE POLICY "Household members only" ON section_scores FOR ALL USING (household_owner(household_id));
 CREATE POLICY "Household members only" ON finance_accounts FOR ALL USING (household_owner(household_id));
 CREATE POLICY "Household members only" ON budget_summary FOR ALL USING (household_owner(household_id));

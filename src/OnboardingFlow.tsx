@@ -15,12 +15,19 @@ import {
 // ─────────────────────────────────────────────
 // Types
 // ─────────────────────────────────────────────
+interface ChildEntry {
+  name: string;
+  birthDate: string;
+}
+
 interface OnboardingData {
   // Household
   firstName: string;
   lastName: string;
   spousePartner: 'yes' | 'no' | '';
   spouseFirstName: string;
+  spouseLastName: string;
+  spouseBirthDate: string;
   city: string;
   state: string;
 
@@ -37,7 +44,7 @@ interface OnboardingData {
   emergencyFund: 'under3' | '3to6' | 'over6' | 'none' | '';
 
   // Family
-  numChildren: string;
+  children: ChildEntry[];
   agingParents: 'yes' | 'no' | '';
   upcomingLifeEvents: string[];
 
@@ -50,7 +57,7 @@ interface OnboardingData {
 
 interface OnboardingFlowProps {
   userId: string;
-  onComplete: () => void;
+  onComplete: () => Promise<void>;
 }
 
 // ─────────────────────────────────────────────
@@ -310,6 +317,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
     lastName: '',
     spousePartner: '',
     spouseFirstName: '',
+    spouseLastName: '',
+    spouseBirthDate: '',
     city: '',
     state: '',
     homeOwnership: '',
@@ -320,7 +329,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
     householdIncome: '',
     netWorth: '',
     emergencyFund: '',
-    numChildren: '',
+    children: [],
     agingParents: '',
     upcomingLifeEvents: [],
     hasWill: '',
@@ -331,6 +340,29 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
 
   const update = (key: keyof OnboardingData, value: any) => {
     setForm((f) => ({ ...f, [key]: value }));
+  };
+
+  const addChild = () => {
+    setForm((f) => ({
+      ...f,
+      children: [...f.children, { name: '', birthDate: '' }],
+    }));
+  };
+
+  const updateChild = (index: number, key: keyof ChildEntry, value: string) => {
+    setForm((f) => ({
+      ...f,
+      children: f.children.map((child, i) =>
+        i === index ? { ...child, [key]: value } : child
+      ),
+    }));
+  };
+
+  const removeChild = (index: number) => {
+    setForm((f) => ({
+      ...f,
+      children: f.children.filter((_, i) => i !== index),
+    }));
   };
 
   const toggleLifeEvent = (event: string) => {
@@ -368,37 +400,36 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
       const netWorthNum = form.netWorth ? parseInt(form.netWorth.replace(/\D/g, '')) : null;
       const homeValueNum = form.homeValue ? parseInt(form.homeValue.replace(/\D/g, '')) : null;
 
-      await supabase.from('household_profile').insert({
+      const { error: profileError } = await supabase.from('household_profile').insert({
         household_id: householdId,
+        primary_name: `${form.firstName}${form.lastName ? ' ' + form.lastName : ''}`,
         primary_first_name: form.firstName,
         primary_last_name: form.lastName,
-        spouse_first_name: form.spouseFirstName || null,
-        city: form.city || null,
-        state: form.state || null,
-        home_ownership: form.homeOwnership || null,
-        home_value: homeValueNum,
-        year_built: form.yearBuilt ? parseInt(form.yearBuilt) : null,
-        household_income: incomeNum,
-        net_worth: netWorthNum,
-        emergency_fund_status: form.emergencyFund || null,
-        num_children: form.numChildren ? parseInt(form.numChildren) : 0,
-        has_aging_parents: form.agingParents === 'yes',
-        upcoming_life_events: form.upcomingLifeEvents,
-        has_will: form.hasWill || null,
-        has_trust: form.hasTrust || null,
-        has_umbrella: form.hasUmbrella || null,
+         partner_name: form.spousePartner === 'yes' ? `${form.spouseFirstName}${form.spouseLastName ? ' ' + form.spouseLastName : ''}` : null,
+         spouse_first_name: form.spouseFirstName || null,
+         city: form.city || null,
+         state: form.state || null,
+         home_ownership: form.homeOwnership || null,
+         home_value: homeValueNum,
+         year_built: form.yearBuilt ? parseInt(form.yearBuilt) : null,
+         household_income: incomeNum,
+         net_worth: netWorthNum,
+         emergency_fund_status: form.emergencyFund || null,
+         num_children: form.children.length,
         life_insurance_review: form.lifeInsuranceReview || null,
         hvac_age: form.hvacAge || null,
         roof_age: form.roofAge || null,
       });
+      if (profileError) throw profileError;
 
       // 3. Auto-create blank section scores
-      await supabase.from('section_scores').insert(
+      const { error: sectionScoresError } = await supabase.from('section_scores').insert(
         SECTION_SCORE_DEFAULTS.map((s) => ({
           household_id: householdId,
           ...s,
         }))
       );
+      if (sectionScoresError) throw sectionScoresError;
 
       // 4. Create initial priority actions based on answers
       const actions: any[] = [];
@@ -473,8 +504,113 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
         });
       }
 
+      const familyMembersToInsert = [] as Array<{
+        household_id: string;
+        name: string;
+        relationship: string;
+        birth_date: string | null;
+      }>;
+
+      if (form.spousePartner === 'yes' && form.spouseFirstName.trim()) {
+        familyMembersToInsert.push({
+          household_id: householdId,
+          name: `${form.spouseFirstName}${form.spouseLastName ? ' ' + form.spouseLastName : ''}`,
+          relationship: 'Spouse',
+          birth_date: form.spouseBirthDate || null,
+        });
+      }
+
+      form.children.forEach((child) => {
+        if (child.name.trim()) {
+          familyMembersToInsert.push({
+            household_id: householdId,
+            name: child.name,
+            relationship: 'Child',
+            birth_date: child.birthDate || null,
+          });
+        }
+      });
+
+      let insertedFamilyMembers: { id: string; name: string; relationship: string; birth_date: string | null; }[] = [];
+      if (familyMembersToInsert.length > 0) {
+        const { data: insertedMembers, error: familyMembersError } = await supabase
+          .from('family_members')
+          .insert(familyMembersToInsert)
+          .select('id, name, relationship, birth_date');
+        if (familyMembersError) throw familyMembersError;
+        insertedFamilyMembers = insertedMembers as typeof insertedFamilyMembers;
+      }
+
+      const milestoneRows: Array<{
+        family_member_id: string;
+        household_id: string;
+        title: string;
+        event_date: string | null;
+        status: string;
+        category: string;
+        triggers_review: string[];
+      }> = [];
+
+      const addYears = (dateString: string, years: number) => {
+        const date = new Date(dateString);
+        if (Number.isNaN(date.getTime())) return null;
+        date.setFullYear(date.getFullYear() + years);
+        return date.toISOString().slice(0, 10);
+      };
+
+      insertedFamilyMembers.forEach((member) => {
+        if (!member.birth_date || member.relationship !== 'Child') return;
+        const milestonesForChild = [
+          {
+            title: '13th birthday',
+            years: 13,
+            category: 'Family',
+            triggers_review: ['insurance', 'legal'],
+          },
+          {
+            title: 'Driver’s license eligibility',
+            years: 16,
+            category: 'Family',
+            triggers_review: ['insurance', 'finances'],
+          },
+          {
+            title: '18th birthday',
+            years: 18,
+            category: 'Family',
+            triggers_review: ['legal', 'finances'],
+          },
+          {
+            title: 'College start year',
+            years: 18,
+            category: 'Family',
+            triggers_review: ['financial', 'legal'],
+          },
+        ];
+
+        milestonesForChild.forEach((milestone) => {
+          const eventDate = addYears(member.birth_date!, milestone.years);
+          if (eventDate) {
+            milestoneRows.push({
+              family_member_id: member.id,
+              household_id: householdId,
+              title: milestone.title,
+              event_date: eventDate,
+              status: 'upcoming',
+              category: milestone.category,
+              triggers_review: milestone.triggers_review,
+            });
+          }
+        });
+      });
+
+      if (milestoneRows.length > 0) {
+        const { error: milestoneError } = await supabase.from('family_milestones').insert(milestoneRows);
+        if (milestoneError) throw milestoneError;
+      }
+
       if (actions.length > 0) {
-        await supabase.from('priority_actions').insert(actions);
+        const { error: priorityError } = await supabase.from('priority_actions').insert(actions);
+        if (priorityError) throw priorityError;
       }
 
       // 5. Calculate initial health score (very rough — refine later)
@@ -487,12 +623,15 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
       if (form.lifeInsuranceReview === 'under1yr') score += 5;
       score = Math.min(score, 85); // never start at 100
 
-      await supabase.from('households').update({ health_score: score }).eq('id', householdId);
+      const { error: healthScoreError } = await supabase.from('households').update({ health_score: score }).eq('id', householdId);
+      if (healthScoreError) throw healthScoreError;
 
       // 6. Wait for setup animation to breathe
-      await new Promise((r) => setTimeout(r, 4800));
+      await new Promise((r) => setTimeout(r, 2400));
 
-      onComplete();
+      setShowSetup(false);
+      setIsSubmitting(false);
+      await onComplete();
     } catch (err: any) {
       console.error('Onboarding error:', err);
       setError(err.message || 'Something went wrong. Please try again.');
@@ -637,7 +776,12 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
                     </OptionCard>
                     <OptionCard
                       selected={form.spousePartner === 'no'}
-                      onClick={() => { update('spousePartner', 'no'); update('spouseFirstName', ''); }}
+                      onClick={() => {
+                        update('spousePartner', 'no');
+                        update('spouseFirstName', '');
+                        update('spouseLastName', '');
+                        update('spouseBirthDate', '');
+                      }}
                     >
                       No
                     </OptionCard>
@@ -645,11 +789,26 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
                 </div>
 
                 {form.spousePartner === 'yes' && (
-                  <TextInput
-                    placeholder="Spouse / partner first name"
-                    value={form.spouseFirstName}
-                    onChange={(v) => update('spouseFirstName', v)}
-                  />
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <TextInput
+                        placeholder="Spouse / partner first name"
+                        value={form.spouseFirstName}
+                        onChange={(v) => update('spouseFirstName', v)}
+                      />
+                      <TextInput
+                        placeholder="Spouse / partner last name"
+                        value={form.spouseLastName}
+                        onChange={(v) => update('spouseLastName', v)}
+                      />
+                    </div>
+                    <TextInput
+                      placeholder="Spouse / partner birthdate"
+                      type="date"
+                      value={form.spouseBirthDate}
+                      onChange={(v) => update('spouseBirthDate', v)}
+                    />
+                  </>
                 )}
 
                 <div>
@@ -866,18 +1025,48 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
               <div className="space-y-5">
                 <div>
                   <label className="text-[#808084] text-xs tracking-wider uppercase mb-2 block">
-                    Number of children
+                    Children
                   </label>
-                  <div className="grid grid-cols-5 gap-2">
-                    {['0', '1', '2', '3', '4+'].map((n) => (
-                      <OptionCard
-                        key={n}
-                        selected={form.numChildren === n}
-                        onClick={() => update('numChildren', n)}
-                      >
-                        <span className="block text-center w-full">{n}</span>
-                      </OptionCard>
-                    ))}
+                  <div className="space-y-4">
+                    {form.children.length === 0 ? (
+                      <div className="rounded-3xl border border-dashed border-[#2a2b2e] bg-[#1c1d20] p-4 text-sm text-[#808084]">
+                        Add each child to generate age-based milestones and keep your family timeline current.
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {form.children.map((child, index) => (
+                          <div key={index} className="rounded-3xl border border-[#2a2b2e] bg-[#1c1d20] p-4">
+                            <div className="grid grid-cols-2 gap-3">
+                              <TextInput
+                                placeholder="Child name"
+                                value={child.name}
+                                onChange={(v) => updateChild(index, 'name', v)}
+                              />
+                              <TextInput
+                                placeholder="Birthdate"
+                                type="date"
+                                value={child.birthDate}
+                                onChange={(v) => updateChild(index, 'birthDate', v)}
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeChild(index)}
+                              className="mt-3 text-sm text-[#C9A24D] hover:text-[#d2b55a]"
+                            >
+                              Remove child
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={addChild}
+                      className="w-full rounded-xl border border-[#2a2b2e] bg-[#1c1d20] px-4 py-3 text-sm font-semibold text-[#F6F6F4] hover:border-[#3a3b3e] hover:bg-[#232528]"
+                    >
+                      Add a child
+                    </button>
                   </div>
                 </div>
 

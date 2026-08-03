@@ -498,11 +498,15 @@ export async function uploadDocumentAsset(householdId: string, file: File, categ
 }
 
 export async function invokeDocumentExtraction(documentId: string): Promise<boolean> {
+  // Pass the object directly — supabase-js serializes it and sets the JSON content type.
   const { error } = await supabase.functions.invoke('extract-document', {
-    body: JSON.stringify({ document_id: documentId }),
+    body: { document_id: documentId },
   });
   if (error) {
-    console.error('Error invoking extraction function:', error);
+    // The function returns a JSON body describing the failure; surface it rather than
+    // logging an opaque FunctionsHttpError.
+    const detail = await error.context?.json?.().catch(() => null);
+    console.error('Error invoking extraction function:', detail?.error ?? error.message);
     return false;
   }
   return true;

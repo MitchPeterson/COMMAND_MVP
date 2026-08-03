@@ -1,0 +1,6 @@
+project_id = "dkvmnhaekwcnwxbbyjfe"
+
+[functions.extract-document]
+# The function verifies the caller's JWT and confirms household ownership before
+# using its service-role key, so requests must carry a valid user session.
+verify_jwt = true

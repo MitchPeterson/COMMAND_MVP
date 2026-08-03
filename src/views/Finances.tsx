@@ -1,9 +1,11 @@
 import React from 'react';
 import { useHousehold } from '../useHousehold';
+import { UploadDropzone } from '../components/UploadDropzone';
+import { uploadDocumentAsset, invokeDocumentExtraction } from '../lib/supabase';
 import { Wallet, PieChart, TrendingUp, FileText } from 'lucide-react';
 
 export function FinancesView() {
-  const { data } = useHousehold();
+  const { data, refresh } = useHousehold();
   const accounts = data?.financeAccounts ?? [];
   const budget = data?.budgetSummary;
 
@@ -23,6 +25,22 @@ export function FinancesView() {
             <span className="ml-2 rounded-full bg-cmd-border px-2 py-1 text-xs text-cmd-offwhite">{accounts.length}</span>
           </div>
         </div>
+      </section>
+
+      <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
+        <UploadDropzone
+          contextLabel="Finance document upload"
+          buttonLabel="Upload finance document"
+          className="mb-6"
+          onUpload={async (file) => {
+            if (!data?.household?.id) return;
+            const document = await uploadDocumentAsset(data.household.id, file, 'finances');
+            if (document) {
+              await invokeDocumentExtraction(document.id);
+              await refresh();
+            }
+          }}
+        />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-3">

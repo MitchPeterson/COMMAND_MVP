@@ -361,3 +361,33 @@ INSERT INTO priority_actions (household_id, title, category, severity, estimated
   ('YOUR_HOUSEHOLD_ID', 'HVAC system approaching end of life', 'home', 'medium', 8000),
   ('YOUR_HOUSEHOLD_ID', 'Q1 estimated tax payment due April 15', 'tax', 'high', NULL);
 */
+
+-- ============================================================
+-- STORAGE
+-- The document vault. This section was missing from earlier versions of this
+-- file, which is why the bucket never existed in the live project even though
+-- the tables above had been applied — uploads failed silently against a
+-- non-existent bucket. Keep it here so a rebuild from this file is complete.
+--
+-- Upload paths are '<household_id>/<timestamp>-<filename>' (see
+-- uploadDocumentAsset in src/lib/supabase.ts), so the first path segment is the
+-- household id and is what the policies below check.
+-- ============================================================
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('raw-uploads', 'raw-uploads', false)
+ON CONFLICT (id) DO NOTHING;
+
+CREATE POLICY "Household can upload own documents" ON storage.objects
+  FOR INSERT TO authenticated
+  WITH CHECK (bucket_id = 'raw-uploads'
+              AND household_owner(((storage.foldername(name))[1])::uuid));
+
+CREATE POLICY "Household can read own documents" ON storage.objects
+  FOR SELECT TO authenticated
+  USING (bucket_id = 'raw-uploads'
+         AND household_owner(((storage.foldername(name))[1])::uuid));
+
+CREATE POLICY "Household can delete own documents" ON storage.objects
+  FOR DELETE TO authenticated
+  USING (bucket_id = 'raw-uploads'
+         AND household_owner(((storage.foldername(name))[1])::uuid));

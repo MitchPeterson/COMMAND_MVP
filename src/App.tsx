@@ -13,6 +13,7 @@ import { FamilyView } from './views/Family';
 import { CreditView } from './views/Credit';
 import { DocumentsView } from './views/Documents';
 import { ProfileView } from './views/Profile';
+import { signOut } from './lib/supabase';
 
 function App() {
   const { data, loading, userId, refresh } = useHousehold();
@@ -23,6 +24,16 @@ function App() {
   const handleOnboardingComplete = useCallback(async () => {
     await refresh();
     setActiveView('dashboard');
+  }, [refresh]);
+
+  // Without this, a session that has no household row is a dead end: the only
+  // signOut in the app lives in Profile, which is behind the dashboard, which
+  // requires a household. Signing out clears userId and returns to AuthScreen.
+  const handleSignOut = useCallback(async () => {
+    await signOut();
+    setShowReturningPrompt(false);
+    setHasPrompted(false);
+    await refresh();
   }, [refresh]);
 
   useEffect(() => {
@@ -55,26 +66,23 @@ function App() {
           </div>
           <h1 className="text-3xl font-semibold text-cmd-offwhite mb-4">Welcome back.</h1>
           <p className="text-cmd-muted mb-8">
-            We detected an existing login, but no household profile has been created yet.
-            Would you like to continue to onboarding or create a new household now?
+            You're signed in, but this account has no household set up yet. Continue to
+            onboarding to create one, or sign out to use a different account.
           </p>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-end">
             <button
               type="button"
-              onClick={() => setShowReturningPrompt(false)}
+              onClick={handleSignOut}
               className="rounded-2xl border border-gray-700 bg-transparent px-5 py-3 text-sm font-semibold text-cmd-offwhite transition hover:border-cmd-gold hover:text-cmd-gold"
             >
-              Continue to onboarding
+              Sign in as a different user
             </button>
             <button
               type="button"
-              onClick={() => {
-                setShowReturningPrompt(false);
-                setActiveView('dashboard');
-              }}
+              onClick={() => setShowReturningPrompt(false)}
               className="rounded-2xl border border-cmd-gold bg-cmd-gold/10 px-5 py-3 text-sm font-semibold text-cmd-gold transition hover:bg-cmd-gold/20"
             >
-              Create new household
+              Continue to onboarding
             </button>
           </div>
         </div>

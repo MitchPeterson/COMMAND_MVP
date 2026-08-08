@@ -10,7 +10,8 @@ import {
 import { InsurancePolicyReview, CoverageRow, currency, titleCase } from '../components/InsurancePolicyReview';
 import { CoverageHealth } from '../components/CoverageHealth';
 import { AddPolicyForm } from '../components/AddPolicyForm';
-import { ChevronDown, ChevronRight, FileWarning, Shield, Trash2 } from 'lucide-react';
+import { EditPolicyPanel } from '../components/EditPolicyPanel';
+import { ChevronDown, ChevronRight, FileWarning, Pencil, Shield, Trash2 } from 'lucide-react';
 
 
 
@@ -357,6 +358,7 @@ export function InsuranceView() {
   const insuranceExtractions = data?.insuranceExtractions ?? [];
   const [expanded, setExpanded] = useState<string | null>(null);
   const [pendingRemove, setPendingRemove] = useState<string | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -484,7 +486,15 @@ export function InsuranceView() {
 
                 {open && extraction && <PolicyDetail extraction={extraction} />}
 
-                <div className="mt-4 flex justify-end border-t border-cmd-border pt-3">
+                {editing === policy.id && (
+                  <EditPolicyPanel
+                    policy={policy}
+                    onCancel={() => setEditing(null)}
+                    onSaved={async () => { setEditing(null); await refresh(); }}
+                  />
+                )}
+
+                <div className="mt-4 flex justify-end gap-4 border-t border-cmd-border pt-3">
                   {pendingRemove === policy.id ? (
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="text-sm text-cmd-muted">Remove this policy from your profile?</span>
@@ -505,13 +515,22 @@ export function InsuranceView() {
                       </button>
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => setPendingRemove(policy.id)}
-                      className="inline-flex items-center gap-1.5 text-xs text-cmd-muted transition hover:text-red-200"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" /> Remove policy
-                    </button>
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setEditing(editing === policy.id ? null : policy.id)}
+                        className="inline-flex items-center gap-1.5 text-xs text-cmd-muted transition hover:text-cmd-gold"
+                      >
+                        <Pencil className="h-3.5 w-3.5" /> {editing === policy.id ? 'Close editor' : 'Edit policy'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingRemove(policy.id)}
+                        className="inline-flex items-center gap-1.5 text-xs text-cmd-muted transition hover:text-red-200"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Remove policy
+                      </button>
+                    </>
                   )}
                 </div>
               </div>

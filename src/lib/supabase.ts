@@ -892,6 +892,43 @@ export async function createManualPolicy(householdId: string, input: ManualPolic
   return true;
 }
 
+export interface PolicyEdit {
+  type?: InsurancePolicyType;
+  carrier?: string | null;
+  policy_number?: string | null;
+  coverage_amount?: string | number | null;
+  deductible?: string | number | null;
+  annual_premium?: string | number | null;
+  renewal_date?: string | null;
+  notes?: string | null;
+}
+
+/**
+ * Edit any policy, extracted or manual. Extracted values are a reading of a
+ * document and can be wrong or inconsistently worded — a carrier that writes
+ * itself two different ways across three policies, for instance. This edits the
+ * insurance_policies record only; the extraction and its evidence trail stay
+ * untouched, so the original reading remains inspectable.
+ */
+export async function updateInsurancePolicy(policyId: string, edit: PolicyEdit): Promise<boolean> {
+  const patch: Record<string, unknown> = {};
+  if (edit.type !== undefined) patch.type = edit.type;
+  if (edit.carrier !== undefined) patch.carrier = edit.carrier?.trim() || null;
+  if (edit.policy_number !== undefined) patch.policy_number = edit.policy_number?.trim() || null;
+  if (edit.notes !== undefined) patch.notes = edit.notes?.trim() || null;
+  if (edit.renewal_date !== undefined) patch.renewal_date = edit.renewal_date || null;
+  if (edit.coverage_amount !== undefined) patch.coverage_amount = parseNumber(edit.coverage_amount as string | null);
+  if (edit.deductible !== undefined) patch.deductible = parseNumber(edit.deductible as string | null);
+  if (edit.annual_premium !== undefined) patch.annual_premium = parseNumber(edit.annual_premium as string | null);
+
+  const { error } = await supabase.from('insurance_policies').update(patch).eq('id', policyId);
+  if (error) {
+    console.error('Failed to update policy:', error);
+    throw new Error(`Could not save the policy: ${error.message}`);
+  }
+  return true;
+}
+
 export async function deleteInsurancePolicy(policyId: string): Promise<boolean> {
   const { error } = await supabase.from('insurance_policies').delete().eq('id', policyId);
   if (error) {

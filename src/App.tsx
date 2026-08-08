@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useHousehold } from './useHousehold';
 import { AuthScreen } from './AuthScreen';
 import { OnboardingFlow } from './OnboardingFlow';
@@ -18,8 +18,9 @@ import { signOut } from './lib/supabase';
 function App() {
   const { data, loading, userId, refresh } = useHousehold();
   const [activeView, setActiveView] = useState<string>('dashboard');
-  const [showReturningPrompt, setShowReturningPrompt] = useState(false);
-  const [hasPrompted, setHasPrompted] = useState(false);
+  // Set only when the user explicitly chooses to start onboarding. Everything
+  // else about which screen shows is derived from data, never from an effect.
+  const [proceedToOnboarding, setProceedToOnboarding] = useState(false);
 
   const handleOnboardingComplete = useCallback(async () => {
     await refresh();
@@ -31,17 +32,9 @@ function App() {
   // requires a household. Signing out clears userId and returns to AuthScreen.
   const handleSignOut = useCallback(async () => {
     await signOut();
-    setShowReturningPrompt(false);
-    setHasPrompted(false);
+    setProceedToOnboarding(false);
     await refresh();
   }, [refresh]);
-
-  useEffect(() => {
-    if (!loading && userId && data && !data.household && !hasPrompted) {
-      setShowReturningPrompt(true);
-      setHasPrompted(true);
-    }
-  }, [loading, userId, data, hasPrompted]);
 
   if (loading) {
     return (
@@ -57,7 +50,11 @@ function App() {
     return <AuthScreen />;
   }
 
-  if (showReturningPrompt) {
+  // A session with no household row. Derived straight from data, so there is no
+  // render where onboarding wins a race against this and strands the user.
+  // `!data?.household` deliberately also covers data === null, which the 8s
+  // safety timeout in useHousehold can produce while a load is still in flight.
+  if (!data?.household && !proceedToOnboarding) {
     return (
       <div className="min-h-screen bg-cmd-black flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-2xl rounded-3xl border border-gray-800 bg-cmd-charcoal p-10 shadow-xl shadow-black/30">
@@ -79,7 +76,7 @@ function App() {
             </button>
             <button
               type="button"
-              onClick={() => setShowReturningPrompt(false)}
+              onClick={() => setProceedToOnboarding(true)}
               className="rounded-2xl border border-cmd-gold bg-cmd-gold/10 px-5 py-3 text-sm font-semibold text-cmd-gold transition hover:bg-cmd-gold/20"
             >
               Continue to onboarding
@@ -91,7 +88,13 @@ function App() {
   }
 
   if (!data?.household) {
-    return <OnboardingFlow userId={userId} onComplete={handleOnboardingComplete} />;
+    return (
+      <OnboardingFlow
+        userId={userId}
+        onComplete={handleOnboardingComplete}
+        onSignOut={handleSignOut}
+      />
+    );
   }
 
   const renderView = () => {

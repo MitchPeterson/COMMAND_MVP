@@ -3,6 +3,7 @@ import { useHousehold } from '../useHousehold';
 import { UploadDropzone } from '../components/UploadDropzone';
 import { DocumentExtractionReview } from '../components/DocumentExtractionReview';
 import { uploadDocumentAsset, invokeDocumentExtraction } from '../lib/supabase';
+import { computeCoverageHealth } from '../lib/coverageHealth';
 import {
   Shield,
   FileText,
@@ -75,11 +76,38 @@ function getScoreState(score: number | null | undefined) {
 export function DashboardView() {
   const { data, refresh } = useHousehold();
 
-  const healthScore = data?.household?.health_score ?? null;
-  const sectionScores = useMemo(
-    () => (data?.sectionScores ?? []).slice().sort((a, b) => a.score - b.score),
-    [data?.sectionScores]
+  // Insurance is scored live from the policies and extracted documents on file,
+  // so it reflects what the household actually has rather than a value frozen at
+  // onboarding. The stored row is overridden when a live score is available.
+  const coverage = useMemo(
+    () => computeCoverageHealth(data?.insurancePolicies ?? [], data?.insuranceExtractions ?? []),
+    [data?.insurancePolicies, data?.insuranceExtractions],
   );
+
+  const sectionScores = useMemo(() => {
+    const rows = (data?.sectionScores ?? []).map((section) =>
+      section.section === 'insurance' && coverage.score !== null
+        ? {
+            ...section,
+            score: coverage.score,
+            status: coverage.status as typeof section.status,
+            summary:
+              coverage.findings.length === 0
+                ? 'No inconsistencies found across the policies on file.'
+                : coverage.findings[0].title,
+          }
+        : section,
+    );
+    return rows.sort((a, b) => a.score - b.score);
+  }, [data?.sectionScores, coverage]);
+
+  // Aggregate follows the sections shown, so a change in coverage moves the
+  // household score instead of leaving it stuck at its onboarding value.
+  const healthScore = useMemo(() => {
+    if (sectionScores.length === 0) return data?.household?.health_score ?? null;
+    const total = sectionScores.reduce((sum, s) => sum + s.score, 0);
+    return Math.round((total / sectionScores.length) * 10) / 10;
+  }, [sectionScores, data?.household?.health_score]);
 
   const priorityActions = useMemo(
     () => (data?.priorityActions ?? []).filter((item) => item.status !== 'dismissed'),

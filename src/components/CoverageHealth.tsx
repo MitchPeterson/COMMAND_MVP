@@ -1,5 +1,5 @@
 import React from 'react';
-import type { InsurancePolicy, InsurancePolicyExtraction } from '../lib/supabase';
+import type { HouseholdProfile, InsurancePolicy, InsurancePolicyExtraction } from '../lib/supabase';
 import { computeCoverageHealth, gradeTone, type FindingSeverity } from '../lib/coverageHealth';
 import { currency, titleCase } from './InsurancePolicyReview';
 import { AlertTriangle, CheckCircle2, Info, ShieldAlert } from 'lucide-react';
@@ -7,11 +7,13 @@ import { AlertTriangle, CheckCircle2, Info, ShieldAlert } from 'lucide-react';
 interface Props {
   policies: InsurancePolicy[];
   extractions: InsurancePolicyExtraction[];
+  profile?: HouseholdProfile | null;
 }
 
-export function CoverageHealth({ policies, extractions }: Props) {
+export function CoverageHealth({ policies, extractions, profile }: Props) {
   const confirmed = extractions.filter((e) => e.review_status === 'confirmed');
-  const { score, grade, findings, totalPremium, byType } = computeCoverageHealth(policies, extractions);
+  const { score, grade, findings, dataFindings, confidence, confidenceReason, totalPremium, byType } =
+    computeCoverageHealth(policies, extractions, profile);
 
   const criticals = findings.filter((f) => f.severity === 'critical');
   const attention = findings.filter((f) => f.severity === 'attention');
@@ -51,6 +53,12 @@ export function CoverageHealth({ policies, extractions }: Props) {
               {policies.length} polic{policies.length === 1 ? 'y' : 'ies'}
             </h1>
             <p className={`mt-1 text-sm font-medium ${tone.className}`}>{tone.label}</p>
+            <p
+              className="mt-1 text-xs text-cmd-muted"
+              title={confidenceReason}
+            >
+              Assessment confidence: {confidence}
+            </p>
           </div>
         </div>
         <div className="text-right">
@@ -88,12 +96,22 @@ export function CoverageHealth({ policies, extractions }: Props) {
               </div>
             ))
           )}
-          {confirmed.length < policies.length && (
-            <p className="px-1 text-xs text-cmd-muted">
-              {policies.length - confirmed.length} polic
-              {policies.length - confirmed.length === 1 ? 'y was' : 'ies were'} added without an
-              extracted document, so coverage-level checks cannot run on them.
-            </p>
+          {dataFindings.length > 0 && (
+            <div className="mt-5 rounded-2xl border border-cmd-border bg-cmd-black/20 px-4 py-3">
+              <p className="text-xs uppercase tracking-[0.2em] text-cmd-muted">
+                What limits this assessment
+              </p>
+              <ul className="mt-2 space-y-1.5">
+                {dataFindings.map((f, i) => (
+                  <li key={i} className="text-sm text-cmd-muted">
+                    <span className="text-cmd-offwhite/80">{f.title}</span> — {f.detail}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-cmd-muted/70">
+                These affect how much could be checked, not the grade itself.
+              </p>
+            </div>
           )}
         </div>
       )}

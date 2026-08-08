@@ -12,6 +12,36 @@ import { CoverageHealth } from '../components/CoverageHealth';
 import { ChevronDown, ChevronRight, FileWarning, Shield, Trash2 } from 'lucide-react';
 
 
+
+/**
+ * Tie a deductible to a specific vehicle. The carrier may label applies_to as
+ * "Vehicle 1", a VIN, or "2022 Toyota Highlander", so match on any identifier we
+ * hold. A deductible that names no vehicle applies policy-wide and is used only
+ * when nothing vehicle-specific was found.
+ */
+function vehicleDeductible(
+  extraction: InsurancePolicyExtraction,
+  vehicle: InsurancePolicyExtraction['insurance_insured_assets'][number],
+  type: string,
+): string | null {
+  const identifiers = [vehicle.vin, vehicle.model, vehicle.make, vehicle.year ? String(vehicle.year) : null]
+    .filter((v): v is string => Boolean(v))
+    .map((v) => v.toLowerCase());
+
+  const candidates = extraction.insurance_deductibles.filter(
+    (d) => d.deductible_type === type && (d.amount !== null || d.percent !== null),
+  );
+
+  const specific = candidates.find((d) => {
+    const applies = (d.applies_to ?? '').toLowerCase();
+    return applies !== '' && identifiers.some((id) => applies.includes(id));
+  });
+
+  const chosen = specific ?? candidates.find((d) => !d.applies_to);
+  if (!chosen) return null;
+  return chosen.amount !== null ? currency(chosen.amount) : `${chosen.percent}%`;
+}
+
 /**
  * The handful of facts you would want before deciding whether to open a policy:
  * what is covered, for how much, and at what deductible. Shaped per insurance
@@ -48,15 +78,27 @@ function executiveSummary(extraction: InsurancePolicyExtraction): Array<{ label:
   switch (extraction.insurance_type) {
     case 'auto':
     case 'motorcycle':
-    case 'rv':
-      push('Vehicles', vehicles.map((v) => [v.year, v.make, v.model].filter(Boolean).join(' ') || v.description || '').filter(Boolean).join(' · ') || null);
+    case 'rv': {
+      // Deductibles vary per vehicle on most auto policies, so each vehicle
+      // carries its own rather than showing one policy-wide figure.
+      for (const vehicle of vehicles) {
+        const name = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') || vehicle.description || 'Vehicle';
+        const parts = [
+          vehicleDeductible(extraction, vehicle, 'collision') ? `Collision ${vehicleDeductible(extraction, vehicle, 'collision')}` : null,
+          vehicleDeductible(extraction, vehicle, 'comprehensive') ? `Comprehensive ${vehicleDeductible(extraction, vehicle, 'comprehensive')}` : null,
+        ].filter(Boolean);
+        push(name, parts.length ? parts.join(' · ') : 'Deductibles not stated');
+      }
+      if (vehicles.length === 0) {
+        push('Collision', dedText('collision') ? `${dedText('collision')} deductible` : null);
+        push('Comprehensive', dedText('comprehensive') ? `${dedText('comprehensive')} deductible` : null);
+      }
       push('Drivers', people.map((p) => p.name).filter(Boolean).join(' · ') || null);
       push('Liability', limitOf('bodily_injury_liability') ?? limitOf('combined_single_limit'));
       push('Property damage', limitOf('property_damage_liability'));
       push('Uninsured motorist', limitOf('uninsured_motorist'));
-      push('Collision', dedText('collision') ? `${dedText('collision')} deductible` : null);
-      push('Comprehensive', dedText('comprehensive') ? `${dedText('comprehensive')} deductible` : null);
       break;
+    }
 
     case 'homeowners':
     case 'renters':
@@ -234,7 +276,7 @@ export function InsuranceView() {
   return (
     <div className="space-y-6">
       {/* Coverage first. The upload is a means to this, not the point of the page. */}
-      <CoverageHealth policies={policies} extractions={insuranceExtractions} />
+      <CoverageHealth policies={policies} extractions={insuranceExtractions} profile={data?.profile} />
 
       <InsurancePolicyReview extractions={insuranceExtractions} onChange={refresh} />
 

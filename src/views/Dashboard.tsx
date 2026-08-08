@@ -80,8 +80,8 @@ export function DashboardView() {
   // so it reflects what the household actually has rather than a value frozen at
   // onboarding. The stored row is overridden when a live score is available.
   const coverage = useMemo(
-    () => computeCoverageHealth(data?.insurancePolicies ?? [], data?.insuranceExtractions ?? []),
-    [data?.insurancePolicies, data?.insuranceExtractions],
+    () => computeCoverageHealth(data?.insurancePolicies ?? [], data?.insuranceExtractions ?? [], data?.profile),
+    [data?.insurancePolicies, data?.insuranceExtractions, data?.profile],
   );
 
   const sectionScores = useMemo(() => {

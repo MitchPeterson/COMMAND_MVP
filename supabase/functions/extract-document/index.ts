@@ -408,7 +408,9 @@ function buildDocumentContent(bytes: Uint8Array, mimeType: string | null): unkno
 
 // deno-lint-ignore no-explicit-any
 async function callClaude(content: unknown[], instructions: string, schema: unknown, effort: string, maxTokens: number): Promise<any> {
-  const response = await anthropic!.beta.messages.create({
+  // Streamed: a long policy needs a high max_tokens, and non-streaming requests
+  // at that size risk HTTP timeouts. finalMessage() still gives one whole reply.
+  const stream = anthropic!.beta.messages.stream({
     model: anthropicModel,
     max_tokens: maxTokens,
     betas: ['server-side-fallback-2026-07-01'],
@@ -417,12 +419,13 @@ async function callClaude(content: unknown[], instructions: string, schema: unkn
     messages: [{ role: 'user', content: [...content, { type: 'text', text: instructions }] }],
     // deno-lint-ignore no-explicit-any
   } as any);
+  const response = await stream.finalMessage();
 
   if (response.stop_reason === 'refusal') {
     throw new Error(`Claude declined to process this document (${response.stop_details?.category ?? 'unspecified'})`);
   }
   if (response.stop_reason === 'max_tokens') {
-    throw new Error('Extraction was truncated before completing — the document may be too long for a single pass');
+    throw new Error(`Extraction was truncated at ${maxTokens} output tokens. The document is long enough to need chunked extraction.`);
   }
   const block = response.content.find((b) => b.type === 'text');
   if (!block || block.type !== 'text' || !block.text) throw new Error('Claude returned no extraction content');
@@ -720,7 +723,7 @@ Deno.serve(async (req: Request) => {
         `enough identifying detail on people and assets — names, addresses, VINs, year/make/model, ` +
         `serial numbers — for later entity matching, without asserting any match yourself. ` +
         `Assess completeness honestly: say plainly if this is only a declarations page.`,
-        IDENTITY_SCHEMA, 'high', 8000,
+        IDENTITY_SCHEMA, 'high', 16000,
       );
 
       const coveragePass = callClaude(
@@ -730,8 +733,11 @@ Deno.serve(async (req: Request) => {
         `deductible, the valuation basis, and whether it is included, excluded, or simply not ` +
         `found. List deductibles separately as well, including wind, hail, hurricane and named ` +
         `storm. Record percentages as percentages with what they apply to — do not convert them ` +
-        `to dollars.`,
-        COVERAGE_SCHEMA, 'high', 8000,
+        `to dollars.\n\nKeep the output bounded: emit included/excluded coverages exhaustively, ` +
+        `but add a not_found row only for coverages a reader would reasonably expect on this kind ` +
+        `of policy and which genuinely do not appear — at most 8 of them. Do not enumerate every ` +
+        `coverage that could theoretically exist.`,
+        COVERAGE_SCHEMA, 'high', 16000,
       );
 
       // Degradable: a declarations page legitimately has little here, and losing
@@ -747,8 +753,11 @@ Deno.serve(async (req: Request) => {
         `rider, beneficiary and ownership designations, and any underlying limits an umbrella ` +
         `requires. Quote policy language exactly. Do not infer exclusions that are not written ` +
         `here — if this is a declarations page, return few or none and record the gap in ` +
-        `unresolved_items. Where two provisions conflict, record both and say which controls.`,
-        TERMS_SCHEMA, 'high', 8000,
+        `unresolved_items. Where two provisions conflict, record both and say which controls.\n\n` +
+        `Keep policy_language to the operative sentence or clause — an excerpt of roughly 300 ` +
+        `characters, not the whole section. Group repeated boilerplate into one entry rather than ` +
+        `repeating it per page.`,
+        TERMS_SCHEMA, 'high', 24000,
       ).catch((err) => {
         console.warn('Terms pass failed; keeping identity and coverage results:', err);
         return {

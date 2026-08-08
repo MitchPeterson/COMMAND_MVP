@@ -552,6 +552,269 @@ export async function uploadDocumentAsset(householdId: string, file: File, categ
  * Short-lived signed URL for a stored document. The bucket is private, so this
  * is the only way to open a file from the vault.
  */
+
+// ============================================================
+// INSURANCE POLICY EXTRACTION (structured, evidence-bearing)
+// ============================================================
+
+export type ExtractionValueType = 'explicit' | 'calculated' | 'inferred' | 'unknown';
+
+export interface InsuranceCoverageRow {
+  id: string;
+  coverage_code: string;
+  coverage_name_raw: string | null;
+  applies_to: string | null;
+  limit_amount: number | null;
+  limit_basis: string | null;
+  secondary_limit_amount: number | null;
+  deductible_amount: number | null;
+  deductible_percent: number | null;
+  included_status: 'included' | 'excluded' | 'optional_not_purchased' | 'not_found';
+  coverage_basis: string | null;
+  notes: string | null;
+  raw_value: string | null;
+  source_page: number | null;
+  source_section: string | null;
+  evidence: string | null;
+  confidence: number | null;
+  value_type: ExtractionValueType;
+  is_controlling: boolean;
+}
+
+export interface InsuranceDeductibleRow {
+  id: string;
+  deductible_type: string;
+  amount: number | null;
+  percent: number | null;
+  calculation_basis: string | null;
+  calculated_amount: number | null;
+  calculation_confidence: number | null;
+  applies_to: string | null;
+  source_page: number | null;
+  evidence: string | null;
+  confidence: number | null;
+  value_type: ExtractionValueType;
+}
+
+export interface InsuranceExclusionRow {
+  id: string;
+  category: string;
+  summary: string | null;
+  policy_language: string | null;
+  affected_coverage: string | null;
+  sublimit_amount: number | null;
+  severity: 'informational' | 'meaningful' | 'significant' | 'critical';
+  source_page: number | null;
+  evidence: string | null;
+  confidence: number | null;
+}
+
+export interface InsuranceEndorsementRow {
+  id: string;
+  endorsement_number: string | null;
+  name: string | null;
+  effective_date: string | null;
+  modifies_coverage: string | null;
+  coverage_added: string | null;
+  coverage_removed: string | null;
+  limit_amount: number | null;
+  restrictions: string | null;
+  source_page: number | null;
+  confidence: number | null;
+}
+
+export interface InsuranceInsuredPartyRow {
+  id: string;
+  role: string;
+  name: string | null;
+  relationship: string | null;
+  confidence: number | null;
+}
+
+export interface InsuranceInsuredAssetRow {
+  id: string;
+  asset_type: string;
+  description: string | null;
+  address: string | null;
+  vin: string | null;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  confidence: number | null;
+}
+
+export interface InsuranceUnderlyingRequirementRow {
+  id: string;
+  requirement_type: string;
+  required_limit: number | null;
+  notes: string | null;
+  confidence: number | null;
+}
+
+export interface InsurancePolicyExtraction {
+  id: string;
+  household_id: string;
+  document_id: string;
+  document_class: string;
+  insurance_type: string;
+  carrier: string | null;
+  policy_number: string | null;
+  policy_status: string | null;
+  effective_date: string | null;
+  expiration_date: string | null;
+  state_of_issuance: string | null;
+  annual_premium: number | null;
+  policy_fields: Array<Record<string, unknown>>;
+  premiums: Array<Record<string, unknown>>;
+  valuation_terms: Array<Record<string, unknown>>;
+  conflicts: Array<Record<string, unknown>>;
+  unresolved_items: Array<{ item?: string; why_unresolved?: string; needed_document?: string }>;
+  extraction_quality: Record<string, unknown>;
+  declarations_only: boolean;
+  has_full_policy: boolean;
+  endorsements_appear_missing: boolean;
+  plain_language_summary: string | null;
+  review_status: 'pending_review' | 'confirmed' | 'discarded';
+  created_at: string;
+  insurance_coverages: InsuranceCoverageRow[];
+  insurance_deductibles: InsuranceDeductibleRow[];
+  insurance_exclusions: InsuranceExclusionRow[];
+  insurance_endorsements: InsuranceEndorsementRow[];
+  insurance_insured_parties: InsuranceInsuredPartyRow[];
+  insurance_insured_assets: InsuranceInsuredAssetRow[];
+  insurance_underlying_requirements: InsuranceUnderlyingRequirementRow[];
+}
+
+/** Header plus every child row in one round trip, via PostgREST embedding. */
+export async function getInsurancePolicyExtractions(householdId: string): Promise<InsurancePolicyExtraction[]> {
+  const { data, error } = await supabase
+    .from('insurance_policy_extractions')
+    .select(
+      '*,insurance_coverages(*),insurance_deductibles(*),insurance_exclusions(*),' +
+      'insurance_endorsements(*),insurance_insured_parties(*),insurance_insured_assets(*),' +
+      'insurance_underlying_requirements(*)',
+    )
+    .eq('household_id', householdId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching insurance policy extractions:', error);
+    return [];
+  }
+  return (data ?? []) as unknown as InsurancePolicyExtraction[];
+}
+
+/**
+ * Accept an extraction into the profile. Creates the insurance_policies record
+ * the rest of the app reads, stamped with the document it came from so it can
+ * later be removed alongside that document.
+ */
+export async function confirmInsuranceExtraction(extraction: InsurancePolicyExtraction): Promise<boolean> {
+  const headline =
+    extraction.insurance_coverages.find((c) => c.coverage_code === 'dwelling') ??
+    extraction.insurance_coverages.find((c) => c.coverage_code === 'umbrella_liability') ??
+    extraction.insurance_coverages.find((c) => c.coverage_code === 'death_benefit') ??
+    extraction.insurance_coverages.find((c) => c.limit_amount !== null);
+
+  const standardDeductible =
+    extraction.insurance_deductibles.find((d) => d.deductible_type === 'standard') ??
+    extraction.insurance_deductibles.find((d) => d.amount !== null);
+
+  const { error: insertError } = await supabase.from('insurance_policies').insert([
+    {
+      household_id: extraction.household_id,
+      type: normalizePolicyType(extraction.insurance_type),
+      carrier: extraction.carrier,
+      policy_number: extraction.policy_number,
+      coverage_amount: headline?.limit_amount ?? null,
+      annual_premium: extraction.annual_premium,
+      deductible: standardDeductible?.amount ?? null,
+      renewal_date: extraction.expiration_date,
+      status: 'active',
+      notes: extraction.plain_language_summary,
+      source_document_id: extraction.document_id,
+      source_extraction_id: extraction.id,
+    },
+  ]);
+
+  if (insertError) {
+    console.error('Failed to create policy from extraction:', insertError);
+    return false;
+  }
+
+  const { error } = await supabase
+    .from('insurance_policy_extractions')
+    .update({ review_status: 'confirmed' })
+    .eq('id', extraction.id);
+  if (error) {
+    console.error('Failed to mark extraction confirmed:', error);
+    return false;
+  }
+  return true;
+}
+
+export async function discardInsuranceExtraction(extractionId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('insurance_policy_extractions')
+    .update({ review_status: 'discarded' })
+    .eq('id', extractionId);
+  if (error) {
+    console.error('Failed to discard extraction:', error);
+    return false;
+  }
+  return true;
+}
+
+/** What deleting a document would take with it, so the user can decide knowingly. */
+export async function getDocumentImpact(documentId: string): Promise<{ policies: number; accounts: number; cards: number; taxDocs: number }> {
+  const count = async (table: string) => {
+    const { count: n } = await supabase
+      .from(table)
+      .select('id', { count: 'exact', head: true })
+      .eq('source_document_id', documentId);
+    return n ?? 0;
+  };
+  const [policies, accounts, cards, taxDocs] = await Promise.all([
+    count('insurance_policies'),
+    count('finance_accounts'),
+    count('credit_cards'),
+    count('tax_documents'),
+  ]);
+  return { policies, accounts, cards, taxDocs };
+}
+
+/**
+ * Remove a document. Staged extractions cascade via FK. Records already
+ * confirmed into the profile are only removed when the caller asks — they are
+ * the user's own data, not a by-product of the file.
+ */
+export async function deleteDocument(
+  documentId: string,
+  filePath: string | null,
+  alsoRemoveImported: boolean,
+): Promise<boolean> {
+  if (alsoRemoveImported) {
+    for (const table of ['insurance_policies', 'finance_accounts', 'credit_cards', 'tax_documents']) {
+      const { error } = await supabase.from(table).delete().eq('source_document_id', documentId);
+      if (error) console.warn(`Could not remove imported rows from ${table}:`, error.message);
+    }
+  }
+
+  // Delete the row first: the storage object is recoverable noise if this fails,
+  // but a row pointing at a deleted file is a broken vault entry.
+  const { error } = await supabase.from('documents').delete().eq('id', documentId);
+  if (error) {
+    console.error('Failed to delete document:', error);
+    throw new Error(`Could not delete the document: ${error.message}`);
+  }
+
+  if (filePath) {
+    const { error: storageError } = await supabase.storage.from(storageBucket).remove([filePath]);
+    if (storageError) console.warn('Document row deleted but file remains in storage:', storageError.message);
+  }
+  return true;
+}
+
 export async function getDocumentUrl(filePath: string): Promise<string | null> {
   const { data, error } = await supabase.storage.from(storageBucket).createSignedUrl(filePath, 300);
   if (error || !data?.signedUrl) {

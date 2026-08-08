@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useHousehold } from '../useHousehold';
-import { getDocumentUrl, invokeDocumentExtraction } from '../lib/supabase';
-import { Folder, FileText, ExternalLink, RefreshCw, AlertCircle, CheckCircle2, Clock } from 'lucide-react';
+import { getDocumentUrl, invokeDocumentExtraction, deleteDocument, getDocumentImpact } from '../lib/supabase';
+import { Folder, FileText, ExternalLink, RefreshCw, AlertCircle, CheckCircle2, Clock, Trash2 } from 'lucide-react';
 
 function formatDate(value: string | null) {
   if (!value) return 'Unknown';
@@ -41,6 +41,11 @@ export function DocumentsView() {
   const extractions = data?.documentExtractions ?? [];
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Delete is confirmed inline rather than via window.confirm, so the impact on
+  // the profile can be shown before anything is destroyed.
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  const [impact, setImpact] = useState<{ policies: number; accounts: number; cards: number; taxDocs: number } | null>(null);
+  const [removeImported, setRemoveImported] = useState(true);
 
   const openDocument = async (filePath: string | null, id: string) => {
     if (!filePath) return;
@@ -50,6 +55,28 @@ export function DocumentsView() {
       const url = await getDocumentUrl(filePath);
       if (url) window.open(url, '_blank', 'noopener,noreferrer');
       else setError('Could not open that file.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const startDelete = async (id: string) => {
+    setError(null);
+    setRemoveImported(true);
+    setImpact(null);
+    setPendingDelete(id);
+    setImpact(await getDocumentImpact(id));
+  };
+
+  const confirmDelete = async (id: string, filePath: string | null) => {
+    setError(null);
+    setBusyId(id);
+    try {
+      await deleteDocument(id, filePath, removeImported);
+      setPendingDelete(null);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not delete the document.');
     } finally {
       setBusyId(null);
     }
@@ -146,12 +173,73 @@ export function DocumentsView() {
                     </button>
                   )}
 
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => startDelete(doc.id)}
+                    className="inline-flex items-center gap-2 rounded-xl border border-cmd-border px-4 py-2 text-sm font-medium text-cmd-muted transition hover:border-red-500/40 hover:text-red-200 disabled:opacity-40"
+                  >
+                    <Trash2 className="h-4 w-4" /> Delete
+                  </button>
+
                   {extraction?.status === 'pending_review' && (
                     <span className="inline-flex items-center px-2 py-2 text-sm text-cmd-muted">
                       Review the extracted details on the Dashboard to add them to your profile.
                     </span>
                   )}
                 </div>
+
+                {pendingDelete === doc.id && (
+                  <div className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/5 p-4">
+                    <p className="text-sm font-semibold text-cmd-offwhite">Delete “{doc.name}”?</p>
+                    <p className="mt-1 text-sm text-cmd-muted">
+                      The file and anything extracted from it will be removed. This cannot be undone.
+                    </p>
+
+                    {impact && (impact.policies + impact.accounts + impact.cards + impact.taxDocs) > 0 ? (
+                      <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm text-cmd-muted">
+                        <input
+                          type="checkbox"
+                          checked={removeImported}
+                          onChange={(e) => setRemoveImported(e.target.checked)}
+                          className="mt-1"
+                        />
+                        <span>
+                          Also remove what this document added to my profile
+                          {impact.policies > 0 && ` · ${impact.policies} polic${impact.policies === 1 ? 'y' : 'ies'}`}
+                          {impact.accounts > 0 && ` · ${impact.accounts} account${impact.accounts === 1 ? '' : 's'}`}
+                          {impact.cards > 0 && ` · ${impact.cards} card${impact.cards === 1 ? '' : 's'}`}
+                          {impact.taxDocs > 0 && ` · ${impact.taxDocs} tax record${impact.taxDocs === 1 ? '' : 's'}`}
+                          <span className="block text-xs text-cmd-muted/70">
+                            Leave unticked to keep those records and delete only the file.
+                          </span>
+                        </span>
+                      </label>
+                    ) : (
+                      <p className="mt-2 text-xs text-cmd-muted/70">
+                        Nothing from this document has been added to your profile yet.
+                      </p>
+                    )}
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => confirmDelete(doc.id, doc.file_path)}
+                        className="inline-flex items-center gap-2 rounded-xl border border-red-500/40 bg-red-500/15 px-4 py-2 text-sm font-semibold text-red-200 transition hover:bg-red-500/25 disabled:opacity-40"
+                      >
+                        <Trash2 className="h-4 w-4" /> {busy ? 'Deleting…' : 'Delete permanently'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingDelete(null)}
+                        className="rounded-xl border border-cmd-border px-4 py-2 text-sm font-medium text-cmd-offwhite transition hover:border-cmd-gold hover:text-cmd-gold"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             );
           })}

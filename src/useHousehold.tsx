@@ -21,6 +21,7 @@ import {
   getCreditCards,
   getDocuments,
   getDocumentExtractions,
+  getInsurancePolicyExtractions,
   type Household,
   type InsurancePolicy,
   type LegalDocument,
@@ -39,6 +40,7 @@ import {
   type CreditCard,
   type Document as StoredDocument,
   type DocumentExtraction,
+  type InsurancePolicyExtraction,
 } from './lib/supabase';
 
 export interface HouseholdData {
@@ -60,6 +62,7 @@ export interface HouseholdData {
   creditCards: CreditCard[];
   documents: StoredDocument[];
   documentExtractions: DocumentExtraction[];
+  insuranceExtractions: InsurancePolicyExtraction[];
 }
 
 export interface UseHouseholdReturn {
@@ -89,6 +92,7 @@ const EMPTY_DATA: HouseholdData = {
   creditCards: [],
   documents: [],
   documentExtractions: [],
+  insuranceExtractions: [],
 };
 
 /**
@@ -144,6 +148,7 @@ function useHouseholdState(): UseHouseholdReturn {
         creditCards,
         documents,
         documentExtractions,
+        insuranceExtractions,
       ] = await Promise.all([
         supabase
           .from('household_profile')
@@ -167,6 +172,7 @@ function useHouseholdState(): UseHouseholdReturn {
         getCreditCards(hid),
         getDocuments(hid),
         getDocumentExtractions(hid),
+        getInsurancePolicyExtractions(hid),
       ]);
 
       setData({
@@ -188,6 +194,7 @@ function useHouseholdState(): UseHouseholdReturn {
         creditCards,
         documents,
         documentExtractions,
+        insuranceExtractions,
       });
     } catch (err) {
       console.error('Failed to load household data:', err);

@@ -21,7 +21,7 @@ export function InsuranceView() {
             <h1 className="mt-3 text-3xl font-semibold text-cmd-offwhite">Policies</h1>
           </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-cmd-border bg-cmd-black/50 px-4 py-2 text-sm text-cmd-muted">
-            <Shield className="h-4 w-4" /> {policies.length} policy{policies.length === 1 ? '' : 'ies'}
+            <Shield className="h-4 w-4" /> {policies.length} polic{policies.length === 1 ? 'y' : 'ies'}
           </div>
         </div>
       </section>

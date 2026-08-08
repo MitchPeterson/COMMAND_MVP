@@ -548,6 +548,19 @@ export async function uploadDocumentAsset(householdId: string, file: File, categ
   return data;
 }
 
+/**
+ * Short-lived signed URL for a stored document. The bucket is private, so this
+ * is the only way to open a file from the vault.
+ */
+export async function getDocumentUrl(filePath: string): Promise<string | null> {
+  const { data, error } = await supabase.storage.from(storageBucket).createSignedUrl(filePath, 300);
+  if (error || !data?.signedUrl) {
+    console.error('Could not create signed URL for document:', error);
+    return null;
+  }
+  return data.signedUrl;
+}
+
 export async function invokeDocumentExtraction(documentId: string): Promise<boolean> {
   // Pass the object directly — supabase-js serializes it and sets the JSON content type.
   const { error } = await supabase.functions.invoke('extract-document', {

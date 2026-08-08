@@ -1,7 +1,7 @@
-// src/useHousehold.ts
+// src/useHousehold.tsx
 // Primary data hook — loads all household data from Supabase
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, createContext, useContext } from 'react';
 import { supabase } from './lib/supabase';
 import {
   getHousehold,
@@ -91,7 +91,11 @@ const EMPTY_DATA: HouseholdData = {
   documentExtractions: [],
 };
 
-export function useHousehold(): UseHouseholdReturn {
+/**
+ * The single loader. Not exported directly — every consumer goes through the
+ * provider below so the whole app shares one instance.
+ */
+function useHouseholdState(): UseHouseholdReturn {
   const [data, setData] = useState<HouseholdData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -276,4 +280,27 @@ export function useHousehold(): UseHouseholdReturn {
   }, [userId, loadData]);
 
   return { data, loading, error, userId, refresh };
+}
+
+// ─────────────────────────────────────────────
+// Shared instance
+//
+// Eleven components used to call this hook directly. Each one ran its own auth
+// init and its own 17-query load on mount — several seconds per view — and each
+// held a separate copy of the data. refresh() after an upload therefore updated
+// only the calling view; every other view kept showing stale data until it was
+// remounted. One provider fixes both.
+// ─────────────────────────────────────────────
+
+const HouseholdContext = createContext<UseHouseholdReturn | null>(null);
+
+export function HouseholdProvider({ children }: { children: React.ReactNode }) {
+  const value = useHouseholdState();
+  return <HouseholdContext.Provider value={value}>{children}</HouseholdContext.Provider>;
+}
+
+export function useHousehold(): UseHouseholdReturn {
+  const ctx = useContext(HouseholdContext);
+  if (!ctx) throw new Error('useHousehold must be used inside <HouseholdProvider>');
+  return ctx;
 }

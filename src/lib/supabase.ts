@@ -572,10 +572,27 @@ function parseNumber(value: string | null | undefined): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/**
+ * Maps what a declarations page actually says to our policy enum. Carriers write
+ * "Homeowners", "Personal Automobile", "Excess Liability" — an exact match against
+ * the enum filed a real homeowners policy as 'other'. Substring matching, most
+ * specific first so "excess liability" doesn't get claimed by 'life'.
+ */
 function normalizePolicyType(type: string | null | undefined): InsurancePolicyType {
   const normalized = type?.toLowerCase().trim();
-  if (normalized === 'home' || normalized === 'auto' || normalized === 'umbrella' || normalized === 'life' || normalized === 'health' || normalized === 'disability') {
-    return normalized;
+  if (!normalized) return 'other';
+
+  const patterns: Array<[InsurancePolicyType, RegExp]> = [
+    ['umbrella', /umbrella|excess\s*liability/],
+    ['disability', /disabilit|income\s*protection|\bltd\b|\bstd\b/],
+    ['health', /health|medical|dental|vision/],
+    ['home', /home|dwelling|hazard|renter|condo|property|\bho-?\d/],
+    ['auto', /auto|vehicle|\bcar\b|motor/],
+    ['life', /life/],
+  ];
+
+  for (const [value, pattern] of patterns) {
+    if (pattern.test(normalized)) return value;
   }
   return 'other';
 }

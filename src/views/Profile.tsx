@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useHousehold } from '../useHousehold';
 import { signOut } from '../lib/supabase';
+import { HouseholdHistory } from '../components/HouseholdHistory';
 import pkg from '../../package.json';
 import { UserCircle2, ArrowLeftRight, MapPin, Shield, Sparkles } from 'lucide-react';
 
@@ -119,6 +120,8 @@ export function ProfileView() {
           </div>
         </div>
       </section>
+      {household?.id && <HouseholdHistory householdId={household.id} />}
+
     </div>
   );
 }

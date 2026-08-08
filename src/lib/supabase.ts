@@ -929,6 +929,49 @@ export async function updateInsurancePolicy(policyId: string, edit: PolicyEdit):
   return true;
 }
 
+export interface RecordHistoryEntry {
+  id: string;
+  household_id: string;
+  table_name: string;
+  record_id: string;
+  version: number;
+  operation: 'created' | 'updated' | 'deleted';
+  changed_fields: Record<string, { from: unknown; to: unknown }>;
+  snapshot: Record<string, unknown>;
+  changed_by: string | null;
+  changed_at: string;
+}
+
+/** Full change log for one record, newest first. */
+export async function getRecordHistory(tableName: string, recordId: string): Promise<RecordHistoryEntry[]> {
+  const { data, error } = await supabase
+    .from('record_history')
+    .select('*')
+    .eq('table_name', tableName)
+    .eq('record_id', recordId)
+    .order('version', { ascending: false });
+  if (error) {
+    console.error('Error fetching record history:', error);
+    return [];
+  }
+  return (data ?? []) as RecordHistoryEntry[];
+}
+
+/** Recent activity across every tracked table in the household. */
+export async function getHouseholdHistory(householdId: string, limit = 50): Promise<RecordHistoryEntry[]> {
+  const { data, error } = await supabase
+    .from('record_history')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('changed_at', { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.error('Error fetching household history:', error);
+    return [];
+  }
+  return (data ?? []) as RecordHistoryEntry[];
+}
+
 export async function deleteInsurancePolicy(policyId: string): Promise<boolean> {
   const { error } = await supabase.from('insurance_policies').delete().eq('id', policyId);
   if (error) {

@@ -733,7 +733,11 @@ Deno.serve(async (req: Request) => {
         `deductible, the valuation basis, and whether it is included, excluded, or simply not ` +
         `found. List deductibles separately as well, including wind, hail, hurricane and named ` +
         `storm. Record percentages as percentages with what they apply to — do not convert them ` +
-        `to dollars.\n\nKeep the output bounded: emit included/excluded coverages exhaustively, ` +
+        `to dollars.\n\nWhen a policy schedules different deductibles per vehicle or per ` +
+        `structure, emit one deductible entry per item and set applies_to to that item as the ` +
+        `document identifies it — the VIN, or the year/make/model, or the property address. Only ` +
+        `leave applies_to empty when the deductible genuinely applies policy-wide.\n\n` +
+        `Keep the output bounded: emit included/excluded coverages exhaustively, ` +
         `but add a not_found row only for coverages a reader would reasonably expect on this kind ` +
         `of policy and which genuinely do not appear — at most 8 of them. Do not enumerate every ` +
         `coverage that could theoretically exist.`,

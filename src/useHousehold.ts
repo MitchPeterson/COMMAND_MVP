@@ -101,6 +101,15 @@ export function useHousehold(): UseHouseholdReturn {
     setLoading(true);
     setError(null);
 
+    // The mount-time safety timeout is cleared once initAuth finishes, so
+    // without this a later load that never settles spins forever. Releasing
+    // loading with data still null lands on the returning-user prompt, which
+    // is recoverable — an infinite spinner is not.
+    const watchdog = setTimeout(() => {
+      console.warn('Household load exceeded 12s — releasing the loading state');
+      setLoading(false);
+    }, 12000);
+
     try {
       // No auto-create — null household = new user → OnboardingFlow
       const household = await getHousehold(uid);
@@ -181,6 +190,7 @@ export function useHousehold(): UseHouseholdReturn {
       setError(err instanceof Error ? err.message : 'Unknown error');
       setData(EMPTY_DATA);
     } finally {
+      clearTimeout(watchdog);
       setLoading(false);
     }
   }, []);
@@ -227,14 +237,25 @@ export function useHousehold(): UseHouseholdReturn {
 
     initAuth();
 
+    // This callback must stay synchronous. supabase-js holds an internal auth
+    // lock for its duration, and every query needs that same lock to attach its
+    // auth header — so awaiting loadData() here deadlocks: the callback waits on
+    // the queries, the queries wait on the lock, and loading never clears.
+    // Deferring with setTimeout lets the lock release first.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event: any, session: any) => {
+      (event: any, session: any) => {
         if (!mounted) return;
 
         if (event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
           const uid = session?.user?.id ?? null;
           setUserId(uid);
-          if (uid) await loadData(uid);
+          if (uid) {
+            setTimeout(() => {
+              if (mounted) void loadData(uid);
+            }, 0);
+          } else {
+            setLoading(false);
+          }
         } else if (event === 'SIGNED_OUT') {
           setUserId(null);
           setData(null);

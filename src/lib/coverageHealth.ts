@@ -41,10 +41,14 @@ const LIABILITY_TARGETS: Record<
 > = {
   home_liability: { extractionTypes: ['homeowners', 'renters'], coverageCodes: ['personal_liability'], policyTypes: ['home'], label: 'home' },
   auto_liability: { extractionTypes: ['auto'], coverageCodes: ['bodily_injury_liability', 'combined_single_limit'], policyTypes: ['auto'], label: 'auto' },
-  boat_liability: { extractionTypes: ['boat'], coverageCodes: ['boat_liability', 'personal_liability'], policyTypes: ['other'], label: 'boat' },
-  rv_liability: { extractionTypes: ['rv'], coverageCodes: ['rv_liability', 'personal_liability'], policyTypes: ['other'], label: 'RV' },
-  motorcycle_liability: { extractionTypes: ['motorcycle'], coverageCodes: ['motorcycle_liability', 'bodily_injury_liability'], policyTypes: ['auto', 'other'], label: 'motorcycle' },
-  rental_property_liability: { extractionTypes: ['homeowners', 'renters'], coverageCodes: ['personal_liability', 'rental_property_liability'], policyTypes: ['home'], label: 'rental property' },
+  // policyTypes is empty for these: insurance_policies.type has no motorcycle,
+  // boat or RV value, so any mapping onto 'auto' or 'other' would invent an
+  // exposure the household never reported. They are evidenced only by an
+  // extraction of that insurance type.
+  boat_liability: { extractionTypes: ['boat'], coverageCodes: ['boat_liability', 'personal_liability'], policyTypes: [], label: 'boat' },
+  rv_liability: { extractionTypes: ['rv'], coverageCodes: ['rv_liability', 'personal_liability'], policyTypes: [], label: 'RV' },
+  motorcycle_liability: { extractionTypes: ['motorcycle'], coverageCodes: ['motorcycle_liability'], policyTypes: [], label: 'motorcycle' },
+  rental_property_liability: { extractionTypes: [], coverageCodes: ['rental_property_liability'], policyTypes: [], label: 'rental property' },
 };
 
 const money = (value: number) =>
@@ -217,18 +221,23 @@ export function computeCoverageHealth(
   }
 
   // 7. Duplicates distort every total on this page.
-  const seen = new Map<string, number>();
+  // A policy number is required to call something a duplicate. Two genuinely
+  // different policies with the same carrier — a life policy each for two
+  // spouses — share everything else, so matching on carrier alone is wrong.
+  const seen = new Map<string, { count: number; carrier: string; number: string }>();
   for (const p of policies) {
-    const key = `${p.carrier ?? ''}|${p.policy_number ?? ''}`.toLowerCase();
-    if (key !== '|') seen.set(key, (seen.get(key) ?? 0) + 1);
+    const number = (p.policy_number ?? '').trim();
+    if (!number) continue;
+    const key = `${(p.carrier ?? '').trim().toLowerCase()}|${number.toLowerCase()}`;
+    const entry = seen.get(key);
+    seen.set(key, { count: (entry?.count ?? 0) + 1, carrier: p.carrier ?? 'Unknown carrier', number });
   }
-  for (const [key, count] of seen) {
-    if (count > 1) {
-      const [carrier, number] = key.split('|');
+  for (const entry of seen.values()) {
+    if (entry.count > 1) {
       findings.push({
         severity: 'attention',
         title: 'The same policy appears more than once',
-        detail: `${carrier || 'Unknown carrier'}${number ? ` #${number}` : ''} is listed ${count} times, which inflates the premium total.`,
+        detail: `${entry.carrier} #${entry.number} is listed ${entry.count} times, which inflates the premium total.`,
       });
     }
   }
@@ -244,6 +253,8 @@ export function computeCoverageHealth(
     });
   }
   for (const target of Object.values(LIABILITY_TARGETS)) {
+    // 'unverifiable' already requires a matching policy or extraction, so this
+    // can no longer fire for a kind of insurance the household does not hold.
     if (liabilityFor(target).state === 'unverifiable') {
       dataFindings.push({
         severity: 'info',

@@ -15,7 +15,9 @@ export function ProfileView() {
   const handleSignOut = async () => {
     setSigningOut(true);
     await signOut();
-    setSigningOut(false);
+    // Same as App: don't depend on the SIGNED_OUT listener firing. Re-init from
+    // scratch so a failed revoke can't leave the user sitting on the dashboard.
+    window.location.replace('/');
   };
 
   const profile = data?.profile;

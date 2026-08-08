@@ -52,37 +52,33 @@ const LEGACY_TYPES = [
 
 const VALUE_TYPES = ['explicit', 'calculated', 'inferred', 'unknown'];
 
-const COVERAGE_CODES = [
-  // Homeowners
-  'dwelling', 'other_structures', 'personal_property', 'loss_of_use',
-  'personal_liability', 'medical_payments', 'ordinance_or_law', 'water_backup',
-  'sewer_backup', 'service_line', 'equipment_breakdown', 'identity_theft',
-  'scheduled_property', 'jewelry', 'firearms', 'electronics', 'business_property',
-  'roof', 'wind', 'hail', 'theft', 'mold', 'flood', 'earthquake',
-  'extended_replacement_cost', 'guaranteed_replacement_cost',
-  // Auto
-  'bodily_injury_liability', 'property_damage_liability', 'combined_single_limit',
-  'uninsured_motorist', 'underinsured_motorist', 'pip', 'collision', 'comprehensive',
-  'glass', 'rental_reimbursement', 'roadside_assistance', 'gap',
-  'new_car_replacement', 'oem_parts', 'accident_forgiveness', 'custom_equipment',
-  'towing', 'rideshare_endorsement',
-  // Umbrella
-  'umbrella_liability', 'retained_limit',
-  // Other liability
-  'boat_liability', 'motorcycle_liability', 'rv_liability', 'rental_property_liability',
-  // Life
-  'death_benefit', 'cash_value', 'accelerated_death_benefit', 'waiver_of_premium',
-  'conversion_rights',
-  // Disability
-  'monthly_benefit', 'residual_disability', 'cola_rider', 'own_occupation',
-  'other',
-];
+// Canonical coverage vocabulary. Deliberately NOT a schema enum — ~60 values
+// blew the compiled-grammar budget. The model writes a loose code, we canonicalise
+// here, and insurance_coverages.coverage_code is free text by design.
+const COVERAGE_CODE_ALIASES: Record<string, string> = {
+  'coverage_a': 'dwelling', 'coverage a': 'dwelling', 'dwelling': 'dwelling',
+  'coverage_b': 'other_structures', 'other structures': 'other_structures',
+  'coverage_c': 'personal_property', 'personal property': 'personal_property',
+  'coverage_d': 'loss_of_use', 'loss of use': 'loss_of_use',
+  'coverage_e': 'personal_liability', 'personal liability': 'personal_liability',
+  'coverage_f': 'medical_payments', 'medical payments': 'medical_payments',
+  'bodily injury': 'bodily_injury_liability', 'bi': 'bodily_injury_liability',
+  'property damage': 'property_damage_liability', 'pd': 'property_damage_liability',
+  'csl': 'combined_single_limit', 'um': 'uninsured_motorist', 'uim': 'underinsured_motorist',
+  'umbrella': 'umbrella_liability', 'excess liability': 'umbrella_liability',
+};
+
+function canonicalCoverageCode(raw: string): string {
+  const key = String(raw ?? '').trim().toLowerCase();
+  if (!key) return 'other';
+  if (COVERAGE_CODE_ALIASES[key]) return COVERAGE_CODE_ALIASES[key];
+  return key.replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60) || 'other';
+}
+
 
 const evidenceProps = {
-  raw_value: { type: 'string', description: 'Verbatim text from the document. Empty string if not found.' },
   source_page: { type: 'integer', description: '1-based page number. 0 if unknown.' },
-  source_section: { type: 'string', description: 'Heading or section label. Empty string if none.' },
-  evidence: { type: 'string', description: 'Short supporting snippet quoted from the document.' },
+  evidence: { type: 'string', description: 'Short verbatim snippet from the document.' },
   confidence: { type: 'number', description: '0 to 1.' },
   value_type: { type: 'string', enum: VALUE_TYPES },
 };
@@ -97,25 +93,29 @@ function record(props: Record<string, unknown>, extra: string[] = []) {
   };
 }
 
-const POLICY_FIELDS = [
-  'carrier', 'policy_number', 'policy_status', 'effective_date', 'expiration_date',
-  'agent_name', 'agent_contact', 'state_of_issuance', 'policy_form', 'billing_frequency',
-  'auto_renewal', 'payment_schedule', 'escrow_paid', 'term_length', 'term_expiration',
-  'premium_guarantee_period', 'elimination_period', 'benefit_duration',
-  'own_occupation_definition', 'non_cancelable_status', 'employer_provided',
-];
+// Policy field names are free text for the same grammar-budget reason.
 
-const INSURANCE_SCHEMA = {
+
+// One monolithic schema exceeded Anthropic's compiled-grammar budget, so
+// extraction runs as three focused passes. This also keeps each response well
+// inside max_tokens, which matters for multi-page policy contracts.
+//
+//   A. identity   — who/what/when/cost   (required)
+//   B. coverages  — limits and deductibles (required)
+//   C. terms      — exclusions, endorsements, beneficiaries, underlying (degradable)
+
+const IDENTITY_SCHEMA = {
   type: 'object',
   properties: {
     document_class: { type: 'string', enum: DOCUMENT_CLASSES },
     insurance_type: { type: 'string', enum: INSURANCE_TYPES },
-
     policy_fields: {
       type: 'array',
-      items: record({ field: { type: 'string', enum: POLICY_FIELDS }, value: { type: 'string' } }),
+      items: record({
+        field: { type: 'string', description: 'snake_case name, e.g. carrier, policy_number, effective_date, expiration_date, agent_name, state_of_issuance, billing_frequency, term_length.' },
+        value: { type: 'string' },
+      }),
     },
-
     insured_parties: {
       type: 'array',
       items: record({
@@ -124,7 +124,6 @@ const INSURANCE_SCHEMA = {
         relationship: { type: 'string' },
       }),
     },
-
     insured_assets: {
       type: 'array',
       items: record({
@@ -138,7 +137,6 @@ const INSURANCE_SCHEMA = {
         model: { type: 'string' },
       }),
     },
-
     premiums: {
       type: 'array',
       items: record({
@@ -148,37 +146,6 @@ const INSURANCE_SCHEMA = {
         period: { type: 'string', enum: ['annual', 'semiannual', 'quarterly', 'monthly', 'one_time', 'not_stated'] },
       }),
     },
-
-    coverages: {
-      type: 'array',
-      items: record({
-        coverage_code: { type: 'string', enum: COVERAGE_CODES },
-        coverage_name_raw: { type: 'string', description: "The carrier's own wording, verbatim." },
-        applies_to: { type: 'string' },
-        limit_amount: { type: 'string' },
-        limit_basis: { type: 'string', enum: ['per_occurrence', 'per_person', 'aggregate', 'combined_single', 'per_item', 'total', 'percentage_of_dwelling', 'not_stated'] },
-        secondary_limit_amount: { type: 'string' },
-        secondary_limit_basis: { type: 'string' },
-        deductible_amount: { type: 'string' },
-        deductible_percent: { type: 'string' },
-        coinsurance: { type: 'string' },
-        included_status: { type: 'string', enum: ['included', 'excluded', 'optional_not_purchased', 'not_found'] },
-        coverage_basis: { type: 'string', enum: ['replacement_cost', 'extended_replacement_cost', 'guaranteed_replacement_cost', 'actual_cash_value', 'agreed_value', 'stated_value', 'market_value', 'functional_replacement_cost', 'depreciated_value', 'not_stated'] },
-        notes: { type: 'string' },
-      }),
-    },
-
-    deductibles: {
-      type: 'array',
-      items: record({
-        deductible_type: { type: 'string', enum: ['standard', 'wind', 'hail', 'wind_hail', 'hurricane', 'named_storm', 'percentage', 'collision', 'comprehensive', 'flood', 'earthquake', 'water_backup', 'theft', 'special', 'other'] },
-        amount: { type: 'string' },
-        percent: { type: 'string' },
-        calculation_basis: { type: 'string', description: 'What the percentage applies to, e.g. "dwelling limit".' },
-        applies_to: { type: 'string' },
-      }),
-    },
-
     valuation_terms: {
       type: 'array',
       items: record({
@@ -187,7 +154,64 @@ const INSURANCE_SCHEMA = {
         notes: { type: 'string' },
       }),
     },
+    extraction_quality: {
+      type: 'object',
+      properties: {
+        declarations_only: { type: 'boolean' },
+        has_full_policy: { type: 'boolean' },
+        endorsements_appear_missing: { type: 'boolean' },
+        fields_expected: { type: 'integer' },
+        fields_found: { type: 'integer' },
+        limitations_summary: { type: 'string', description: 'What this document cannot support, e.g. exclusion analysis from a dec page alone.' },
+      },
+      required: ['declarations_only', 'has_full_policy', 'endorsements_appear_missing', 'fields_expected', 'fields_found', 'limitations_summary'],
+      additionalProperties: false,
+    },
+    plain_language_summary: { type: 'string' },
+  },
+  required: ['document_class', 'insurance_type', 'policy_fields', 'insured_parties', 'insured_assets', 'premiums', 'valuation_terms', 'extraction_quality', 'plain_language_summary'],
+  additionalProperties: false,
+};
 
+const COVERAGE_SCHEMA = {
+  type: 'object',
+  properties: {
+    coverages: {
+      type: 'array',
+      items: record({
+        coverage_code: { type: 'string', description: 'snake_case standard name: dwelling, other_structures, personal_property, loss_of_use, personal_liability, medical_payments, water_backup, ordinance_or_law, scheduled_property, bodily_injury_liability, property_damage_liability, combined_single_limit, uninsured_motorist, collision, comprehensive, umbrella_liability, death_benefit, monthly_benefit, other.' },
+        coverage_name_raw: { type: 'string', description: "The carrier's own wording, verbatim." },
+        applies_to: { type: 'string' },
+        limit_amount: { type: 'string' },
+        limit_basis: { type: 'string', enum: ['per_occurrence', 'per_person', 'aggregate', 'combined_single', 'per_item', 'total', 'percentage_of_dwelling', 'not_stated'] },
+        secondary_limit_amount: { type: 'string' },
+        deductible_amount: { type: 'string' },
+        included_status: { type: 'string', enum: ['included', 'excluded', 'optional_not_purchased', 'not_found'] },
+        coverage_basis: { type: 'string', enum: ['replacement_cost', 'extended_replacement_cost', 'guaranteed_replacement_cost', 'actual_cash_value', 'agreed_value', 'stated_value', 'market_value', 'functional_replacement_cost', 'depreciated_value', 'not_stated'] },
+        notes: { type: 'string' },
+        raw_value: { type: 'string' },
+        source_section: { type: 'string' },
+      }),
+    },
+    deductibles: {
+      type: 'array',
+      items: record({
+        deductible_type: { type: 'string', enum: ['standard', 'wind', 'hail', 'wind_hail', 'hurricane', 'named_storm', 'percentage', 'collision', 'comprehensive', 'flood', 'earthquake', 'water_backup', 'theft', 'special', 'other'] },
+        amount: { type: 'string' },
+        percent: { type: 'string' },
+        calculation_basis: { type: 'string', description: 'What a percentage applies to, e.g. "dwelling limit".' },
+        applies_to: { type: 'string' },
+        raw_value: { type: 'string' },
+      }),
+    },
+  },
+  required: ['coverages', 'deductibles'],
+  additionalProperties: false,
+};
+
+const TERMS_SCHEMA = {
+  type: 'object',
+  properties: {
     exclusions: {
       type: 'array',
       items: record({
@@ -200,7 +224,6 @@ const INSURANCE_SCHEMA = {
         severity: { type: 'string', enum: ['informational', 'meaningful', 'significant', 'critical'] },
       }),
     },
-
     endorsements: {
       type: 'array',
       items: record({
@@ -216,7 +239,6 @@ const INSURANCE_SCHEMA = {
         restrictions: { type: 'string' },
       }),
     },
-
     beneficiaries: {
       type: 'array',
       items: record({
@@ -228,7 +250,6 @@ const INSURANCE_SCHEMA = {
         is_employer_owned: { type: 'boolean' },
       }),
     },
-
     underlying_requirements: {
       type: 'array',
       items: record({
@@ -238,7 +259,6 @@ const INSURANCE_SCHEMA = {
         notes: { type: 'string' },
       }),
     },
-
     conflicts: {
       type: 'array',
       items: {
@@ -256,7 +276,6 @@ const INSURANCE_SCHEMA = {
         additionalProperties: false,
       },
     },
-
     unresolved_items: {
       type: 'array',
       items: {
@@ -270,29 +289,8 @@ const INSURANCE_SCHEMA = {
         additionalProperties: false,
       },
     },
-
-    extraction_quality: {
-      type: 'object',
-      properties: {
-        declarations_only: { type: 'boolean' },
-        has_full_policy: { type: 'boolean' },
-        endorsements_appear_missing: { type: 'boolean' },
-        fields_expected: { type: 'integer' },
-        fields_found: { type: 'integer' },
-        limitations_summary: { type: 'string', description: 'What this document cannot support, e.g. exclusion analysis from a dec page alone.' },
-      },
-      required: ['declarations_only', 'has_full_policy', 'endorsements_appear_missing', 'fields_expected', 'fields_found', 'limitations_summary'],
-      additionalProperties: false,
-    },
-
-    plain_language_summary: { type: 'string' },
   },
-  required: [
-    'document_class', 'insurance_type', 'policy_fields', 'insured_parties',
-    'insured_assets', 'premiums', 'coverages', 'deductibles', 'valuation_terms',
-    'exclusions', 'endorsements', 'beneficiaries', 'underlying_requirements',
-    'conflicts', 'unresolved_items', 'extraction_quality', 'plain_language_summary',
-  ],
+  required: ['exclusions', 'endorsements', 'beneficiaries', 'underlying_requirements', 'conflicts', 'unresolved_items'],
   additionalProperties: false,
 };
 
@@ -519,7 +517,7 @@ async function persistInsurance(doc: any, extraction: any): Promise<string> {
   // deno-lint-ignore no-explicit-any
   await insertMany('insurance_coverages', (extraction.coverages ?? []).map((r: any) => ({
     ...base,
-    coverage_code: r.coverage_code ?? 'other',
+    coverage_code: canonicalCoverageCode(r.coverage_code),
     coverage_name_raw: text(r.coverage_name_raw),
     applies_to: text(r.applies_to),
     limit_amount: num(r.limit_amount),
@@ -704,23 +702,61 @@ Deno.serve(async (req: Request) => {
     );
 
     if (classification.is_insurance) {
-      // Pass 2 — deep extraction at high effort.
-      const extraction = await callClaude(
-        content,
-        `Extract every materially relevant term from this insurance document into the schema.\n\n` +
+      const context =
         `File name: ${document.name}\n` +
         `Classified as: ${classification.document_class}, ${classification.insurance_type}\n\n` +
-        `${EXTRACTION_RULES}\n\n` +
-        `Cover the policy identity and lifecycle, every premium component, every coverage with its ` +
-        `limits and basis, every deductible, valuation methodology by category, exclusions and ` +
-        `sublimits, endorsements, beneficiaries and ownership, and any underlying limits an umbrella ` +
-        `requires. Include enough identifying detail on insured people and assets (names, addresses, ` +
-        `VINs, year/make/model, serial numbers) for later entity matching, without guessing at matches.`,
-        INSURANCE_SCHEMA,
-        'high',
-        16000,
+        `${EXTRACTION_RULES}`;
+
+      // Pass A — identity, parties, assets, cost, valuation, completeness.
+      const identity = await callClaude(
+        content,
+        `${context}\n\nExtract policy identity and lifecycle, every insured party, every insured ` +
+        `asset, every premium component (including taxes, fees, surcharges and discounts as ` +
+        `separate entries), and the valuation methodology for each property category. Include ` +
+        `enough identifying detail on people and assets — names, addresses, VINs, year/make/model, ` +
+        `serial numbers — for later entity matching, without asserting any match yourself. ` +
+        `Assess completeness honestly: say plainly if this is only a declarations page.`,
+        IDENTITY_SCHEMA, 'high', 8000,
       );
 
+      // Pass B — the coverage grid.
+      const coverageData = await callClaude(
+        content,
+        `${context}\n\nExtract every coverage and every deductible. For each coverage give the ` +
+        `standardized code, the carrier's own wording verbatim, the limit and its basis, any ` +
+        `deductible, the valuation basis, and whether it is included, excluded, or simply not ` +
+        `found. List deductibles separately as well, including wind, hail, hurricane and named ` +
+        `storm. Record percentages as percentages with what they apply to — do not convert them ` +
+        `to dollars.`,
+        COVERAGE_SCHEMA, 'high', 8000,
+      );
+
+      // Pass C — exclusions and modifications. Degradable: a dec page legitimately
+      // has little here, and losing it must not discard passes A and B.
+      let terms: Record<string, unknown[]> = {
+        exclusions: [], endorsements: [], beneficiaries: [],
+        underlying_requirements: [], conflicts: [], unresolved_items: [],
+      };
+      try {
+        terms = await callClaude(
+          content,
+          `${context}\n\nExtract exclusions, sublimits and restrictions, every endorsement or ` +
+          `rider, beneficiary and ownership designations, and any underlying limits an umbrella ` +
+          `requires. Quote policy language exactly. Do not infer exclusions that are not written ` +
+          `here — if this is a declarations page, return few or none and record the gap in ` +
+          `unresolved_items. Where two provisions conflict, record both and say which controls.`,
+          TERMS_SCHEMA, 'high', 8000,
+        );
+      } catch (err) {
+        console.warn('Terms pass failed; keeping identity and coverage results:', err);
+        terms.unresolved_items = [{
+          item: 'Exclusions, endorsements and beneficiaries',
+          why_unresolved: `Extraction pass failed: ${err instanceof Error ? err.message : String(err)}`,
+          needed_document: 'Retry extraction, or provide the full policy contract',
+        }];
+      }
+
+      const extraction = { ...identity, ...coverageData, ...terms };
       const extractionId = await persistInsurance(document, extraction);
 
       // Compatibility row so the existing review card keeps working.

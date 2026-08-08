@@ -58,6 +58,9 @@ interface OnboardingData {
 interface OnboardingFlowProps {
   userId: string;
   onComplete: () => Promise<void>;
+  /** Escape hatch. Onboarding is what a session with no household lands on, so
+   *  without this the only way out of a wrong account is clearing site data. */
+  onSignOut: () => Promise<void>;
 }
 
 // ─────────────────────────────────────────────
@@ -305,7 +308,7 @@ const SetupScreen: React.FC<{ firstName: string }> = ({ firstName }) => {
 // ─────────────────────────────────────────────
 // Main OnboardingFlow Component
 // ─────────────────────────────────────────────
-export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComplete }) => {
+export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComplete, onSignOut }) => {
   const TOTAL_STEPS = 6;
   const [step, setStep] = useState(0); // 0 = welcome
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -1047,6 +1050,17 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
 
           <p className="text-[#4a4b4e] text-xs mt-4">
             You can update any of this later from your profile.
+          </p>
+
+          <p className="text-[#808084] text-xs mt-6">
+            Already have a household?{' '}
+            <button
+              type="button"
+              onClick={onSignOut}
+              className="text-[#C9A24D] font-semibold underline underline-offset-2 hover:text-[#b8913c] transition-colors"
+            >
+              Sign in to a different account
+            </button>
           </p>
         </div>
       </div>

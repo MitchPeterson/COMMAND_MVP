@@ -11,6 +11,109 @@ import { InsurancePolicyReview, CoverageRow, currency, titleCase } from '../comp
 import { CoverageHealth } from '../components/CoverageHealth';
 import { ChevronDown, ChevronRight, FileWarning, Shield, Trash2 } from 'lucide-react';
 
+
+/**
+ * The handful of facts you would want before deciding whether to open a policy:
+ * what is covered, for how much, and at what deductible. Shaped per insurance
+ * type because the salient facts differ — vehicles and drivers for auto, the
+ * dwelling limit and property for home, the stack for umbrella.
+ */
+function executiveSummary(extraction: InsurancePolicyExtraction): Array<{ label: string; value: string }> {
+  const coverage = (code: string) =>
+    extraction.insurance_coverages.find((c) => c.coverage_code === code && c.included_status !== 'not_found');
+  const deductible = (type: string) =>
+    extraction.insurance_deductibles.find((d) => d.deductible_type === type && (d.amount !== null || d.percent !== null));
+  const dedText = (type: string) => {
+    const d = deductible(type);
+    if (!d) return null;
+    return d.amount !== null ? currency(d.amount) : `${d.percent}%`;
+  };
+
+  const assets = extraction.insurance_insured_assets;
+  const vehicles = assets.filter((a) => a.asset_type === 'vehicle');
+  const properties = assets.filter((a) => a.asset_type === 'property' || a.asset_type === 'rental_property');
+  const people = extraction.insurance_insured_parties.filter((p) => p.name);
+
+  const limitOf = (code: string) => {
+    const c = coverage(code);
+    if (!c || c.limit_amount === null) return null;
+    return c.secondary_limit_amount
+      ? `${currency(c.limit_amount)} / ${currency(c.secondary_limit_amount)}`
+      : currency(c.limit_amount);
+  };
+
+  const items: Array<{ label: string; value: string }> = [];
+  const push = (label: string, value: string | null) => { if (value) items.push({ label, value }); };
+
+  switch (extraction.insurance_type) {
+    case 'auto':
+    case 'motorcycle':
+    case 'rv':
+      push('Vehicles', vehicles.map((v) => [v.year, v.make, v.model].filter(Boolean).join(' ') || v.description || '').filter(Boolean).join(' · ') || null);
+      push('Drivers', people.map((p) => p.name).filter(Boolean).join(' · ') || null);
+      push('Liability', limitOf('bodily_injury_liability') ?? limitOf('combined_single_limit'));
+      push('Property damage', limitOf('property_damage_liability'));
+      push('Uninsured motorist', limitOf('uninsured_motorist'));
+      push('Collision', dedText('collision') ? `${dedText('collision')} deductible` : null);
+      push('Comprehensive', dedText('comprehensive') ? `${dedText('comprehensive')} deductible` : null);
+      break;
+
+    case 'homeowners':
+    case 'renters':
+    case 'flood':
+      push('Property', properties.map((p) => p.address || p.description || '').filter(Boolean)[0] ?? null);
+      push('Dwelling', limitOf('dwelling'));
+      push('Personal property', limitOf('personal_property'));
+      push('Liability', limitOf('personal_liability'));
+      push('Deductible', dedText('standard') ? `${dedText('standard')}` : null);
+      push('Wind / hail', dedText('wind_hail') ?? dedText('wind') ?? dedText('hail'));
+      break;
+
+    case 'umbrella':
+      push('Umbrella limit', limitOf('umbrella_liability'));
+      push('Retained limit', limitOf('retained_limit'));
+      push(
+        'Requires underlying',
+        extraction.insurance_underlying_requirements
+          .filter((r) => r.required_limit !== null)
+          .map((r) => `${r.requirement_type.replace('_liability', '')} ${currency(r.required_limit)}`)
+          .join(' · ') || null,
+      );
+      push('Covered people', people.map((p) => p.name).filter(Boolean).join(' · ') || null);
+      break;
+
+    case 'life':
+      push('Insured', people.find((p) => p.role === 'insured')?.name ?? people[0]?.name ?? null);
+      push('Death benefit', limitOf('death_benefit'));
+      push('Cash value', limitOf('cash_value'));
+      push(
+        'Beneficiaries',
+        extraction.insurance_beneficiaries
+          .filter((b) => b.designation === 'primary' && b.name)
+          .map((b) => (b.percentage ? `${b.name} (${b.percentage}%)` : b.name))
+          .join(' · ') || null,
+      );
+      break;
+
+    case 'disability':
+      push('Insured', people.find((p) => p.role === 'insured')?.name ?? people[0]?.name ?? null);
+      push('Monthly benefit', limitOf('monthly_benefit'));
+      break;
+
+    default: {
+      // Unknown type: lead with whatever carries the largest limits.
+      const top = extraction.insurance_coverages
+        .filter((c) => c.limit_amount !== null && c.included_status !== 'not_found')
+        .sort((a, b) => (b.limit_amount ?? 0) - (a.limit_amount ?? 0))
+        .slice(0, 4);
+      for (const c of top) push(titleCase(c.coverage_code), currency(c.limit_amount));
+      push('Deductible', dedText('standard'));
+    }
+  }
+
+  return items;
+}
+
 /** The extracted detail behind a confirmed policy, revealed on demand. */
 function PolicyDetail({ extraction }: { extraction: InsurancePolicyExtraction }) {
   const found = extraction.insurance_coverages.filter((c) => c.included_status !== 'not_found');
@@ -192,6 +295,17 @@ export function InsuranceView() {
                       </p>
                     </div>
                   </div>
+
+                  {extraction && executiveSummary(extraction).length > 0 && (
+                    <dl className="mt-4 grid gap-x-6 gap-y-2 border-t border-cmd-border pt-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {executiveSummary(extraction).map((item) => (
+                        <div key={item.label}>
+                          <dt className="text-[11px] uppercase tracking-[0.16em] text-cmd-muted">{item.label}</dt>
+                          <dd className="mt-0.5 text-sm text-cmd-offwhite">{item.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
 
                   <div className="mt-3 flex items-center gap-1 text-xs text-cmd-muted">
                     {extraction ? (

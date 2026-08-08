@@ -645,6 +645,19 @@ export interface InsuranceInsuredAssetRow {
   confidence: number | null;
 }
 
+export interface InsuranceBeneficiaryRow {
+  id: string;
+  designation: 'primary' | 'contingent' | 'irrevocable' | 'successor_owner';
+  name: string | null;
+  relationship: string | null;
+  percentage: number | null;
+  is_trust: boolean;
+  is_employer_owned: boolean;
+  source_page: number | null;
+  evidence: string | null;
+  confidence: number | null;
+}
+
 export interface InsuranceUnderlyingRequirementRow {
   id: string;
   requirement_type: string;
@@ -685,6 +698,7 @@ export interface InsurancePolicyExtraction {
   insurance_insured_parties: InsuranceInsuredPartyRow[];
   insurance_insured_assets: InsuranceInsuredAssetRow[];
   insurance_underlying_requirements: InsuranceUnderlyingRequirementRow[];
+  insurance_beneficiaries: InsuranceBeneficiaryRow[];
 }
 
 /** Header plus every child row in one round trip, via PostgREST embedding. */
@@ -694,7 +708,7 @@ export async function getInsurancePolicyExtractions(householdId: string): Promis
     .select(
       '*,insurance_coverages(*),insurance_deductibles(*),insurance_exclusions(*),' +
       'insurance_endorsements(*),insurance_insured_parties(*),insurance_insured_assets(*),' +
-      'insurance_underlying_requirements(*)',
+      'insurance_underlying_requirements(*),insurance_beneficiaries(*)',
     )
     .eq('household_id', householdId)
     .order('created_at', { ascending: false });

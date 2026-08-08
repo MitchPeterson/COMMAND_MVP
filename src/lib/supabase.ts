@@ -9,7 +9,49 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 const storageBucket = (import.meta.env.VITE_SUPABASE_STORAGE_BUCKET as string) ?? 'raw-uploads';
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+/**
+ * supabase-js serializes token refreshes behind a Web Lock, which is shared
+ * across every tab on the origin. If a tab dies mid-refresh — or wedges holding
+ * it — the lock is never released and every subsequent Supabase call in every
+ * tab blocks forever. That is not a network error and produces no console
+ * output; it simply never resolves. It is what made onboarding hang on its
+ * first insert while the same insert over REST completed in 0.6s.
+ *
+ * Keep the cross-tab lock for the normal case, but give up after 5s and proceed
+ * without it. A duplicate token refresh is a far cheaper failure than an app
+ * that hangs with no way out.
+ */
+async function resilientAuthLock<R>(
+  name: string,
+  _acquireTimeout: number,
+  fn: () => Promise<R>,
+): Promise<R> {
+  const locks = (globalThis as { navigator?: { locks?: LockManager } }).navigator?.locks;
+  if (!locks?.request) return fn();
+
+  let started = false;
+  const guarded = () => {
+    started = true;
+    return fn();
+  };
+
+  const controller = new AbortController();
+  const giveUp = setTimeout(() => controller.abort(), 5000);
+  try {
+    return await locks.request(name, { signal: controller.signal }, guarded);
+  } catch (err) {
+    // If fn() already started, this is its own failure — don't run it twice.
+    if (started) throw err;
+    console.warn('Supabase auth lock unavailable; proceeding without it:', err);
+    return await fn();
+  } finally {
+    clearTimeout(giveUp);
+  }
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: { lock: resilientAuthLock },
+});
 
 // ============================================================
 // DATABASE TYPES

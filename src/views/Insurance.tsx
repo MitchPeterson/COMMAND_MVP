@@ -2,6 +2,7 @@ import React from 'react';
 import { useHousehold } from '../useHousehold';
 import { UploadDropzone } from '../components/UploadDropzone';
 import { uploadDocumentAsset, invokeDocumentExtraction } from '../lib/supabase';
+import { InsurancePolicyReview } from '../components/InsurancePolicyReview';
 import { Shield, HeartPulse, Sparkles } from 'lucide-react';
 
 function formatCurrency(value: number | null | undefined) {
@@ -11,6 +12,7 @@ function formatCurrency(value: number | null | undefined) {
 export function InsuranceView() {
   const { data, refresh } = useHousehold();
   const policies = data?.insurancePolicies ?? [];
+  const insuranceExtractions = data?.insuranceExtractions ?? [];
 
   return (
     <div className="space-y-6">
@@ -38,6 +40,8 @@ export function InsuranceView() {
             await refresh();
           }}
         />
+        <InsurancePolicyReview extractions={insuranceExtractions} onChange={refresh} />
+
         {policies.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-cmd-border bg-cmd-black/50 p-8 text-center text-cmd-muted">
             No insurance policies connected yet.

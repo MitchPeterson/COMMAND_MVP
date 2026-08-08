@@ -179,7 +179,7 @@ const COVERAGE_SCHEMA = {
     coverages: {
       type: 'array',
       items: record({
-        coverage_code: { type: 'string', description: 'snake_case standard name: dwelling, other_structures, personal_property, loss_of_use, personal_liability, medical_payments, water_backup, ordinance_or_law, scheduled_property, bodily_injury_liability, property_damage_liability, combined_single_limit, uninsured_motorist, collision, comprehensive, umbrella_liability, death_benefit, monthly_benefit, other.' },
+        coverage_code: { type: 'string', description: 'snake_case standard name. Home: dwelling, other_structures, personal_property, loss_of_use, personal_liability, medical_payments, ordinance_or_law, water_backup, sewer_backup, service_line, equipment_breakdown, identity_theft, scheduled_property, jewelry, firearms, electronics, business_property, mold, flood, earthquake, extended_replacement_cost, guaranteed_replacement_cost. Auto: bodily_injury_liability, property_damage_liability, combined_single_limit, uninsured_motorist, underinsured_motorist, pip, collision, comprehensive, glass, rental_reimbursement, roadside_assistance, gap, new_car_replacement, oem_parts, accident_forgiveness, custom_equipment, towing, rideshare_endorsement. Umbrella: umbrella_liability, retained_limit. Other liability: boat_liability, motorcycle_liability, rv_liability, rental_property_liability. Life: death_benefit, cash_value, accelerated_death_benefit, waiver_of_premium, conversion_rights. Disability: monthly_benefit, residual_disability, cola_rider, own_occupation. Use "other" only when nothing above fits.' },
         coverage_name_raw: { type: 'string', description: "The carrier's own wording, verbatim." },
         applies_to: { type: 'string' },
         limit_amount: { type: 'string' },
@@ -707,8 +707,12 @@ Deno.serve(async (req: Request) => {
         `Classified as: ${classification.document_class}, ${classification.insurance_type}\n\n` +
         `${EXTRACTION_RULES}`;
 
-      // Pass A — identity, parties, assets, cost, valuation, completeness.
-      const identity = await callClaude(
+      // The three passes read the same document and do not depend on each other,
+      // so they run concurrently. Sequentially a 12-page policy took 133s, which
+      // is inside Supabase's ~150s edge wall-clock only by luck; a real carrier
+      // PDF exceeded it and the function was killed mid-extraction. Concurrently
+      // the cost is the slowest single pass, not their sum.
+      const identityPass = callClaude(
         content,
         `${context}\n\nExtract policy identity and lifecycle, every insured party, every insured ` +
         `asset, every premium component (including taxes, fees, surcharges and discounts as ` +
@@ -719,8 +723,7 @@ Deno.serve(async (req: Request) => {
         IDENTITY_SCHEMA, 'high', 8000,
       );
 
-      // Pass B — the coverage grid.
-      const coverageData = await callClaude(
+      const coveragePass = callClaude(
         content,
         `${context}\n\nExtract every coverage and every deductible. For each coverage give the ` +
         `standardized code, the carrier's own wording verbatim, the limit and its basis, any ` +
@@ -731,30 +734,34 @@ Deno.serve(async (req: Request) => {
         COVERAGE_SCHEMA, 'high', 8000,
       );
 
-      // Pass C — exclusions and modifications. Degradable: a dec page legitimately
-      // has little here, and losing it must not discard passes A and B.
-      let terms: Record<string, unknown[]> = {
+      // Degradable: a declarations page legitimately has little here, and losing
+      // this pass must not discard the other two. Caught inline so it cannot
+      // reject the Promise.all below.
+      const emptyTerms: Record<string, unknown[]> = {
         exclusions: [], endorsements: [], beneficiaries: [],
         underlying_requirements: [], conflicts: [], unresolved_items: [],
       };
-      try {
-        terms = await callClaude(
-          content,
-          `${context}\n\nExtract exclusions, sublimits and restrictions, every endorsement or ` +
-          `rider, beneficiary and ownership designations, and any underlying limits an umbrella ` +
-          `requires. Quote policy language exactly. Do not infer exclusions that are not written ` +
-          `here — if this is a declarations page, return few or none and record the gap in ` +
-          `unresolved_items. Where two provisions conflict, record both and say which controls.`,
-          TERMS_SCHEMA, 'high', 8000,
-        );
-      } catch (err) {
+      const termsPass = callClaude(
+        content,
+        `${context}\n\nExtract exclusions, sublimits and restrictions, every endorsement or ` +
+        `rider, beneficiary and ownership designations, and any underlying limits an umbrella ` +
+        `requires. Quote policy language exactly. Do not infer exclusions that are not written ` +
+        `here — if this is a declarations page, return few or none and record the gap in ` +
+        `unresolved_items. Where two provisions conflict, record both and say which controls.`,
+        TERMS_SCHEMA, 'high', 8000,
+      ).catch((err) => {
         console.warn('Terms pass failed; keeping identity and coverage results:', err);
-        terms.unresolved_items = [{
-          item: 'Exclusions, endorsements and beneficiaries',
-          why_unresolved: `Extraction pass failed: ${err instanceof Error ? err.message : String(err)}`,
-          needed_document: 'Retry extraction, or provide the full policy contract',
-        }];
-      }
+        return {
+          ...emptyTerms,
+          unresolved_items: [{
+            item: 'Exclusions, endorsements and beneficiaries',
+            why_unresolved: `Extraction pass failed: ${err instanceof Error ? err.message : String(err)}`,
+            needed_document: 'Retry extraction, or provide the full policy contract',
+          }],
+        };
+      });
+
+      const [identity, coverageData, terms] = await Promise.all([identityPass, coveragePass, termsPass]);
 
       const extraction = { ...identity, ...coverageData, ...terms };
       const extractionId = await persistInsurance(document, extraction);

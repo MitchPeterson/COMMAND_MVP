@@ -9,6 +9,7 @@ import {
 } from '../lib/supabase';
 import { InsurancePolicyReview, CoverageRow, currency, titleCase } from '../components/InsurancePolicyReview';
 import { CoverageHealth } from '../components/CoverageHealth';
+import { AddPolicyForm } from '../components/AddPolicyForm';
 import { ChevronDown, ChevronRight, FileWarning, Shield, Trash2 } from 'lucide-react';
 
 
@@ -43,12 +44,16 @@ function vehicleDeductible(
 }
 
 /**
- * The handful of facts you would want before deciding whether to open a policy:
- * what is covered, for how much, and at what deductible. Shaped per insurance
- * type because the salient facts differ — vehicles and drivers for auto, the
- * dwelling limit and property for home, the stack for umbrella.
+ * Column groups for the collapsed policy card. Grouping rather than a flat list
+ * so related facts sit together — vehicles with their own deductibles, drivers,
+ * then the liability stack — instead of wrapping arbitrarily across a grid.
  */
-function executiveSummary(extraction: InsurancePolicyExtraction): Array<{ label: string; value: string }> {
+interface SummaryColumn {
+  heading: string;
+  entries: Array<{ primary: string; secondary?: string }>;
+}
+
+function executiveSummary(extraction: InsurancePolicyExtraction): SummaryColumn[] {
   const coverage = (code: string) =>
     extraction.insurance_coverages.find((c) => c.coverage_code === code && c.included_status !== 'not_found');
   const deductible = (type: string) =>
@@ -58,12 +63,6 @@ function executiveSummary(extraction: InsurancePolicyExtraction): Array<{ label:
     if (!d) return null;
     return d.amount !== null ? currency(d.amount) : `${d.percent}%`;
   };
-
-  const assets = extraction.insurance_insured_assets;
-  const vehicles = assets.filter((a) => a.asset_type === 'vehicle');
-  const properties = assets.filter((a) => a.asset_type === 'property' || a.asset_type === 'rental_property');
-  const people = extraction.insurance_insured_parties.filter((p) => p.name);
-
   const limitOf = (code: string) => {
     const c = coverage(code);
     if (!c || c.limit_amount === null) return null;
@@ -72,88 +71,119 @@ function executiveSummary(extraction: InsurancePolicyExtraction): Array<{ label:
       : currency(c.limit_amount);
   };
 
-  const items: Array<{ label: string; value: string }> = [];
-  const push = (label: string, value: string | null) => { if (value) items.push({ label, value }); };
+  const assets = extraction.insurance_insured_assets;
+  const vehicles = assets.filter((a) => a.asset_type === 'vehicle');
+  const properties = assets.filter((a) => a.asset_type === 'property' || a.asset_type === 'rental_property');
+  const people = extraction.insurance_insured_parties.filter((p) => p.name);
+
+  const column = (heading: string, entries: Array<{ primary: string; secondary?: string } | null>): SummaryColumn | null => {
+    const kept = entries.filter((e): e is { primary: string; secondary?: string } => e !== null);
+    return kept.length ? { heading, entries: kept } : null;
+  };
+  const line = (primary: string | null, secondary?: string | null) =>
+    primary ? { primary, secondary: secondary ?? undefined } : null;
+
+  const columns: Array<SummaryColumn | null> = [];
 
   switch (extraction.insurance_type) {
     case 'auto':
     case 'motorcycle':
     case 'rv': {
-      // Deductibles vary per vehicle on most auto policies, so each vehicle
-      // carries its own rather than showing one policy-wide figure.
-      for (const vehicle of vehicles) {
-        const name = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(' ') || vehicle.description || 'Vehicle';
-        const parts = [
-          vehicleDeductible(extraction, vehicle, 'collision') ? `Collision ${vehicleDeductible(extraction, vehicle, 'collision')}` : null,
-          vehicleDeductible(extraction, vehicle, 'comprehensive') ? `Comprehensive ${vehicleDeductible(extraction, vehicle, 'comprehensive')}` : null,
-        ].filter(Boolean);
-        push(name, parts.length ? parts.join(' · ') : 'Deductibles not stated');
-      }
-      if (vehicles.length === 0) {
-        push('Collision', dedText('collision') ? `${dedText('collision')} deductible` : null);
-        push('Comprehensive', dedText('comprehensive') ? `${dedText('comprehensive')} deductible` : null);
-      }
-      push('Drivers', people.map((p) => p.name).filter(Boolean).join(' · ') || null);
-      push('Liability', limitOf('bodily_injury_liability') ?? limitOf('combined_single_limit'));
-      push('Property damage', limitOf('property_damage_liability'));
-      push('Uninsured motorist', limitOf('uninsured_motorist'));
+      columns.push(
+        column(
+          vehicles.length === 1 ? 'Vehicle' : 'Vehicles',
+          vehicles.length
+            ? vehicles.map((v) => {
+                const name = [v.year, v.make, v.model].filter(Boolean).join(' ') || v.description || 'Vehicle';
+                const parts = [
+                  vehicleDeductible(extraction, v, 'collision') ? `Collision ${vehicleDeductible(extraction, v, 'collision')}` : null,
+                  vehicleDeductible(extraction, v, 'comprehensive') ? `Comp ${vehicleDeductible(extraction, v, 'comprehensive')}` : null,
+                ].filter(Boolean);
+                return { primary: name, secondary: parts.length ? parts.join(' · ') : 'Deductibles not stated' };
+              })
+            : [
+                line('Not listed in this document',
+                  [dedText('collision') ? `Collision ${dedText('collision')}` : null,
+                   dedText('comprehensive') ? `Comp ${dedText('comprehensive')}` : null].filter(Boolean).join(' · ') || undefined),
+              ],
+        ),
+        column('Drivers', people.length ? people.map((p) => ({ primary: p.name as string, secondary: p.relationship ?? undefined })) : [line('Not listed in this document')]),
+        column('Liability', [
+          line(limitOf('bodily_injury_liability') ?? limitOf('combined_single_limit'), 'Bodily injury'),
+          line(limitOf('property_damage_liability'), 'Property damage'),
+          line(limitOf('uninsured_motorist'), 'Uninsured motorist'),
+          line(limitOf('underinsured_motorist'), 'Underinsured motorist'),
+        ]),
+      );
       break;
     }
 
     case 'homeowners':
     case 'renters':
     case 'flood':
-      push('Property', properties.map((p) => p.address || p.description || '').filter(Boolean)[0] ?? null);
-      push('Dwelling', limitOf('dwelling'));
-      push('Personal property', limitOf('personal_property'));
-      push('Liability', limitOf('personal_liability'));
-      push('Deductible', dedText('standard') ? `${dedText('standard')}` : null);
-      push('Wind / hail', dedText('wind_hail') ?? dedText('wind') ?? dedText('hail'));
+      columns.push(
+        column('Property', [
+          line(properties.map((p) => p.address || p.description || '').filter(Boolean)[0] ?? null),
+          line(limitOf('dwelling'), 'Dwelling'),
+          line(limitOf('personal_property'), 'Personal property'),
+        ]),
+        column('Deductibles', [
+          line(dedText('standard'), 'Standard'),
+          line(dedText('wind_hail') ?? dedText('wind') ?? dedText('hail'), 'Wind / hail'),
+        ]),
+        column('Liability', [
+          line(limitOf('personal_liability'), 'Personal liability'),
+          line(limitOf('medical_payments'), 'Medical payments'),
+        ]),
+      );
       break;
 
     case 'umbrella':
-      push('Umbrella limit', limitOf('umbrella_liability'));
-      push('Retained limit', limitOf('retained_limit'));
-      push(
-        'Requires underlying',
-        extraction.insurance_underlying_requirements
+      columns.push(
+        column('Coverage', [
+          line(limitOf('umbrella_liability'), 'Umbrella limit'),
+          line(limitOf('retained_limit'), 'Retained limit'),
+        ]),
+        column('Requires underlying', extraction.insurance_underlying_requirements
           .filter((r) => r.required_limit !== null)
-          .map((r) => `${r.requirement_type.replace('_liability', '')} ${currency(r.required_limit)}`)
-          .join(' · ') || null,
+          .map((r) => ({ primary: currency(r.required_limit), secondary: r.requirement_type.replace('_liability', '') }))),
+        column('Covered people', people.map((p) => ({ primary: p.name as string, secondary: p.relationship ?? undefined }))),
       );
-      push('Covered people', people.map((p) => p.name).filter(Boolean).join(' · ') || null);
       break;
 
     case 'life':
-      push('Insured', people.find((p) => p.role === 'insured')?.name ?? people[0]?.name ?? null);
-      push('Death benefit', limitOf('death_benefit'));
-      push('Cash value', limitOf('cash_value'));
-      push(
-        'Beneficiaries',
-        extraction.insurance_beneficiaries
+      columns.push(
+        column('Insured', [line(people.find((p) => p.role === 'insured')?.name ?? people[0]?.name ?? null)]),
+        column('Benefit', [
+          line(limitOf('death_benefit'), 'Death benefit'),
+          line(limitOf('cash_value'), 'Cash value'),
+        ]),
+        column('Beneficiaries', extraction.insurance_beneficiaries
           .filter((b) => b.designation === 'primary' && b.name)
-          .map((b) => (b.percentage ? `${b.name} (${b.percentage}%)` : b.name))
-          .join(' · ') || null,
+          .map((b) => ({ primary: b.name as string, secondary: b.percentage ? `${b.percentage}%` : b.relationship ?? undefined }))),
       );
       break;
 
     case 'disability':
-      push('Insured', people.find((p) => p.role === 'insured')?.name ?? people[0]?.name ?? null);
-      push('Monthly benefit', limitOf('monthly_benefit'));
+      columns.push(
+        column('Insured', [line(people.find((p) => p.role === 'insured')?.name ?? people[0]?.name ?? null)]),
+        column('Benefit', [line(limitOf('monthly_benefit'), 'Monthly benefit')]),
+      );
       break;
 
     default: {
-      // Unknown type: lead with whatever carries the largest limits.
       const top = extraction.insurance_coverages
         .filter((c) => c.limit_amount !== null && c.included_status !== 'not_found')
         .sort((a, b) => (b.limit_amount ?? 0) - (a.limit_amount ?? 0))
         .slice(0, 4);
-      for (const c of top) push(titleCase(c.coverage_code), currency(c.limit_amount));
-      push('Deductible', dedText('standard'));
+      columns.push(
+        column('Coverage', top.map((c) => ({ primary: currency(c.limit_amount), secondary: titleCase(c.coverage_code) }))),
+        column('Deductible', [line(dedText('standard'))]),
+      );
     }
   }
 
-  return items;
+  return columns.filter((c): c is SummaryColumn => c !== null);
 }
 
 /** The extracted detail behind a confirmed policy, revealed on demand. */
@@ -286,6 +316,9 @@ export function InsuranceView() {
           <h2 className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Your policies</h2>
         </div>
 
+        {/* Full width: collapsed this is a single button, expanded it is a form. */}
+        {data?.household?.id && <AddPolicyForm householdId={data.household.id} onAdded={refresh} />}
+
         {error && (
           <div className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-200">
             {error}
@@ -339,14 +372,26 @@ export function InsuranceView() {
                   </div>
 
                   {extraction && executiveSummary(extraction).length > 0 && (
-                    <dl className="mt-4 grid gap-x-6 gap-y-2 border-t border-cmd-border pt-4 sm:grid-cols-2 lg:grid-cols-3">
-                      {executiveSummary(extraction).map((item) => (
-                        <div key={item.label}>
-                          <dt className="text-[11px] uppercase tracking-[0.16em] text-cmd-muted">{item.label}</dt>
-                          <dd className="mt-0.5 text-sm text-cmd-offwhite">{item.value}</dd>
+                    <div className="mt-4 grid gap-6 border-t border-cmd-border pt-4 sm:grid-cols-2 lg:grid-cols-3">
+                      {executiveSummary(extraction).map((col) => (
+                        <div key={col.heading}>
+                          <p className="text-[11px] uppercase tracking-[0.16em] text-cmd-muted">{col.heading}</p>
+                          <ul className="mt-1.5 space-y-1">
+                            {col.entries.map((entry, i) => (
+                              <li key={i} className="flex gap-2 text-sm">
+                                <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-cmd-gold/60" />
+                                <span>
+                                  <span className="text-cmd-offwhite">{entry.primary}</span>
+                                  {entry.secondary && (
+                                    <span className="block text-xs text-cmd-muted">{entry.secondary}</span>
+                                  )}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
                         </div>
                       ))}
-                    </dl>
+                    </div>
                   )}
 
                   <div className="mt-3 flex items-center gap-1 text-xs text-cmd-muted">

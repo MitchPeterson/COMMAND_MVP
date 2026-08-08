@@ -11,7 +11,8 @@ import { InsurancePolicyReview, CoverageRow, currency, titleCase } from '../comp
 import { CoverageHealth } from '../components/CoverageHealth';
 import { AddPolicyForm } from '../components/AddPolicyForm';
 import { EditPolicyPanel } from '../components/EditPolicyPanel';
-import { ChevronDown, ChevronRight, FileWarning, Pencil, Shield, Trash2 } from 'lucide-react';
+import { RecordHistory } from '../components/RecordHistory';
+import { ChevronDown, ChevronRight, FileWarning, History, Pencil, Shield, Trash2 } from 'lucide-react';
 
 
 
@@ -359,6 +360,7 @@ export function InsuranceView() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [pendingRemove, setPendingRemove] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const [historyFor, setHistoryFor] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -486,6 +488,10 @@ export function InsuranceView() {
 
                 {open && extraction && <PolicyDetail extraction={extraction} />}
 
+                {historyFor === policy.id && (
+                  <RecordHistory tableName="insurance_policies" recordId={policy.id} />
+                )}
+
                 {editing === policy.id && (
                   <EditPolicyPanel
                     policy={policy}
@@ -516,6 +522,13 @@ export function InsuranceView() {
                     </div>
                   ) : (
                     <>
+                      <button
+                        type="button"
+                        onClick={() => setHistoryFor(historyFor === policy.id ? null : policy.id)}
+                        className="inline-flex items-center gap-1.5 text-xs text-cmd-muted transition hover:text-cmd-gold"
+                      >
+                        <History className="h-3.5 w-3.5" /> {historyFor === policy.id ? 'Hide history' : 'History'}
+                      </button>
                       <button
                         type="button"
                         onClick={() => setEditing(editing === policy.id ? null : policy.id)}

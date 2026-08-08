@@ -14,6 +14,7 @@ import { CreditView } from './views/Credit';
 import { DocumentsView } from './views/Documents';
 import { ProfileView } from './views/Profile';
 import { signOut } from './lib/supabase';
+import { WhatsNew } from './components/WhatsNew';
 
 function App() {
   const { data, loading, userId, refresh } = useHousehold();
@@ -129,6 +130,9 @@ function App() {
 
   return (
     <div className="min-h-screen flex bg-cmd-black text-cmd-offwhite">
+      {/* Shown only when there are unseen releases, and only once signed in with
+          a household — a changelog is meaningless before there is an app to use. */}
+      <WhatsNew />
       <Sidebar
         activeView={activeView}
         onNavigate={setActiveView}

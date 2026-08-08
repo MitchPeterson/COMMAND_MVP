@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
 import { useHousehold } from '../useHousehold';
 import { UploadDropzone } from '../components/UploadDropzone';
-import { uploadDocumentAsset, invokeDocumentExtraction, type InsurancePolicyExtraction } from '../lib/supabase';
+import {
+  uploadDocumentAsset,
+  invokeDocumentExtraction,
+  deleteInsurancePolicy,
+  type InsurancePolicyExtraction,
+} from '../lib/supabase';
 import { InsurancePolicyReview, CoverageRow, currency, titleCase } from '../components/InsurancePolicyReview';
 import { CoverageHealth } from '../components/CoverageHealth';
-import { ChevronDown, ChevronRight, FileWarning, Shield } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileWarning, Shield, Trash2 } from 'lucide-react';
 
 /** The extracted detail behind a confirmed policy, revealed on demand. */
 function PolicyDetail({ extraction }: { extraction: InsurancePolicyExtraction }) {
@@ -102,6 +107,23 @@ export function InsuranceView() {
   const policies = data?.insurancePolicies ?? [];
   const insuranceExtractions = data?.insuranceExtractions ?? [];
   const [expanded, setExpanded] = useState<string | null>(null);
+  const [pendingRemove, setPendingRemove] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const removePolicy = async (policyId: string) => {
+    setError(null);
+    setBusy(policyId);
+    try {
+      await deleteInsurancePolicy(policyId);
+      setPendingRemove(null);
+      await refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not remove the policy.');
+    } finally {
+      setBusy(null);
+    }
+  };
 
   const extractionFor = (extractionId: string | null | undefined) =>
     extractionId ? insuranceExtractions.find((e) => e.id === extractionId) : undefined;
@@ -118,6 +140,12 @@ export function InsuranceView() {
           <Shield className="h-4 w-4 text-cmd-gold" />
           <h2 className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Your policies</h2>
         </div>
+
+        {error && (
+          <div className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            {error}
+          </div>
+        )}
 
         {policies.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-cmd-border bg-cmd-black/50 p-8 text-center text-cmd-muted">
@@ -180,6 +208,37 @@ export function InsuranceView() {
                 </button>
 
                 {open && extraction && <PolicyDetail extraction={extraction} />}
+
+                <div className="mt-4 flex justify-end border-t border-cmd-border pt-3">
+                  {pendingRemove === policy.id ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm text-cmd-muted">Remove this policy from your profile?</span>
+                      <button
+                        type="button"
+                        disabled={busy === policy.id}
+                        onClick={() => removePolicy(policy.id)}
+                        className="rounded-lg border border-red-500/40 bg-red-500/15 px-3 py-1.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/25 disabled:opacity-40"
+                      >
+                        {busy === policy.id ? 'Removing…' : 'Remove'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingRemove(null)}
+                        className="rounded-lg border border-cmd-border px-3 py-1.5 text-sm text-cmd-offwhite transition hover:border-cmd-gold hover:text-cmd-gold"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setPendingRemove(policy.id)}
+                      className="inline-flex items-center gap-1.5 text-xs text-cmd-muted transition hover:text-red-200"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" /> Remove policy
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })

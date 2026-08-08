@@ -62,54 +62,40 @@ function filenameHint(fileName: string): DocumentType {
   return 'unknown';
 }
 
-const nullableString = { anyOf: [{ type: 'string' }, { type: 'null' }] };
-const nullableNumber = { anyOf: [{ type: 'number' }, { type: 'null' }] };
+const FIELD_NAMES = [
+  'lender', 'interest_rate', 'monthly_payment', 'escrow_balance',
+  'carrier', 'policy_type', 'policy_number', 'coverage_amount', 'premium', 'renewal_date',
+  'issuer', 'card_name_last4', 'credit_limit', 'minimum_payment', 'due_date', 'apr',
+  'institution', 'account_type', 'balance', 'as_of_date',
+  'tax_year', 'amount',
+  'employer', 'pay_period', 'gross_pay', 'net_pay', 'pay_frequency',
+  'current_balance', 'notes',
+];
 
-// Structured outputs requires every object to declare additionalProperties:false and list
-// every property in `required`, so extracted_fields is a nullable superset across all doc
-// types rather than a free-form object. Fields irrelevant to the detected type come back null.
-const EXTRACTED_FIELDS = {
-  lender: nullableString,
-  interest_rate: nullableNumber,
-  monthly_payment: nullableNumber,
-  escrow_balance: nullableNumber,
-  carrier: nullableString,
-  policy_type: nullableString,
-  policy_number: nullableString,
-  coverage_amount: nullableNumber,
-  premium: nullableNumber,
-  renewal_date: nullableString,
-  issuer: nullableString,
-  card_name_last4: nullableString,
-  credit_limit: nullableNumber,
-  minimum_payment: nullableNumber,
-  due_date: nullableString,
-  apr: nullableNumber,
-  institution: nullableString,
-  account_type: nullableString,
-  balance: nullableNumber,
-  as_of_date: nullableString,
-  tax_year: nullableString,
-  amount: nullableNumber,
-  employer: nullableString,
-  pay_period: nullableString,
-  gross_pay: nullableNumber,
-  net_pay: nullableNumber,
-  pay_frequency: nullableString,
-  current_balance: nullableNumber,
-  notes: nullableString,
-} as const;
-
+// Key/value pairs rather than one object with a nullable property per field.
+// Structured outputs caps a schema at 16 union-typed parameters, and a nullable
+// superset across every document type needs 29 — the API rejects it with a 400.
+// Pairs use zero unions, let Claude return only the fields actually present, and
+// accommodate new document types without touching this schema.
+//
+// Values are strings because that is what confirmDocumentExtraction expects: it
+// runs parseNumber() over them client-side when writing to the pillar tables.
 const EXTRACTION_SCHEMA = {
   type: 'object',
   properties: {
     detected_type: { type: 'string', enum: DOCUMENT_TYPES },
     confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
     extracted_fields: {
-      type: 'object',
-      properties: EXTRACTED_FIELDS,
-      required: Object.keys(EXTRACTED_FIELDS),
-      additionalProperties: false,
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          key: { type: 'string', enum: FIELD_NAMES },
+          value: { type: 'string' },
+        },
+        required: ['key', 'value'],
+        additionalProperties: false,
+      },
     },
   },
   required: ['detected_type', 'confidence', 'extracted_fields'],
@@ -257,16 +243,19 @@ Deno.serve(async (req: Request) => {
 File name: ${document.name}
 Filename-based guess (may be wrong — trust the document contents over this): ${filenameHint(document.name)}
 
-Populate only the fields that genuinely appear in the document. Leave every other field null —
-do not guess, infer, or carry a value over from a similar field. Return monetary amounts and
-rates as plain numbers with no currency symbols, commas, or percent signs (an APR of 24.99% is
-24.99). Dates should be ISO format (YYYY-MM-DD) where a full date is present.
+Return one entry in extracted_fields for each field that genuinely appears in the document.
+Omit fields entirely rather than guessing, inferring, or carrying a value over from a similar
+field — an absent entry means "not in this document". Do not repeat a key.
+
+Write monetary amounts and rates as plain numbers with no currency symbols, commas, or percent
+signs (an APR of 24.99% is "24.99", a premium of $3,200.00 is "3200.00"). Use ISO format
+(YYYY-MM-DD) for dates where a full date is present.
 
 Set confidence to "high" only when the document is clearly legible and the key fields are
 unambiguous, "medium" when some fields required interpretation, and "low" when the document is
 partly illegible or its type is uncertain.`;
 
-  let extraction: { detected_type: DocumentType; confidence: string; extracted_fields: Record<string, unknown> };
+  let extraction: { detected_type: DocumentType; confidence: string; extracted_fields: Array<{ key: string; value: string }> };
 
   try {
     // Server-side fallback: if Claude's safety classifiers decline the request, the API
@@ -310,10 +299,14 @@ partly illegible or its type is uncertain.`;
     : 'unknown';
   const confidence = ['high', 'medium', 'low'].includes(extraction.confidence) ? extraction.confidence : 'low';
 
-  // Drop the nulls so extracted_fields holds only what was actually found.
-  const extractedFields = Object.fromEntries(
-    Object.entries(extraction.extracted_fields ?? {}).filter(([, value]) => value !== null && value !== ''),
-  );
+  // Collapse the pairs into the object shape the app already consumes. Later
+  // duplicates of a key are ignored; blank values are dropped.
+  const extractedFields: Record<string, string> = {};
+  for (const pair of extraction.extracted_fields ?? []) {
+    if (!pair?.key || pair.value === null || pair.value === undefined) continue;
+    const value = String(pair.value).trim();
+    if (value && !(pair.key in extractedFields)) extractedFields[pair.key] = value;
+  }
 
   const { error: insertError } = await admin.from('document_extractions').insert([
     {

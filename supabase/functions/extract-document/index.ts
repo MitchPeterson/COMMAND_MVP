@@ -722,7 +722,14 @@ Deno.serve(async (req: Request) => {
         `separate entries), and the valuation methodology for each property category. Include ` +
         `enough identifying detail on people and assets — names, addresses, VINs, year/make/model, ` +
         `serial numbers — for later entity matching, without asserting any match yourself. ` +
-        `Assess completeness honestly: say plainly if this is only a declarations page.`,
+        `Assess completeness honestly: say plainly if this is only a declarations page.\n\n` +
+        `Two rules for insured_parties. First, list each person once. Policies name the same ` +
+        `individual in several places — the named-insured block, the rated-driver schedule, the ` +
+        `signature line — often reordered as "Last, First". Merge those into a single entry with ` +
+        `the fullest relationship description rather than repeating the person. Second, ` +
+        `lienholders, mortgagees, loss payees and other financial interests are not people ` +
+        `covered by the policy: give them role "other" and state what they hold in relationship, ` +
+        `so they are never mistaken for drivers or insureds.`,
         IDENTITY_SCHEMA, 'high', 16000,
       );
 

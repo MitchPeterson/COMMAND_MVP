@@ -308,6 +308,34 @@ const SetupScreen: React.FC<{ firstName: string }> = ({ firstName }) => {
 // ─────────────────────────────────────────────
 // Main OnboardingFlow Component
 // ─────────────────────────────────────────────
+/**
+ * Rejects if a Supabase call stalls. Without this, one wedged request leaves
+ * the setup screen spinning forever with nothing shown to the user.
+ */
+function withTimeout<T>(op: PromiseLike<T>, label: string, ms = 15000): Promise<T> {
+  return Promise.race([
+    Promise.resolve(op),
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms / 1000}s`)), ms),
+    ),
+  ]);
+}
+
+/**
+ * Seed and enrichment writes. These target tables that may not exist in every
+ * environment, and none of them is worth stranding someone mid-onboarding — the
+ * household record is what actually matters. Failures are logged and skipped so
+ * the user still lands in the app with a usable account.
+ */
+async function optionalWrite(label: string, op: PromiseLike<{ error: unknown }>): Promise<void> {
+  try {
+    const { error } = await withTimeout(op, label);
+    if (error) console.warn(`Onboarding: skipped ${label} —`, error);
+  } catch (err) {
+    console.warn(`Onboarding: skipped ${label} —`, err);
+  }
+}
+
 export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComplete, onSignOut }) => {
   const TOTAL_STEPS = 6;
   const [step, setStep] = useState(0); // 0 = welcome
@@ -385,15 +413,18 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
 
     try {
       // 1. Create household record
-      const { data: householdData, error: householdError } = await supabase
-        .from('households')
-        .insert({
-          user_id: userId,
-          name: `${form.firstName}${form.lastName ? ' ' + form.lastName : ''} Household`,
-          health_score: 0,
-        })
-        .select('id')
-        .single();
+      const { data: householdData, error: householdError } = await withTimeout(
+        supabase
+          .from('households')
+          .insert({
+            user_id: userId,
+            name: `${form.firstName}${form.lastName ? ' ' + form.lastName : ''} Household`,
+            health_score: 0,
+          })
+          .select('id')
+          .single(),
+        'create household',
+      );
 
       if (householdError) throw householdError;
       const householdId = householdData.id;
@@ -403,7 +434,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
       const netWorthNum = form.netWorth ? parseInt(form.netWorth.replace(/\D/g, '')) : null;
       const homeValueNum = form.homeValue ? parseInt(form.homeValue.replace(/\D/g, '')) : null;
 
-      const { error: profileError } = await supabase.from('household_profile').insert({
+      const { error: profileError } = await withTimeout(supabase.from('household_profile').insert({
         household_id: householdId,
         primary_name: `${form.firstName}${form.lastName ? ' ' + form.lastName : ''}`,
         primary_first_name: form.firstName,
@@ -427,15 +458,18 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
         has_will: form.hasWill || null,
         has_trust: form.hasTrust || null,
         has_umbrella: form.hasUmbrella || null,
-      });
+      }), 'create household profile');
       if (profileError) throw profileError;
 
       // 3. Auto-create blank section scores
-      const { error: sectionScoresError } = await supabase.from('section_scores').insert(
-        SECTION_SCORE_DEFAULTS.map((s) => ({
-          household_id: householdId,
-          ...s,
-        }))
+      const { error: sectionScoresError } = await withTimeout(
+        supabase.from('section_scores').insert(
+          SECTION_SCORE_DEFAULTS.map((s) => ({
+            household_id: householdId,
+            ...s,
+          }))
+        ),
+        'create section scores',
       );
       if (sectionScoresError) throw sectionScoresError;
 
@@ -782,59 +816,59 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
       } : null;
 
       if (financeAccountsToInsert.length > 0) {
-        const { error: financeError } = await supabase
-          .from('finance_accounts')
-          .insert(financeAccountsToInsert);
-        if (financeError) throw financeError;
+        await optionalWrite(
+          'seed finance accounts',
+          supabase.from('finance_accounts').insert(financeAccountsToInsert),
+        );
       }
 
       if (budgetSummaryToInsert) {
-        const { error: budgetError } = await supabase
-          .from('budget_summary')
-          .insert(budgetSummaryToInsert);
-        if (budgetError) throw budgetError;
+        await optionalWrite(
+          'seed budget summary',
+          supabase.from('budget_summary').insert(budgetSummaryToInsert),
+        );
       }
 
       if (creditCardsToInsert.length > 0) {
-        const { error: creditError } = await supabase
-          .from('credit_cards')
-          .insert(creditCardsToInsert);
-        if (creditError) throw creditError;
+        await optionalWrite(
+          'seed credit cards',
+          supabase.from('credit_cards').insert(creditCardsToInsert),
+        );
       }
 
       if (taxDocumentsToInsert.length > 0) {
-        const { error: taxDocsError } = await supabase
-          .from('tax_documents')
-          .insert(taxDocumentsToInsert);
-        if (taxDocsError) throw taxDocsError;
+        await optionalWrite(
+          'seed tax documents',
+          supabase.from('tax_documents').insert(taxDocumentsToInsert),
+        );
       }
 
       if (taxRecommendationsToInsert.length > 0) {
-        const { error: taxRecError } = await supabase
-          .from('tax_recommendations')
-          .insert(taxRecommendationsToInsert);
-        if (taxRecError) throw taxRecError;
+        await optionalWrite(
+          'seed tax recommendations',
+          supabase.from('tax_recommendations').insert(taxRecommendationsToInsert),
+        );
       }
 
       if (insurancePoliciesToInsert.length > 0) {
-        const { error: insuranceError } = await supabase
-          .from('insurance_policies')
-          .insert(insurancePoliciesToInsert);
-        if (insuranceError) throw insuranceError;
+        await optionalWrite(
+          'seed insurance policies',
+          supabase.from('insurance_policies').insert(insurancePoliciesToInsert),
+        );
       }
 
       if (legalDocumentsToInsert.length > 0) {
-        const { error: legalError } = await supabase
-          .from('legal_documents')
-          .insert(legalDocumentsToInsert);
-        if (legalError) throw legalError;
+        await optionalWrite(
+          'seed legal documents',
+          supabase.from('legal_documents').insert(legalDocumentsToInsert),
+        );
       }
 
       if (timelineEventsToInsert.length > 0) {
-        const { error: timelineError } = await supabase
-          .from('timeline_events')
-          .insert(timelineEventsToInsert);
-        if (timelineError) throw timelineError;
+        await optionalWrite(
+          'seed timeline events',
+          supabase.from('timeline_events').insert(timelineEventsToInsert),
+        );
       }
 
       const familyMembersToInsert = [] as Array<{
@@ -866,12 +900,21 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
 
       let insertedFamilyMembers: { id: string; name: string; relationship: string; birth_date: string | null; }[] = [];
       if (familyMembersToInsert.length > 0) {
-        const { data: insertedMembers, error: familyMembersError } = await supabase
-          .from('family_members')
-          .insert(familyMembersToInsert)
-          .select('id, name, relationship, birth_date');
-        if (familyMembersError) throw familyMembersError;
-        insertedFamilyMembers = insertedMembers as typeof insertedFamilyMembers;
+        try {
+          const { data: insertedMembers, error: familyMembersError } = await withTimeout(
+            supabase
+              .from('family_members')
+              .insert(familyMembersToInsert)
+              .select('id, name, relationship, birth_date'),
+            'seed family members',
+          );
+          if (familyMembersError) throw familyMembersError;
+          insertedFamilyMembers = insertedMembers as typeof insertedFamilyMembers;
+        } catch (err) {
+          // Milestones below are derived from these rows; an empty list just
+          // means no milestones get generated.
+          console.warn('Onboarding: skipped seed family members —', err);
+        }
       }
 
       const milestoneRows: Array<{
@@ -937,13 +980,11 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
       });
 
       if (milestoneRows.length > 0) {
-        const { error: milestoneError } = await supabase.from('family_milestones').insert(milestoneRows);
-        if (milestoneError) throw milestoneError;
+        await optionalWrite('seed family milestones', supabase.from('family_milestones').insert(milestoneRows));
       }
 
       if (actions.length > 0) {
-        const { error: priorityError } = await supabase.from('priority_actions').insert(actions);
-        if (priorityError) throw priorityError;
+        await optionalWrite('seed priority actions', supabase.from('priority_actions').insert(actions));
       }
 
       // 5. Calculate initial health score (very rough — refine later)
@@ -956,8 +997,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
       if (form.lifeInsuranceReview === 'under1yr') score += 5;
       score = Math.min(score, 85); // never start at 100
 
-      const { error: healthScoreError } = await supabase.from('households').update({ health_score: score }).eq('id', householdId);
-      if (healthScoreError) throw healthScoreError;
+      await optionalWrite('set health score', supabase.from('households').update({ health_score: score }).eq('id', householdId));
 
       // 6. Wait for setup animation to breathe
       await new Promise((r) => setTimeout(r, 2400));

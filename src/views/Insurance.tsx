@@ -14,6 +14,63 @@ import { ChevronDown, ChevronRight, FileWarning, Shield, Trash2 } from 'lucide-r
 
 
 
+
+/**
+ * Lienholders, mortgagees and loss payees are recorded as insured parties
+ * because they hold an interest in the vehicle — they are not people who drive
+ * it. Carriers list them in the same schedule, so they arrive mixed in.
+ */
+const NON_PERSON_INTEREST = /lienhold|loss ?payee|mortgagee|interested party|additional interest|lender|leasing|financial|\bbank\b|credit union/i;
+
+function isInterestedParty(party: { name: string | null; relationship: string | null }): boolean {
+  return NON_PERSON_INTEREST.test(`${party.relationship ?? ''} ${party.name ?? ''}`);
+}
+
+/**
+ * The same person appears twice on most auto policies: once in the named-insured
+ * block as "MITCHELL PETERSON" and again in the rated-driver schedule as
+ * "PETERSON, MITCHELL". Sorting the name tokens makes both forms collide, so the
+ * two entries merge instead of reading as two drivers.
+ */
+function personKey(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .sort()
+    .join(' ');
+}
+
+function driversOf(extraction: InsurancePolicyExtraction) {
+  const people = extraction.insurance_insured_parties.filter((p) => p.name && !isInterestedParty(p));
+  const merged = new Map<string, { name: string; relationship: string | null }>();
+
+  for (const person of people) {
+    const key = personKey(person.name as string);
+    const existing = merged.get(key);
+    if (!existing) {
+      merged.set(key, { name: person.name as string, relationship: person.relationship });
+      continue;
+    }
+    // Prefer the readable "First Last" form, and whichever relationship says more.
+    const name = existing.name.includes(',') && !(person.name as string).includes(',')
+      ? (person.name as string)
+      : existing.name;
+    const relationship =
+      (person.relationship?.length ?? 0) > (existing.relationship?.length ?? 0)
+        ? person.relationship
+        : existing.relationship;
+    merged.set(key, { name, relationship });
+  }
+
+  return [...merged.values()];
+}
+
+function interestedPartiesOf(extraction: InsurancePolicyExtraction) {
+  return extraction.insurance_insured_parties.filter((p) => p.name && isInterestedParty(p));
+}
+
 /**
  * Tie a deductible to a specific vehicle. The carrier may label applies_to as
  * "Vehicle 1", a VIN, or "2022 Toyota Highlander", so match on any identifier we
@@ -75,6 +132,7 @@ function executiveSummary(extraction: InsurancePolicyExtraction): SummaryColumn[
   const vehicles = assets.filter((a) => a.asset_type === 'vehicle');
   const properties = assets.filter((a) => a.asset_type === 'property' || a.asset_type === 'rental_property');
   const people = extraction.insurance_insured_parties.filter((p) => p.name);
+  const drivers = driversOf(extraction);
 
   const column = (heading: string, entries: Array<{ primary: string; secondary?: string } | null>): SummaryColumn | null => {
     const kept = entries.filter((e): e is { primary: string; secondary?: string } => e !== null);
@@ -107,7 +165,9 @@ function executiveSummary(extraction: InsurancePolicyExtraction): SummaryColumn[
                    dedText('comprehensive') ? `Comp ${dedText('comprehensive')}` : null].filter(Boolean).join(' · ') || undefined),
               ],
         ),
-        column('Drivers', people.length ? people.map((p) => ({ primary: p.name as string, secondary: p.relationship ?? undefined })) : [line('Not listed in this document')]),
+        column('Drivers', drivers.length
+          ? drivers.map((p) => ({ primary: p.name, secondary: p.relationship ?? undefined }))
+          : [line('Not listed in this document')]),
         column('Liability', [
           line(limitOf('bodily_injury_liability') ?? limitOf('combined_single_limit'), 'Bodily injury'),
           line(limitOf('property_damage_liability'), 'Property damage'),
@@ -147,7 +207,7 @@ function executiveSummary(extraction: InsurancePolicyExtraction): SummaryColumn[
         column('Requires underlying', extraction.insurance_underlying_requirements
           .filter((r) => r.required_limit !== null)
           .map((r) => ({ primary: currency(r.required_limit), secondary: r.requirement_type.replace('_liability', '') }))),
-        column('Covered people', people.map((p) => ({ primary: p.name as string, secondary: p.relationship ?? undefined }))),
+        column('Covered people', drivers.map((p) => ({ primary: p.name, secondary: p.relationship ?? undefined }))),
       );
       break;
 
@@ -265,6 +325,20 @@ function PolicyDetail({ extraction }: { extraction: InsurancePolicyExtraction })
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {interestedPartiesOf(extraction).length > 0 && (
+        <div>
+          <h4 className="text-xs uppercase tracking-[0.2em] text-cmd-muted">Lienholders & interested parties</h4>
+          <ul className="mt-2 space-y-1 text-sm text-cmd-muted">
+            {interestedPartiesOf(extraction).map((p) => (
+              <li key={p.id}>
+                • <span className="text-cmd-offwhite">{p.name}</span>
+                {p.relationship ? <span className="text-cmd-muted/70"> — {p.relationship}</span> : null}
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 

@@ -177,7 +177,15 @@ export function DashboardView() {
             />
             <DocumentExtractionReview
               householdId={data?.household?.id ?? ''}
-              extractions={data?.documentExtractions ?? []}
+              extractions={(data?.documentExtractions ?? []).filter(
+                // Insurance documents are reviewed on the Insurance page against the
+                // full extraction. Showing the compatibility row here too gave two
+                // routes to confirm the same document, creating duplicate policies.
+                (extraction) =>
+                  !(data?.insuranceExtractions ?? []).some(
+                    (insurance) => insurance.document_id === extraction.document_id,
+                  ),
+              )}
               onChange={refresh}
             />
             <div className="mb-6 flex items-center justify-between">

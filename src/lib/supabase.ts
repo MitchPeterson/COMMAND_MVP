@@ -835,6 +835,19 @@ export async function deleteDocument(
   return true;
 }
 
+/**
+ * Remove a policy directly. Document-scoped deletion cannot help when one
+ * document produced two rows, or when the source document is already gone.
+ */
+export async function deleteInsurancePolicy(policyId: string): Promise<boolean> {
+  const { error } = await supabase.from('insurance_policies').delete().eq('id', policyId);
+  if (error) {
+    console.error('Failed to delete policy:', error);
+    throw new Error(`Could not remove this policy: ${error.message}`);
+  }
+  return true;
+}
+
 export async function getDocumentUrl(filePath: string): Promise<string | null> {
   const { data, error } = await supabase.storage.from(storageBucket).createSignedUrl(filePath, 300);
   if (error || !data?.signedUrl) {

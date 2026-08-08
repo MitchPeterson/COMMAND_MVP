@@ -68,10 +68,8 @@ export function CreditView() {
           onUpload={async (file) => {
             if (!data?.household?.id) return;
             const document = await uploadDocumentAsset(data.household.id, file, 'credit');
-            if (document) {
-              await invokeDocumentExtraction(document.id);
-              await refresh();
-            }
+            await invokeDocumentExtraction(document.id);
+            await refresh();
           }}
         />
       </section>

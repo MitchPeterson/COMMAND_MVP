@@ -103,15 +103,19 @@ function CoverageRow({ coverage }: { coverage: InsuranceCoverageRow }) {
 export function InsurancePolicyReview({ extractions, onChange }: Props) {
   const pending = extractions.filter((e) => e.review_status === 'pending_review');
   const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [showAllCoverages, setShowAllCoverages] = useState<Record<string, boolean>>({});
 
   if (pending.length === 0) return null;
 
   const act = async (id: string, fn: () => Promise<boolean>) => {
     setBusy(id);
+    setError(null);
     try {
       const ok = await fn();
       if (ok && onChange) await onChange();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.');
     } finally {
       setBusy(null);
     }
@@ -263,6 +267,12 @@ export function InsurancePolicyReview({ extractions, onChange }: Props) {
                     </li>
                   ))}
                 </ul>
+              </div>
+            )}
+
+            {error && (
+              <div className="mt-6 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                {error}
               </div>
             )}
 

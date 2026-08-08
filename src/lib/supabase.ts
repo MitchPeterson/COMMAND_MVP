@@ -739,7 +739,9 @@ export async function confirmInsuranceExtraction(extraction: InsurancePolicyExtr
 
   if (insertError) {
     console.error('Failed to create policy from extraction:', insertError);
-    return false;
+    // Throw rather than return false: a silent false leaves the button looking
+    // untouched and the user re-clicking a no-op.
+    throw new Error(`Could not add this policy to your profile: ${insertError.message}`);
   }
 
   const { error } = await supabase
@@ -748,7 +750,7 @@ export async function confirmInsuranceExtraction(extraction: InsurancePolicyExtr
     .eq('id', extraction.id);
   if (error) {
     console.error('Failed to mark extraction confirmed:', error);
-    return false;
+    throw new Error(`Policy was added but could not be marked reviewed: ${error.message}`);
   }
   return true;
 }
@@ -760,7 +762,7 @@ export async function discardInsuranceExtraction(extractionId: string): Promise<
     .eq('id', extractionId);
   if (error) {
     console.error('Failed to discard extraction:', error);
-    return false;
+    throw new Error(`Could not discard this extraction: ${error.message}`);
   }
   return true;
 }

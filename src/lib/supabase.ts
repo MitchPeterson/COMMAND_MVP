@@ -853,6 +853,45 @@ export async function deleteDocument(
  * Remove a policy directly. Document-scoped deletion cannot help when one
  * document produced two rows, or when the source document is already gone.
  */
+export interface ManualPolicyInput {
+  type: InsurancePolicyType;
+  carrier: string | null;
+  policy_number: string | null;
+  coverage_amount: string | number | null;
+  deductible: string | number | null;
+  annual_premium: string | number | null;
+  renewal_date: string | null;
+  notes: string | null;
+}
+
+/**
+ * A policy the user typed in rather than uploaded. Everything is optional — the
+ * point is to capture what they know now, not to gate the record behind a
+ * document they cannot find. No source_document_id, so the UI correctly reports
+ * it as having no extracted detail.
+ */
+export async function createManualPolicy(householdId: string, input: ManualPolicyInput): Promise<boolean> {
+  const { error } = await supabase.from('insurance_policies').insert([
+    {
+      household_id: householdId,
+      type: input.type,
+      carrier: input.carrier,
+      policy_number: input.policy_number,
+      coverage_amount: parseNumber(input.coverage_amount as string | null),
+      deductible: parseNumber(input.deductible as string | null),
+      annual_premium: parseNumber(input.annual_premium as string | null),
+      renewal_date: input.renewal_date || null,
+      status: 'active',
+      notes: input.notes,
+    },
+  ]);
+  if (error) {
+    console.error('Failed to add policy:', error);
+    throw new Error(`Could not add the policy: ${error.message}`);
+  }
+  return true;
+}
+
 export async function deleteInsurancePolicy(policyId: string): Promise<boolean> {
   const { error } = await supabase.from('insurance_policies').delete().eq('id', policyId);
   if (error) {

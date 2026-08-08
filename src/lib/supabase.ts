@@ -207,6 +207,8 @@ export type PolicyStatus = 'active' | 'renewal_soon' | 'action_needed' | 'expire
 export interface InsurancePolicy {
   id: string;
   household_id: string;
+  source_document_id?: string | null;
+  source_extraction_id?: string | null;
   type: InsurancePolicyType;
   carrier: string | null;
   policy_number: string | null;
@@ -719,6 +721,22 @@ export async function confirmInsuranceExtraction(extraction: InsurancePolicyExtr
   const standardDeductible =
     extraction.insurance_deductibles.find((d) => d.deductible_type === 'standard') ??
     extraction.insurance_deductibles.find((d) => d.amount !== null);
+
+  // Idempotency: the button was clickable while confirm was silently failing, so
+  // a second successful click must not create a duplicate policy.
+  const { data: existing } = await supabase
+    .from('insurance_policies')
+    .select('id')
+    .eq('source_extraction_id', extraction.id)
+    .maybeSingle();
+
+  if (existing) {
+    await supabase
+      .from('insurance_policy_extractions')
+      .update({ review_status: 'confirmed' })
+      .eq('id', extraction.id);
+    return true;
+  }
 
   const { error: insertError } = await supabase.from('insurance_policies').insert([
     {

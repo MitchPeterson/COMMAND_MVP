@@ -13,19 +13,19 @@ interface Props {
   onChange?: () => void;
 }
 
-const currency = (value: number | null | undefined) =>
+export const currency = (value: number | null | undefined) =>
   value === null || value === undefined
     ? '—'
     : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 
-const titleCase = (value: string) => value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+export const titleCase = (value: string) => value.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 /**
  * value_type is the honesty signal. An explicit value came off the page; a
  * calculated one is our arithmetic; unknown means we looked and did not find it,
  * which is emphatically not the same as "not covered".
  */
-function ValueTypeTag({ type }: { type: ExtractionValueType }) {
+export function ValueTypeTag({ type }: { type: ExtractionValueType }) {
   if (type === 'explicit') return null;
   const styles: Record<string, string> = {
     calculated: 'border-sky-500/25 bg-sky-500/10 text-sky-200',
@@ -42,7 +42,7 @@ function Confidence({ value }: { value: number | null }) {
   return <span className={`text-[11px] ${tone}`}>{pct}%</span>;
 }
 
-function CoverageRow({ coverage }: { coverage: InsuranceCoverageRow }) {
+export function CoverageRow({ coverage }: { coverage: InsuranceCoverageRow }) {
   const [open, setOpen] = useState(false);
   const notFound = coverage.included_status === 'not_found';
 

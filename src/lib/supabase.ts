@@ -844,12 +844,35 @@ export async function getCreditCards(householdId: string): Promise<CreditCard[]>
 }
 
 export async function signOut(): Promise<boolean> {
-  const { error } = await supabase.auth.signOut();
-  if (error) {
-    console.error('Error signing out:', error);
-    return false;
+  let ok = true;
+
+  // scope:'local' clears the stored session without a server round-trip. The
+  // default ('global') tries to revoke server-side first, and when that call
+  // fails — expired token, stale refresh token, no network — supabase-js
+  // returns an error and leaves the local session in place. The user stays
+  // signed in, no SIGNED_OUT event fires, and the click appears to do nothing.
+  try {
+    const { error } = await supabase.auth.signOut({ scope: 'local' });
+    if (error) {
+      console.error('Error signing out:', error);
+      ok = false;
+    }
+  } catch (err) {
+    console.error('Error signing out:', err);
+    ok = false;
   }
-  return true;
+
+  // Belt and braces: if the call above failed for any reason, drop the
+  // persisted session ourselves so sign-out is never a no-op.
+  try {
+    Object.keys(window.localStorage)
+      .filter((key) => key.startsWith('sb-') && key.endsWith('-auth-token'))
+      .forEach((key) => window.localStorage.removeItem(key));
+  } catch {
+    // localStorage can be unavailable (private mode, blocked cookies).
+  }
+
+  return ok;
 }
 
 export async function dismissAction(actionId: string): Promise<boolean> {

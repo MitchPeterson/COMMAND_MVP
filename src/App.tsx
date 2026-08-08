@@ -32,9 +32,12 @@ function App() {
   // requires a household. Signing out clears userId and returns to AuthScreen.
   const handleSignOut = useCallback(async () => {
     await signOut();
-    setProceedToOnboarding(false);
-    await refresh();
-  }, [refresh]);
+    // Hard reload rather than relying on the SIGNED_OUT event and a refresh().
+    // Those only reset the app if the auth listener actually fires; a full
+    // re-init cannot leave stale userId/data behind, so the user always lands
+    // on AuthScreen.
+    window.location.replace('/');
+  }, []);
 
   if (loading) {
     return (

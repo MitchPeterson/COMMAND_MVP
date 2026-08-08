@@ -503,7 +503,13 @@ export async function getDocuments(householdId: string): Promise<Document[]> {
   return data ?? [];
 }
 
-export async function uploadDocumentAsset(householdId: string, file: File, category: string): Promise<Document | null> {
+/**
+ * Throws on failure rather than returning null. UploadDropzone already renders
+ * whatever error propagates out of onUpload; returning null meant callers
+ * silently skipped their success branch and the dropzone reported "Upload
+ * completed" for an upload that never happened.
+ */
+export async function uploadDocumentAsset(householdId: string, file: File, category: string): Promise<Document> {
   const normalizedCategory = category || 'general';
   const uploadPath = `${householdId}/${Date.now()}-${file.name}`;
 
@@ -514,7 +520,10 @@ export async function uploadDocumentAsset(householdId: string, file: File, categ
 
   if (uploadError) {
     console.error('Error uploading file to storage:', uploadError);
-    return null;
+    const message = /bucket not found/i.test(uploadError.message)
+      ? `Storage bucket "${storageBucket}" does not exist. Create it in Supabase → Storage before uploading.`
+      : `Could not upload the file: ${uploadError.message}`;
+    throw new Error(message);
   }
 
   const { data, error } = await supabase
@@ -534,7 +543,7 @@ export async function uploadDocumentAsset(householdId: string, file: File, categ
 
   if (error) {
     console.error('Error creating document record:', error);
-    return null;
+    throw new Error(`File uploaded but the document record could not be saved: ${error.message}`);
   }
   return data;
 }
@@ -548,8 +557,11 @@ export async function invokeDocumentExtraction(documentId: string): Promise<bool
     // The function returns a JSON body describing the failure; surface it rather than
     // logging an opaque FunctionsHttpError.
     const detail = await error.context?.json?.().catch(() => null);
-    console.error('Error invoking extraction function:', detail?.error ?? error.message);
-    return false;
+    const message = detail?.error ?? error.message;
+    console.error('Error invoking extraction function:', message);
+    // The file is safely stored and the document row exists, so this is not a
+    // failed upload — surface it as a partial success the user can retry.
+    throw new Error(`Document saved, but extraction failed: ${message}`);
   }
   return true;
 }

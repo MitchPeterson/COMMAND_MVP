@@ -68,10 +68,8 @@ export function TaxesView() {
           onUpload={async (file) => {
             if (!data?.household?.id) return;
             const document = await uploadDocumentAsset(data.household.id, file, 'tax');
-            if (document) {
-              await invokeDocumentExtraction(document.id);
-              await refresh();
-            }
+            await invokeDocumentExtraction(document.id);
+            await refresh();
           }}
         />
         <div className="mb-6 flex items-center justify-between gap-4">

@@ -2,16 +2,59 @@
 
 Guidance for Claude Code (claude.ai/code) when working in this repository.
 
+## How to work here
+
+Mitch's benchmark is a session that turned around **41 changes at a median of 2.6 minutes each**,
+every one of them merged and live on Vercel before he replied. Match that pace. What made it work:
+
+- **Ship without being asked.** Branch, commit, push, open the PR, merge, confirm the deploy — one
+  compound Bash call, not six. `main` is protected, so a direct push stalls silently. "Done" means
+  deployed, not written.
+- **Don't open with a question.** Pick the sensible default, say which assumption you made in one
+  line, and build. A follow-up commit is cheaper than a blocking question. Ask only when the wrong
+  guess would be unsafe or would waste the whole build.
+- **Verify with the build.** `npm run build` is the gate. Skip live-Supabase probes and throwaway
+  e2e scripts unless the thing genuinely cannot be judged any other way — an Edge Function change
+  can be; a React view cannot justify it.
+- **Confirm a deploy by content, one call:**
+  ```bash
+  until curl -s "https://command-mvp.vercel.app/$(curl -s https://command-mvp.vercel.app/ \
+    | grep -o 'assets/index-[A-Za-z0-9_-]*\.js')" | grep -q "<a string only the new code has>"; \
+    do sleep 15; done
+  ```
+  Bundle hashes differ between local and Vercel builds, so never compare those.
+- **Hand off manual steps on the clipboard**, never as a code block to select:
+  ```bash
+  pbcopy < supabase/migrations/<file>.sql && echo "Clipboard: <file>.sql ($(wc -l < …) lines) → Supabase SQL editor"
+  ```
+  Applying SQL and redeploying the Edge Function are the only things he should have to do by hand.
+- **Split a multi-part request into shipped increments.** Four features in one message is four
+  merges with visible progress between them, not one fifteen-minute silence.
+
 ## Commands
 
 ```bash
 npm run dev       # Vite dev server
 npm run build     # tsc + vite build — what Vercel runs, and the correctness gate
 npm run preview   # Preview the production build
+npm run release   # Bump the version + add a changelog entry — see Versioning
 npm run lint      # BROKEN — no ESLint config exists in the repo
 ```
 
 No test suite. `npm run build` passing is the bar; TypeScript errors block the Vercel deploy.
+
+## Versioning
+
+`src/lib/releaseNotes.ts` is both the changelog and the version number; `package.json` is kept in
+step with it. Every merge to `main` is a deploy and carries exactly one entry:
+
+```bash
+npm run release -- patch --title "What this release is" "Bullet one" "Bullet two"
+```
+
+`patch` for fixes, `minor` for something a user would notice, `major` only when the product itself
+changes — major should stay rare. Clicking the version on the Profile screen opens the history.
+Do not hand-edit the version in either file; the script moves both and refuses if they have drifted.
 
 ## Architecture
 

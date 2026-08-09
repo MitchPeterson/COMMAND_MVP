@@ -32,6 +32,10 @@ every one of them merged and live on Vercel before he replied. Match that pace. 
   not copy anything else until he confirms it is applied. Copying a second thing silently destroys
   the first — that is how a migration went unapplied for two PRs while the code that depended on it
   shipped. When two steps are needed, name the order and hand over only step one.
+- **Every handoff states the line count and the expected result**, so a bad paste is obvious before
+  it becomes a bug: how many lines are on the clipboard, where they go, what the editor should say
+  on success (`Success. No rows returned` for DDL), and what the change should have created. Then
+  verify it yourself over the REST API rather than asking him to run a check query.
 - **Verify manual steps landed** before building on them. A table is one query away:
   `select 1 from <table> limit 1` through the REST API with a test account returns 404 (PGRST205)
   when the migration was never applied. Never assume a hand-off was completed.

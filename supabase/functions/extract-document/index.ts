@@ -2159,8 +2159,14 @@ Deno.serve(async (req: Request) => {
         `payment, other — and set category_from_issuer false. The distinction matters: one is what ` +
         `the issuer said, the other is your reading of it.\n\n` +
         `Set truncated true if you could not fit every line, and transaction_count_stated to the ` +
-        `count the statement itself reports if it prints one.`,
-        CREDIT_TRANSACTIONS_SCHEMA, 'high', 24000,
+        `count the statement itself reports if it prints one.\n\n` +
+        `If the statement runs to more than 200 transactions, transcribe the first 200 in order and ` +
+        `set truncated true rather than working through all of them — a partial list that arrives is ` +
+        `worth more than a complete one that times out.`,
+        // Transcription, not judgment: medium effort reads a transaction table
+        // as accurately as high and is markedly faster, which is what keeps a
+        // real multi-page statement inside the edge wall clock.
+        CREDIT_TRANSACTIONS_SCHEMA, 'medium', 24000,
       ).catch((err) => {
         console.warn('Credit transactions pass failed:', err instanceof Error ? err.message : String(err));
         return { transactions: [], transaction_count_stated: 0, truncated: false };

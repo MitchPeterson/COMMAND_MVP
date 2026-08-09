@@ -100,7 +100,7 @@ export function DocumentsView() {
       <section className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-8 shadow-sm shadow-black/10">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Document center</p>
+            <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Document vault</p>
             <h1 className="mt-3 text-3xl font-semibold text-cmd-offwhite">Documents</h1>
           </div>
           <div className="inline-flex items-center gap-2 rounded-full border border-cmd-border bg-cmd-black/50 px-4 py-2 text-sm text-cmd-muted">

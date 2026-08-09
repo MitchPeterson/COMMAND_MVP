@@ -2054,7 +2054,17 @@ export async function invokeDocumentExtraction(documentId: string): Promise<bool
     // The function returns a JSON body describing the failure; surface it rather than
     // logging an opaque FunctionsHttpError.
     const detail = await error.context?.json?.().catch(() => null);
-    const message = detail?.error ?? error.message;
+
+    // Two different body shapes arrive here. Our own failures carry `error`.
+    // Platform failures — chiefly the edge wall clock — carry `code` and
+    // `message`, which the old code ignored, so a timeout surfaced as
+    // "returned a non-2xx status code" and told the user nothing.
+    const message =
+      detail?.code === 'WORKER_RESOURCE_LIMIT'
+        ? 'the document took longer to read than the server allows. Large or multi-account ' +
+          'statements can exceed it — try a single statement, or retry from the vault.'
+        : detail?.error ?? detail?.message ?? error.message;
+
     console.error('Error invoking extraction function:', message);
     // The file is safely stored and the document row exists, so this is not a
     // failed upload — surface it as a partial success the user can retry.

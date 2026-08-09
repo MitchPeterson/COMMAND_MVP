@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.19.2',
+    date: '2026-08-09',
+    title: 'A vault that says what went wrong',
+    items: [
+      'Document Center is now the Document Vault.',
+      'When extraction fails because a document took longer to read than the server allows, Command says so instead of reporting an unhelpful status code. Large or multi-account statements are the usual cause.',
+      'Credit card statements with long transaction lists are read more efficiently, and a statement running past 200 transactions now returns the first 200 marked as partial rather than timing out with nothing.',
+    ],
+  },
+  {
     version: '0.19.1',
     date: '2026-08-09',
     title: 'Offer research that fits in the time it has',

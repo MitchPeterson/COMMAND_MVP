@@ -135,7 +135,7 @@ function PersonFields({
 
 /**
  * The household's people, backed by `family_members`. Writes here also reconcile
- * the profile's denormalised copies (partner name, number of children) — see
+ * the profile's denormalized copies (partner name, number of children) — see
  * syncProfilePeople — so nothing downstream reads a stale count.
  */
 export function PeopleEditor({ householdId, members, profile, onSaved }: Props) {

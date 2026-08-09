@@ -17,6 +17,7 @@ import {
   type LegalCategory,
 } from '../lib/legalTaxonomy';
 import { LegalDocumentDetail } from '../components/LegalDocumentDetail';
+import { LegalHealth } from '../components/LegalHealth';
 import { AlertTriangle, ChevronDown, ChevronRight, FileText, Gavel, Info, Scale, ShieldCheck } from 'lucide-react';
 
 function statusLabel(code: string | null | undefined): string {
@@ -145,10 +146,18 @@ export function LegalView() {
         </div>
         <p className="mt-6 flex items-start gap-2 text-xs text-cmd-muted/80">
           <Scale className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          Command organises and reads your documents. It does not give legal advice, and nothing here
+          Command organizes and reads your documents. It does not give legal advice, and nothing here
           says whether a document is valid or currently in force — an attorney does that.
         </p>
       </section>
+
+      <LegalHealth
+        extractions={extractions}
+        documents={documents}
+        profile={data?.profile ?? null}
+        familyMembers={data?.familyMembers ?? []}
+        assets={data?.assets ?? []}
+      />
 
       <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
         <UploadDropzone

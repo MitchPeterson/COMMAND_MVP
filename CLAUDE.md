@@ -158,6 +158,16 @@ These caused repeated Vercel build failures:
 - **`signOut()` uses `scope: 'local'`** and clears `sb-*-auth-token` itself. The default `global` scope hits the network first and leaves the session intact when that fails, making sign-out a silent no-op.
 - **Never swallow a failure.** `uploadDocumentAsset`, `confirmInsuranceExtraction` and friends throw rather than returning `null`/`false`. Returning a falsy value that callers ignore produced several "nothing happens" bugs where the UI reported success.
 
+## Writing
+
+- **US English everywhere** — UI copy, comments, commit messages, release notes. recognize, not
+  recognise; labeled, not labelled; license, not licence; -ize endings throughout. This applies to
+  model prompts too, since extracted text is shown to the user.
+- Say what is on file, never what the household has: "no will found in Command", not "you have no
+  will". The distinction is load-bearing in the Legal section and in coverage findings.
+- No legal or financial conclusions. Command reports what a document says and what it could not
+  see; whether something is valid, enforceable or sufficient is an attorney's call.
+
 ## Brand / styling
 
 - **Command Black** `#0F0F10` · **Command Gold** `#C9A24D` · **Charcoal** `#1C1D20` · **Off-White** `#F6F6F4`

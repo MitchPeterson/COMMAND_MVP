@@ -96,7 +96,7 @@ INSERT INTO legal_document_types (code, label, category, extractor, sort_order) 
   ('settlement_agreement','Settlement agreement','business','generic',470),
   ('court_order_or_judgment','Court order or judgment','business','generic',480),
   ('unclassified_legal_contract','Legal contract, not otherwise classified','business','generic',490),
-  ('unknown_legal_document','Unrecognised legal document','unclassified','generic',900),
+  ('unknown_legal_document','Unrecognized legal document','unclassified','generic',900),
   ('possibly_legal','Possibly a legal document','unclassified','generic',910),
   ('not_legal','Not a legal document','unclassified','generic',920)
 ON CONFLICT (code) DO UPDATE

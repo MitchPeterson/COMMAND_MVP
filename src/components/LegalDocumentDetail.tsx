@@ -18,7 +18,7 @@ interface Props {
 /**
  * Sensitive identifiers are stored — they are in the document either way — but
  * never rendered in full and never logged. Last four only, which is enough to
- * recognise the value without reproducing it.
+ * recognize the value without reproducing it.
  */
 function mask(value: string): string {
   const trimmed = value.trim();

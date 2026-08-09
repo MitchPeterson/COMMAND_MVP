@@ -297,7 +297,13 @@ Deno.serve(async (req: Request) => {
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
       output_config: { effort: 'medium' },
-      tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 5 }],
+      tools: [
+        { type: 'web_search_20260209', name: 'web_search', max_uses: 6 },
+        // Search locates the issuer's page; fetch is what reads the terms off
+        // it. Without this the model burned its search budget re-searching for
+        // detail it could not open, and reported the shortfall itself.
+        { type: 'web_fetch_20260209', name: 'web_fetch', max_uses: 6 },
+      ],
       messages: [{
         role: 'user',
         content:
@@ -306,6 +312,9 @@ Deno.serve(async (req: Request) => {
           `Annual spending by category:\n${spendLines}\n\n` +
           `Cards already held (do not propose these again):\n${heldLines}\n\n` +
           `${RESEARCH_RULES}\n\n` +
+          `Search to find candidates, then open each card's own page to read its terms — a search ` +
+          `snippet is rarely enough to state an earn rate accurately. Budget your searches: you have a ` +
+          `limited number, so search broadly first and spend the rest opening pages.\n\n` +
           `Find three or four cards that fit this spending pattern. For each, report the issuer, ` +
           `the card name, the annual fee, the earn rate for every category it advertises, any current ` +
           `sign-up bonus and what it requires, any introductory APR, notable benefits, and the credit ` +
@@ -322,7 +331,9 @@ Deno.serve(async (req: Request) => {
       .map((block: any) => block.text)
       .join('\n');
     // deno-lint-ignore no-explicit-any
-    const searchesRun = searchMessage.content.filter((b: any) => b.type === 'server_tool_use').length;
+    const searchesRun = searchMessage.content.filter(
+      (b: any) => b.type === 'server_tool_use' && b.name === 'web_search',
+    ).length;
 
     if (!searchText.trim()) return await fail('The search returned nothing to work from.', 502);
 

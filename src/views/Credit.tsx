@@ -3,6 +3,7 @@ import { useHousehold } from '../useHousehold';
 import { UploadDropzone } from '../components/UploadDropzone';
 import { CreditHealth } from '../components/CreditHealth';
 import { CreditStatementReview } from '../components/CreditStatementReview';
+import { CardStrategy } from '../components/CardStrategy';
 import { uploadDocumentAsset, invokeDocumentExtraction, type CreditCard as CreditCardRow } from '../lib/supabase';
 import { CreditCard } from 'lucide-react';
 
@@ -87,6 +88,18 @@ export function CreditView() {
             ))}
           </div>
         </section>
+      )}
+
+      {data?.household?.id && (
+        <CardStrategy
+          cards={cards}
+          statements={statements}
+          transactions={data?.creditTransactions ?? []}
+          offers={data?.cardOffers ?? []}
+          profile={data?.profile ?? null}
+          householdId={data.household.id}
+          onChanged={refresh}
+        />
       )}
 
       <div className="flex items-center gap-2 px-1">

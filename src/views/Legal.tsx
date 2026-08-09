@@ -285,6 +285,21 @@ export function LegalView() {
                       <span className="rounded-lg border border-cmd-border px-2.5 py-1 text-xs text-cmd-muted">
                         Reading v{extraction.extraction_version}
                       </span>
+                      <span
+                        className={`rounded-lg border px-2.5 py-1 text-xs ${
+                          extraction.review_status === 'confirmed'
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+                            : extraction.review_status === 'partially_confirmed'
+                              ? 'border-cmd-gold/30 bg-cmd-gold/10 text-cmd-gold'
+                              : 'border-cmd-border text-cmd-muted'
+                        }`}
+                      >
+                        {extraction.review_status === 'confirmed'
+                          ? 'In your profile'
+                          : extraction.review_status === 'partially_confirmed'
+                            ? 'Partly in your profile'
+                            : 'Not yet reviewed'}
+                      </span>
                       <TypeCorrector extraction={extraction} onSaved={refresh} />
                       <button
                         type="button"
@@ -304,7 +319,12 @@ export function LegalView() {
                     </div>
 
                     {openId === extraction.id && (
-                      <LegalDocumentDetail extraction={extraction} filePath={source?.file_path ?? null} />
+                      <LegalDocumentDetail
+                        extraction={extraction}
+                        filePath={source?.file_path ?? null}
+                        familyMembers={data?.familyMembers ?? []}
+                        onConfirmed={refresh}
+                      />
                     )}
                   </div>
                 );

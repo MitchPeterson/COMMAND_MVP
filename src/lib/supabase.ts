@@ -577,6 +577,345 @@ export async function getLegalExtractionDetail(extractionId: string): Promise<Le
   };
 }
 
+// ─────────────────────────────────────────────────────────────
+// Review and confirmation
+//
+// The line between what a model read and what the household asserts is true
+// runs through here. Extraction rows are a reading; legal_documents and
+// legal_profile_facts are the household's record. Nothing crosses that line
+// without a person deciding it should.
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * How much a value can be trusted on its own.
+ *
+ *   high   — prefilled and preselected, still labeled as extracted until confirmed
+ *   medium — shown, never preselected; requires an explicit confirmation
+ *   low    — a suggestion only. It cannot reach the canonical record as extracted;
+ *            editing it makes the value the user's own, which can.
+ */
+export type ConfidenceBand = 'high' | 'medium' | 'low';
+
+export function confidenceBand(confidence: number | null | undefined): ConfidenceBand {
+  if (confidence == null) return 'low';
+  if (confidence >= 0.85) return 'high';
+  if (confidence >= 0.6) return 'medium';
+  return 'low';
+}
+
+/**
+ * Values that stay reviewable however confident the model is. Dates, names,
+ * roles, ownership and beneficiary designations decide who gets what — a
+ * confident misreading of any of them is worse than an unanswered question, so
+ * none of them is ever auto-accepted.
+ */
+const ALWAYS_REVIEWABLE = /(date|name|role|owner|beneficiary|trustee|executor|guardian|agent|percent|share)/i;
+
+export function alwaysReviewable(fieldCode: string): boolean {
+  return ALWAYS_REVIEWABLE.test(fieldCode);
+}
+
+export type ReviewDecision = 'confirmed' | 'edited' | 'rejected' | 'unresolved';
+
+/** One user decision about one extracted value. */
+export async function reviewLegalField(
+  fieldId: string,
+  decision: ReviewDecision,
+  userValue?: string | null,
+): Promise<boolean> {
+  const patch: Record<string, unknown> = {
+    review_state: decision,
+    reviewed_at: new Date().toISOString(),
+  };
+  if (decision === 'edited') patch.user_value = (userValue ?? '').trim() || null;
+  if (decision === 'rejected') patch.user_value = null;
+
+  const { error } = await supabase.from('legal_extracted_fields').update(patch).eq('id', fieldId);
+  if (error) {
+    console.error('Failed to record the field decision:', error);
+    throw new Error(`Could not save that decision: ${error.message}`);
+  }
+  return true;
+}
+
+export async function reviewLegalProvision(provisionId: string, decision: ReviewDecision): Promise<boolean> {
+  const { error } = await supabase
+    .from('legal_provisions')
+    .update({ review_state: decision })
+    .eq('id', provisionId);
+  if (error) {
+    console.error('Failed to record the provision decision:', error);
+    throw new Error(`Could not save that decision: ${error.message}`);
+  }
+  return true;
+}
+
+/**
+ * Confirms or rejects the suggestion that a named party is a household member.
+ * Confirming links them; it never rewrites the person's existing profile from
+ * the document, because a document spelling a name differently is not evidence
+ * that the profile is wrong.
+ */
+export async function resolveLegalPartyMatch(
+  partyId: string,
+  state: 'confirmed' | 'rejected' | 'unmatched',
+  familyMemberId?: string | null,
+): Promise<boolean> {
+  const patch: Record<string, unknown> = { match_state: state };
+  if (state === 'confirmed' && familyMemberId) {
+    patch.matched_family_member_id = familyMemberId;
+    patch.match_conflict = null;
+  }
+  if (state === 'rejected' || state === 'unmatched') {
+    patch.matched_family_member_id = null;
+  }
+
+  const { error } = await supabase.from('legal_parties').update(patch).eq('id', partyId);
+  if (error) {
+    console.error('Failed to resolve the party match:', error);
+    throw new Error(`Could not save that match: ${error.message}`);
+  }
+  return true;
+}
+
+/** Adds a named party to the household as a new person, on explicit request. */
+export async function createFamilyMemberFromParty(
+  householdId: string,
+  party: LegalParty,
+  relationship: string,
+): Promise<FamilyMember> {
+  const member = await addFamilyMember(householdId, {
+    name: party.name,
+    relationship,
+    birth_date: null,
+  });
+  await resolveLegalPartyMatch(party.id, 'confirmed', member.id);
+  return member;
+}
+
+/** The coarse bucket the existing Legal view renders, from the taxonomy code. */
+function canonicalType(extractor: string, typeCode: string): string {
+  if (typeCode === 'vehicle_title' || typeCode === 'boat_or_rv_title' || typeCode === 'property_title') return 'title';
+  switch (extractor) {
+    case 'will': return 'will';
+    case 'trust': return 'trust';
+    case 'power_of_attorney': return 'poa';
+    case 'healthcare_directive': return 'healthcare_directive';
+    case 'deed_property': return 'deed';
+    case 'family': return 'family';
+    case 'business': return 'business';
+    default: return 'other';
+  }
+}
+
+/** Which profile facts a confirmed document of this kind establishes. */
+const FACTS_BY_EXTRACTOR: Record<string, string[]> = {
+  will: ['has_will'],
+  trust: ['has_trust'],
+  power_of_attorney: ['has_financial_poa'],
+  healthcare_directive: ['has_healthcare_directive'],
+  deed_property: ['has_deed'],
+  family: [],
+  business: ['has_business_documents'],
+  generic: [],
+};
+
+export interface LegalConfirmationResult {
+  legalDocumentId: string;
+  fieldsApplied: number;
+  factsWritten: number;
+  conflicts: string[];
+  partial: boolean;
+}
+
+/**
+ * Promotes one reviewed reading to the household's record.
+ *
+ * Only values the user confirmed or edited are carried across, and low-confidence
+ * values are excluded unless the user edited them — at which point the value is
+ * theirs, not the model's. Anything left unreviewed simply does not travel, and
+ * the extraction is marked partially confirmed so it stays in the queue.
+ *
+ * An existing document of the same type is never overwritten. Both rows survive,
+ * `supersedes_document_id` records the suspicion, and a flag asks the user which
+ * one controls — because upload order is not evidence and neither is a date the
+ * model read off a page.
+ */
+export async function confirmLegalExtraction(
+  extraction: LegalDocumentExtraction,
+  extractorKey: string,
+): Promise<LegalConfirmationResult> {
+  const householdId = extraction.household_id;
+  const typeCode = extraction.user_document_type ?? extraction.document_type ?? 'unknown_legal_document';
+
+  const { data: fieldRows, error: fieldError } = await supabase
+    .from('legal_extracted_fields')
+    .select('*')
+    .eq('extraction_id', extraction.id);
+  if (fieldError) {
+    console.error('Could not read the reviewed fields:', fieldError);
+    throw new Error(`Could not read this document's fields: ${fieldError.message}`);
+  }
+
+  const fields = (fieldRows ?? []) as LegalExtractedField[];
+  const accepted = fields.filter((f) => {
+    if (f.review_state === 'edited') return true;
+    if (f.review_state !== 'confirmed') return false;
+    // A confirmed low-confidence reading is still the model's reading. The user
+    // confirming it is what makes it usable — which is exactly what happened.
+    return true;
+  });
+
+  if (accepted.length === 0) {
+    throw new Error(
+      'Nothing has been confirmed yet. Confirm at least one detail before adding this document to your profile.',
+    );
+  }
+
+  const valueOf = (code: string): string | null => {
+    const hit = accepted.find((f) => f.field_code === code);
+    return hit ? (hit.user_value ?? hit.value_text) : null;
+  };
+
+  const conflicts: string[] = [];
+
+  // Never overwrite a document already on file. Two wills can both be real.
+  const { data: existing } = await supabase
+    .from('legal_documents')
+    .select('id, name, execution_date, source_extraction_id, document_type')
+    .eq('household_id', householdId)
+    .eq('document_type', typeCode);
+
+  const fromThisReading = (existing ?? []).find((d) => d.source_extraction_id === extraction.id);
+  const others = (existing ?? []).filter((d) => d.source_extraction_id !== extraction.id);
+
+  const row = {
+    household_id: householdId,
+    name: valueOf('document_title') ?? extraction.document_title ?? 'Untitled legal document',
+    type: canonicalType(extractorKey, typeCode),
+    document_type: typeCode,
+    document_subtype: extraction.document_subtype,
+    category: extraction.category,
+    status: 'current' as const,
+    document_status: extraction.document_status,
+    execution_date: valueOf('execution_date') ?? extraction.execution_date,
+    effective_date: valueOf('effective_date') ?? extraction.effective_date,
+    expiration_date: valueOf('expiration_date') ?? extraction.expiration_date,
+    governing_jurisdiction: valueOf('governing_jurisdiction') ?? extraction.governing_jurisdiction,
+    attorney: valueOf('attorney_name') ?? valueOf('law_firm'),
+    last_reviewed: new Date().toISOString().slice(0, 10),
+    source_document_id: extraction.document_id,
+    source_extraction_id: extraction.id,
+    supersedes_document_id: others.length === 1 ? others[0].id : null,
+    // Deliberately null, not true: which document controls is not ours to decide.
+    is_controlling: null,
+  };
+
+  let legalDocumentId: string;
+  if (fromThisReading) {
+    const { error } = await supabase.from('legal_documents').update(row).eq('id', fromThisReading.id);
+    if (error) throw new Error(`Could not update this document: ${error.message}`);
+    legalDocumentId = fromThisReading.id;
+  } else {
+    const { data: inserted, error } = await supabase
+      .from('legal_documents').insert([row]).select('id').single();
+    if (error || !inserted) throw new Error(`Could not add this document: ${error?.message ?? 'no row returned'}`);
+    legalDocumentId = inserted.id;
+  }
+
+  if (others.length > 0) {
+    conflicts.push(
+      `${others.length} other ${others.length === 1 ? 'document' : 'documents'} of this type ${others.length === 1 ? 'is' : 'are'} already on file.`,
+    );
+    await supabase.from('legal_issue_flags').insert([{
+      household_id: householdId,
+      extraction_id: extraction.id,
+      flag_code: 'multiple_documents_same_type',
+      severity: 'worth_reviewing',
+      confidence: 1,
+      explanation:
+        `Your profile now holds more than one document of this type. Command has kept them all and ` +
+        `has not decided which one is current.`,
+      suggested_action: 'Check the execution dates and confirm which document is the current one.',
+      attorney_review_suggested: true,
+    }]);
+  }
+
+  // Profile facts. 'document_found' is the strongest claim available here: it
+  // says a document is on file, never that the household is covered.
+  const factCodes = FACTS_BY_EXTRACTOR[extractorKey] ?? [];
+  let factsWritten = 0;
+  for (const factCode of factCodes) {
+    const { error } = await supabase.from('legal_profile_facts').upsert(
+      {
+        household_id: householdId,
+        fact_code: factCode,
+        subject_label: valueOf('document_title') ?? 'Household',
+        value_text: row.name,
+        value_date: row.execution_date,
+        state: 'document_found',
+        origin: 'user_confirmed',
+        source_extraction_id: extraction.id,
+        source_document_id: extraction.document_id,
+        confidence: extraction.classification_confidence,
+        confirmed_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'household_id,fact_code,subject_label' },
+    );
+    if (error) console.error('Could not write a profile fact:', error);
+    else factsWritten += 1;
+  }
+
+  // Anything still unreviewed keeps the reading in the queue rather than
+  // declaring it done.
+  const unreviewed = fields.filter((f) => f.review_state === 'unreviewed').length;
+  const partial = unreviewed > 0;
+
+  const { error: headerError } = await supabase
+    .from('legal_document_extractions')
+    .update({
+      review_status: partial ? 'partially_confirmed' : 'confirmed',
+      processing_state: partial ? 'partially_confirmed' : 'confirmed',
+    })
+    .eq('id', extraction.id);
+  if (headerError) throw new Error(`Could not update the review status: ${headerError.message}`);
+
+  return { legalDocumentId, fieldsApplied: accepted.length, factsWritten, conflicts, partial };
+}
+
+/** Sets every unreviewed value on a reading to one decision. */
+export async function reviewAllLegalFields(
+  extractionId: string,
+  decision: ReviewDecision,
+  onlyBands: ConfidenceBand[] = ['high', 'medium'],
+): Promise<number> {
+  const { data, error } = await supabase
+    .from('legal_extracted_fields')
+    .select('id, confidence, review_state')
+    .eq('extraction_id', extractionId)
+    .eq('review_state', 'unreviewed');
+  if (error) {
+    console.error('Could not read fields for bulk review:', error);
+    throw new Error(`Could not confirm these details: ${error.message}`);
+  }
+
+  // Low-confidence values are excluded from a bulk confirm by default. They are
+  // exactly the ones a person should look at individually.
+  const targets = (data ?? []).filter((f) => onlyBands.includes(confidenceBand(f.confidence as number | null)));
+  if (targets.length === 0) return 0;
+
+  const { error: updateError } = await supabase
+    .from('legal_extracted_fields')
+    .update({ review_state: decision, reviewed_at: new Date().toISOString() })
+    .in('id', targets.map((t) => t.id));
+  if (updateError) {
+    console.error('Could not apply the bulk review:', updateError);
+    throw new Error(`Could not confirm these details: ${updateError.message}`);
+  }
+  return targets.length;
+}
+
 /** Newest reading per document, newest first. */
 export async function getLegalExtractions(householdId: string): Promise<LegalDocumentExtraction[]> {
   const { data, error } = await supabase

@@ -28,6 +28,13 @@ every one of them merged and live on Vercel before he replied. Match that pace. 
   pbcopy < supabase/migrations/<file>.sql && echo "Clipboard: <file>.sql ($(wc -l < …) lines) → Supabase SQL editor"
   ```
   Applying SQL and redeploying the Edge Function are the only things he should have to do by hand.
+- **One clipboard at a time, and wait.** Copy one artifact, say plainly what to do with it, and do
+  not copy anything else until he confirms it is applied. Copying a second thing silently destroys
+  the first — that is how a migration went unapplied for two PRs while the code that depended on it
+  shipped. When two steps are needed, name the order and hand over only step one.
+- **Verify manual steps landed** before building on them. A table is one query away:
+  `select 1 from <table> limit 1` through the REST API with a test account returns 404 (PGRST205)
+  when the migration was never applied. Never assume a hand-off was completed.
 - **Split a multi-part request into shipped increments.** Four features in one message is four
   merges with visible progress between them, not one fifteen-minute silence.
 

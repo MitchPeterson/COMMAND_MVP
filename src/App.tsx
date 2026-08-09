@@ -147,7 +147,7 @@ function App() {
         userName={data?.profile?.primary_name ?? data?.profile?.primary_first_name ?? data?.household?.name ?? 'Your account'}
         userLocation={data?.profile ? `${data.profile.city}, ${data.profile.state}` : 'Household'}
       />
-      <main className="flex-1 bg-cmd-charcoal/90 p-6">{renderView()}</main>
+      <main className="min-w-0 flex-1 overflow-x-hidden bg-cmd-charcoal/90 p-6">{renderView()}</main>
     </div>
   );
 }

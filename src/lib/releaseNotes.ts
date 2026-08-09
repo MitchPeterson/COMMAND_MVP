@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.16.0',
+    date: '2026-08-09',
+    title: 'A health score that tells the truth about a new profile',
+    items: [
+      'The household health score now has two readings: what you have built, and the full picture across every section. Toggle between them — a half-finished profile scoring 13 because four sections are empty was discouraging and wrong.',
+      'Sections you have not started drop to the bottom of Section Status and say so, rather than showing a 0.0 that looks like failure.',
+      'Fixed a layout bug where a long document title stretched the dashboard sideways and pushed Priority Actions off the edge of the screen.',
+    ],
+  },
+  {
     version: '0.15.0',
     date: '2026-08-09',
     title: 'A dashboard that points at the work',

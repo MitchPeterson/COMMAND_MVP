@@ -1110,6 +1110,112 @@ export interface CreditStatementDetail {
   transactions: CreditTransaction[];
 }
 
+/** One card found by searching the web. A lead, never a term sheet. */
+export interface CardOfferCandidate {
+  id: string;
+  research_id: string;
+  household_id: string;
+  issuer: string;
+  card_name: string;
+  annual_fee: number | null;
+  earn_rates: Array<{ category: string; rate: string; unit: string; note?: string }>;
+  signup_bonus: string | null;
+  signup_requirement: string | null;
+  intro_apr: string | null;
+  notable_benefits: string | null;
+  credit_needed: string | null;
+  /** Command's arithmetic on your own spend — not a figure from the page. */
+  estimated_annual_value: number | null;
+  value_basis: Record<string, unknown>;
+  source_url: string;
+  source_title: string | null;
+  is_issuer_source: boolean;
+  retrieved_at: string;
+  confidence: number | null;
+  verification_state: 'unverified' | 'user_confirmed' | 'user_rejected';
+  user_note: string | null;
+}
+
+export interface CardOfferResearch {
+  id: string;
+  household_id: string;
+  status: 'running' | 'complete' | 'failed';
+  spend_profile: Record<string, number>;
+  search_summary: string | null;
+  failure_reason: string | null;
+  searches_run: number | null;
+  requested_at: string;
+  completed_at: string | null;
+}
+
+export async function getCardOfferCandidates(householdId: string): Promise<CardOfferCandidate[]> {
+  const { data, error } = await supabase
+    .from('card_offer_candidates')
+    .select('*')
+    .eq('household_id', householdId)
+    .neq('verification_state', 'user_rejected')
+    .order('estimated_annual_value', { ascending: false, nullsFirst: false });
+  if (error) {
+    console.error('Error fetching card offers:', error);
+    return [];
+  }
+  return (data ?? []) as CardOfferCandidate[];
+}
+
+export async function getLatestCardResearch(householdId: string): Promise<CardOfferResearch | null> {
+  const { data, error } = await supabase
+    .from('card_offer_research')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('requested_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error('Error fetching card research:', error);
+    return null;
+  }
+  return (data as CardOfferResearch) ?? null;
+}
+
+/**
+ * Runs a fresh search. Slow by nature — several web searches and two model
+ * passes — so the UI shows it working rather than pretending it is instant.
+ */
+export async function researchCardOffers(householdId: string): Promise<{ candidates: number }> {
+  const { data: session } = await supabase.auth.getSession();
+  const token = session?.session?.access_token;
+  if (!token) throw new Error('You need to be signed in to research offers.');
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/research-card-offers`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ household_id: householdId }),
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload?.error ?? `Research failed (${response.status}).`);
+  }
+  return { candidates: payload.candidates ?? 0 };
+}
+
+/** The user's verdict on a researched offer. Nothing else moves it. */
+export async function verifyCardOffer(
+  candidateId: string,
+  state: 'user_confirmed' | 'user_rejected',
+  note?: string,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('card_offer_candidates')
+    .update({ verification_state: state, user_note: note ?? null })
+    .eq('id', candidateId);
+  if (error) {
+    console.error('Failed to record the offer verdict:', error);
+    throw new Error(`Could not save that: ${error.message}`);
+  }
+  return true;
+}
+
 export async function getCreditStatements(householdId: string): Promise<CreditStatement[]> {
   const { data, error } = await supabase
     .from('credit_statements')
@@ -1122,6 +1228,20 @@ export async function getCreditStatements(householdId: string): Promise<CreditSt
     return [];
   }
   return (data ?? []) as CreditStatement[];
+}
+
+/** Every transaction across the household, for spend analysis. */
+export async function getCreditTransactions(householdId: string): Promise<CreditTransaction[]> {
+  const { data, error } = await supabase
+    .from('credit_transactions')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('transaction_date', { ascending: false, nullsFirst: false });
+  if (error) {
+    console.error('Error fetching credit transactions:', error);
+    return [];
+  }
+  return (data ?? []) as CreditTransaction[];
 }
 
 export async function getCreditStatementDetail(statementId: string): Promise<CreditStatementDetail> {

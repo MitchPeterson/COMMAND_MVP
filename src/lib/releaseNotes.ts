@@ -25,6 +25,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.19.0',
+    date: '2026-08-09',
+    title: 'Rewards strategy, grounded and researched',
+    items: [
+      'Command now shows what each of your cards actually returns — rewards earned divided by what you spent, measured from your own statements — alongside where your spending goes by category.',
+      'It quantifies what putting spend on the wrong card costs you per year, and says plainly when interest is outrunning rewards, because until a balance is cleared no card earns its way out of it.',
+      'Research current offers searches the web for cards that suit your spending and works out what each would return on your actual categories. Every card carries the page it was read from, the date it was read, and an explicit note that Command has not confirmed it with the issuer.',
+      'Only category totals and card names ever leave your household for that search — no balances, no account numbers, no names.',
+    ],
+  },
+  {
     version: '0.18.0',
     date: '2026-08-09',
     title: 'Credit card statements, read properly',

@@ -5,6 +5,7 @@ import { DocumentExtractionReview } from '../components/DocumentExtractionReview
 import { uploadDocumentAsset, invokeDocumentExtraction } from '../lib/supabase';
 import { computeCoverageHealth } from '../lib/coverageHealth';
 import { computeLegalHealth } from '../lib/legalHealth';
+import { computeCreditHealth } from '../lib/creditHealth';
 import { buildPriorityActions, type RankedAction, type RankedSeverity } from '../lib/priorityActions';
 import {
   Shield,
@@ -66,7 +67,7 @@ function formatTimelineDate(dateString?: string | null) {
 
 function formatScore(score: number | null | undefined) {
   if (score == null) return '--';
-  return score.toFixed(1);
+  return String(Math.round(score));
 }
 
 function getScoreState(score: number | null | undefined) {
@@ -104,6 +105,11 @@ export function DashboardView({ onNavigate }: DashboardProps) {
     [data?.legalExtractions, data?.legalDocuments, data?.profile, data?.familyMembers, data?.assets],
   );
 
+  const credit = useMemo(
+    () => computeCreditHealth(data?.creditCards ?? [], data?.profile),
+    [data?.creditCards, data?.profile],
+  );
+
   // Any section with a live score overrides its stored row. The stored rows were
   // written once at onboarding and never recalculated, so without this an upload
   // changes the section page and leaves the dashboard telling the old story.
@@ -129,8 +135,18 @@ export function DashboardView({ onNavigate }: DashboardProps) {
             : legal.findings[0].title,
       };
     }
+    if (credit.score !== null) {
+      live.credit = {
+        score: credit.score,
+        status: credit.status,
+        summary:
+          credit.findings.length === 0
+            ? 'Nothing outstanding across the cards on file.'
+            : credit.findings[0].title,
+      };
+    }
     return live;
-  }, [coverage, legal]);
+  }, [coverage, legal, credit]);
 
   const sectionScores = useMemo(() => {
     const rows = (data?.sectionScores ?? []).map((section) => {
@@ -168,8 +184,10 @@ export function DashboardView({ onNavigate }: DashboardProps) {
   // half-built profile scoring 13 is discouraging and wrong; a half-built
   // profile scoring 78 across what exists, with four sections still empty, is
   // both true and useful. Neither number is hidden.
+  // Whole numbers. A household score is not precise to a tenth and pretending
+  // otherwise reads as false accuracy.
   const average = (rows: typeof sectionScores) =>
-    rows.length === 0 ? null : Math.round((rows.reduce((sum, s) => sum + s.score, 0) / rows.length) * 10) / 10;
+    rows.length === 0 ? null : Math.round(rows.reduce((sum, s) => sum + s.score, 0) / rows.length);
 
   const startedScore = useMemo(() => average(startedSections), [startedSections]);
   const fullScore = useMemo(() => average(sectionScores), [sectionScores]);

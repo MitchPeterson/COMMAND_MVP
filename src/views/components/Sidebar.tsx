@@ -16,11 +16,11 @@ const navItems = [
   { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
   { id: 'insurance', label: 'Insurance', Icon: Shield },
   { id: 'legal', label: 'Legal', Icon: FileText },
+  { id: 'credit', label: 'Credit', Icon: CreditCard },
   { id: 'home', label: 'Home', Icon: Home },
   { id: 'finances', label: 'Finances', Icon: Wallet },
   { id: 'taxes', label: 'Taxes', Icon: Receipt },
   { id: 'family', label: 'Family', Icon: Users },
-  { id: 'credit', label: 'Credit', Icon: CreditCard },
   { id: 'documents', label: 'Documents', Icon: Folder },
 ];
 

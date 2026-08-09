@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useHousehold } from '../useHousehold';
 import { UploadDropzone } from '../components/UploadDropzone';
 import {
@@ -114,9 +114,26 @@ function TypeCorrector({ extraction, onSaved }: TypeCorrectorProps) {
   );
 }
 
-export function LegalView() {
+interface LegalViewProps {
+  /** A reading to open on arrival, when the user came from a dashboard link. */
+  focusId?: string | null;
+}
+
+export function LegalView({ focusId = null }: LegalViewProps) {
   const { data, refresh } = useHousehold();
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(focusId);
+
+  // Arriving with a focus opens that reading and brings it into view. Landing at
+  // the top of a long page with nothing obviously different is the failure this
+  // avoids.
+  useEffect(() => {
+    if (!focusId) return;
+    setOpenId(focusId);
+    const timer = window.setTimeout(() => {
+      document.getElementById(`legal-${focusId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
+    return () => window.clearTimeout(timer);
+  }, [focusId]);
   const documents = data?.legalDocuments ?? [];
   const extractions = data?.legalExtractions ?? [];
   const flags = data?.legalIssueFlags ?? [];
@@ -209,7 +226,13 @@ export function LegalView() {
                 const corrected = Boolean(extraction.user_document_type);
 
                 return (
-                  <div key={extraction.id} className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-5">
+                  <div
+                    key={extraction.id}
+                    id={`legal-${extraction.id}`}
+                    className={`rounded-3xl border bg-cmd-charcoal p-5 ${
+                      openId === extraction.id ? 'border-cmd-gold/40' : 'border-cmd-border'
+                    }`}
+                  >
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 text-cmd-gold">

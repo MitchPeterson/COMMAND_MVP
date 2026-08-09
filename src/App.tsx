@@ -19,6 +19,14 @@ import { WhatsNew } from './components/WhatsNew';
 function App() {
   const { data, loading, userId, refresh } = useHousehold();
   const [activeView, setActiveView] = useState<string>('dashboard');
+  // Set when a dashboard link points at one record rather than a whole section,
+  // so the section can open that record instead of making the user hunt for it.
+  const [focusId, setFocusId] = useState<string | null>(null);
+
+  const navigate = (view: string, focus?: string) => {
+    setActiveView(view);
+    setFocusId(focus ?? null);
+  };
   // Set only when the user explicitly chooses to start onboarding. Everything
   // else about which screen shows is derived from data, never from an effect.
   const [proceedToOnboarding, setProceedToOnboarding] = useState(false);
@@ -104,11 +112,11 @@ function App() {
   const renderView = () => {
     switch (activeView) {
       case 'dashboard':
-        return <DashboardView onNavigate={setActiveView} />;
+        return <DashboardView onNavigate={navigate} />;
       case 'insurance':
         return <InsuranceView />;
       case 'legal':
-        return <LegalView />;
+        return <LegalView focusId={focusId} />;
       case 'home':
         return <HomeView />;
       case 'finances':
@@ -124,7 +132,7 @@ function App() {
       case 'profile':
         return <ProfileView />;
       default:
-        return <DashboardView onNavigate={setActiveView} />;
+        return <DashboardView onNavigate={navigate} />;
     }
   };
 

@@ -9,6 +9,7 @@ const TABLE_LABELS: Record<string, string> = {
   household_profile: 'Household profile',
   finance_accounts: 'Finance account',
   credit_cards: 'Credit card',
+  family_members: 'Person',
 };
 
 const describe = (entry: RecordHistoryEntry): string => {
@@ -53,8 +54,8 @@ export function HouseholdHistory({ householdId }: { householdId: string }) {
         <div className="flex items-center gap-3">
           <History className="h-5 w-5 text-cmd-gold" />
           <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Version history</p>
-            <h2 className="mt-1 text-xl font-semibold text-cmd-offwhite">Recent changes</h2>
+            <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Activity</p>
+            <h2 className="mt-1 text-xl font-semibold text-cmd-offwhite">Changes to your household</h2>
           </div>
         </div>
         {open ? <ChevronDown className="h-4 w-4 text-cmd-muted" /> : <ChevronRight className="h-4 w-4 text-cmd-muted" />}

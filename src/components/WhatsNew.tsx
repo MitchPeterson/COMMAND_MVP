@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { markReleasesSeen, unseenReleases, type ReleaseNote } from '../lib/releaseNotes';
+import { formatReleaseDate, markReleasesSeen, unseenReleases, type ReleaseNote } from '../lib/releaseNotes';
 import { Sparkles, X } from 'lucide-react';
 
 /**
@@ -48,11 +48,13 @@ export function WhatsNew() {
 
         <div className="max-h-[60vh] overflow-y-auto px-6 py-5">
           {releases.map((release) => (
-            <section key={release.id} className="mb-6 last:mb-0">
+            <section key={release.version} className="mb-6 last:mb-0">
               {releases.length > 1 && (
                 <p className="text-sm font-semibold text-cmd-offwhite">{release.title}</p>
               )}
-              <p className="text-xs text-cmd-muted">{release.date}</p>
+              <p className="text-xs text-cmd-muted">
+                v{release.version} · {formatReleaseDate(release.date)}
+              </p>
               <ul className="mt-3 space-y-3">
                 {release.items.map((item, i) => (
                   <li key={i} className="flex gap-3 text-sm text-cmd-muted">

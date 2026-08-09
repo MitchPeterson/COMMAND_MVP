@@ -1328,6 +1328,208 @@ export async function getFamilyMembers(householdId: string): Promise<FamilyMembe
   return data ?? [];
 }
 
+export interface FamilyMemberInput {
+  name: string;
+  relationship: string;
+  birth_date: string | null;
+}
+
+/** Spouse, partner, child, self — the relationships the profile editor writes. */
+export type Relationship = 'Self' | 'Spouse' | 'Partner' | 'Child' | 'Other';
+
+export function isSpouseRelationship(relationship: string | null | undefined): boolean {
+  const value = (relationship ?? '').toLowerCase();
+  return value === 'spouse' || value === 'partner' || value === 'husband' || value === 'wife';
+}
+
+export function isChildRelationship(relationship: string | null | undefined): boolean {
+  const value = (relationship ?? '').toLowerCase();
+  return value === 'child' || value === 'son' || value === 'daughter';
+}
+
+export function isSelfRelationship(relationship: string | null | undefined): boolean {
+  const value = (relationship ?? '').toLowerCase();
+  return value === 'self' || value === 'primary' || value === 'me';
+}
+
+export async function addFamilyMember(householdId: string, input: FamilyMemberInput): Promise<FamilyMember> {
+  const { data, error } = await supabase
+    .from('family_members')
+    .insert([
+      {
+        household_id: householdId,
+        name: input.name.trim(),
+        relationship: input.relationship,
+        birth_date: input.birth_date || null,
+      },
+    ])
+    .select('*')
+    .single();
+
+  if (error || !data) {
+    console.error('Failed to add family member:', error);
+    throw new Error(`Could not add this person: ${error?.message ?? 'no row returned'}`);
+  }
+  await syncProfilePeople(householdId);
+  return data as FamilyMember;
+}
+
+export async function updateFamilyMember(
+  householdId: string,
+  memberId: string,
+  input: Partial<FamilyMemberInput>,
+  previous?: FamilyMember,
+): Promise<boolean> {
+  const patch: Record<string, unknown> = {};
+  if (input.name !== undefined) patch.name = input.name.trim();
+  if (input.relationship !== undefined) patch.relationship = input.relationship;
+  if (input.birth_date !== undefined) patch.birth_date = input.birth_date || null;
+
+  const { error } = await supabase.from('family_members').update(patch).eq('id', memberId);
+  if (error) {
+    console.error('Failed to update family member:', error);
+    throw new Error(`Could not save this person: ${error.message}`);
+  }
+  // Re-labelling the only spouse as something else vacates the role the same way
+  // deleting them would.
+  const vacated =
+    previous && input.relationship !== undefined && previous.relationship !== input.relationship
+      ? previous
+      : undefined;
+  await syncProfilePeople(householdId, vacated);
+  return true;
+}
+
+/**
+ * Removing a person takes their milestones with them (ON DELETE CASCADE). The
+ * record_history trigger keeps a snapshot, so the removal stays inspectable.
+ */
+export async function deleteFamilyMember(householdId: string, member: FamilyMember): Promise<boolean> {
+  const { error } = await supabase.from('family_members').delete().eq('id', member.id);
+  if (error) {
+    console.error('Failed to remove family member:', error);
+    throw new Error(`Could not remove this person: ${error.message}`);
+  }
+  await syncProfilePeople(householdId, member);
+  return true;
+}
+
+/**
+ * household_profile carries denormalised copies of the household's people —
+ * `partner_name`, `spouse_first_name`, `num_children` — which onboarding wrote
+ * once and nothing has updated since. Scoring and the dashboard read them, so
+ * every write to family_members reconciles them here.
+ *
+ * It reconciles in one direction only: an absence in family_members is not
+ * evidence of an absence in the household. Onboarding recorded a partner's name
+ * and a child count without necessarily creating rows for them — the seeded demo
+ * household has a spouse and two children in the profile and no member rows at
+ * all — so blindly writing what family_members says would erase them on the
+ * first edit. A field is only cleared when the user actually removed the person
+ * behind it, which `removed` reports.
+ */
+export async function syncProfilePeople(householdId: string, removed?: FamilyMember): Promise<void> {
+  const members = await getFamilyMembers(householdId);
+  const spouse = members.find((m) => isSpouseRelationship(m.relationship));
+  const children = members.filter((m) => isChildRelationship(m.relationship));
+  const self = members.find((m) => isSelfRelationship(m.relationship));
+
+  const patch: HouseholdProfileEdit = {};
+
+  if (spouse) {
+    patch.partner_name = spouse.name;
+    patch.spouse_first_name = spouse.name.trim().split(/\s+/)[0];
+  } else if (removed && isSpouseRelationship(removed.relationship)) {
+    patch.partner_name = null;
+    patch.spouse_first_name = null;
+  }
+
+  const { data: current } = await supabase
+    .from('household_profile')
+    .select('num_children')
+    .eq('household_id', householdId)
+    .maybeSingle();
+  const recorded = (current?.num_children as number | null) ?? 0;
+
+  if (removed && isChildRelationship(removed.relationship)) {
+    // One child left the household — a decrement, not a recount, so a profile
+    // that knows about children this list never named keeps knowing.
+    patch.num_children = Math.max(children.length, recorded - 1);
+  } else if (children.length > recorded) {
+    // Otherwise the count only rises to meet the list. A household that told
+    // onboarding it has two children and has since named one of them has two
+    // children, not one.
+    patch.num_children = children.length;
+  }
+
+  if (self) patch.primary_name = self.name;
+
+  await updateHouseholdProfile(householdId, patch);
+}
+
+export interface HouseholdProfileEdit {
+  primary_name?: string | null;
+  primary_first_name?: string | null;
+  primary_last_name?: string | null;
+  partner_name?: string | null;
+  spouse_first_name?: string | null;
+  num_children?: number;
+  household_income?: string | number | null;
+  net_worth?: string | number | null;
+  home_value?: string | number | null;
+  city?: string | null;
+  state?: string | null;
+}
+
+/**
+ * Writes the profile row, creating it if onboarding never did. Currency fields
+ * accept what the user typed — "$325,000" parses the same as 325000.
+ */
+export async function updateHouseholdProfile(householdId: string, edit: HouseholdProfileEdit): Promise<boolean> {
+  const patch: Record<string, unknown> = {};
+  const text = (value: string | null | undefined) => (value ?? '').trim() || null;
+
+  if (edit.primary_name !== undefined) patch.primary_name = text(edit.primary_name);
+  if (edit.primary_first_name !== undefined) patch.primary_first_name = text(edit.primary_first_name);
+  if (edit.primary_last_name !== undefined) patch.primary_last_name = text(edit.primary_last_name);
+  if (edit.partner_name !== undefined) patch.partner_name = text(edit.partner_name);
+  if (edit.spouse_first_name !== undefined) patch.spouse_first_name = text(edit.spouse_first_name);
+  if (edit.num_children !== undefined) patch.num_children = edit.num_children;
+  if (edit.city !== undefined) patch.city = text(edit.city);
+  if (edit.state !== undefined) patch.state = text(edit.state);
+  if (edit.household_income !== undefined) patch.household_income = parseNumber(edit.household_income as string | null);
+  if (edit.net_worth !== undefined) patch.net_worth = parseNumber(edit.net_worth as string | null);
+  if (edit.home_value !== undefined) patch.home_value = parseNumber(edit.home_value as string | null);
+
+  if (Object.keys(patch).length === 0) return true;
+  patch.updated_at = new Date().toISOString();
+
+  const { data, error } = await supabase
+    .from('household_profile')
+    .update(patch)
+    .eq('household_id', householdId)
+    .select('id');
+
+  if (error) {
+    console.error('Failed to update household profile:', error);
+    throw new Error(`Could not save your profile: ${error.message}`);
+  }
+
+  // No profile row yet — an account that skipped or half-finished onboarding.
+  // An update matching nothing succeeds silently, which would look like a save
+  // that quietly did not happen.
+  if (!data || data.length === 0) {
+    const { error: insertError } = await supabase
+      .from('household_profile')
+      .insert([{ household_id: householdId, num_children: 0, ...patch }]);
+    if (insertError) {
+      console.error('Failed to create household profile:', insertError);
+      throw new Error(`Could not save your profile: ${insertError.message}`);
+    }
+  }
+  return true;
+}
+
 export async function getFamilyMilestones(householdId: string): Promise<FamilyMilestone[]> {
   const { data, error } = await supabase
     .from('family_milestones')

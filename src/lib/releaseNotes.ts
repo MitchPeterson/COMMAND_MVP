@@ -25,6 +25,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.13.0',
+    date: '2026-08-09',
+    title: 'Review what Command read, then decide',
+    items: [
+      'Every detail Command reads from a legal document can now be confirmed, edited, rejected or left for later — and only what you confirm reaches your profile.',
+      'People named in a document can be matched to your household, added as new members, or marked as outsiders. A different spelling never rewrites someone\'s existing profile.',
+      'Confidence decides how much work you have to do: high and moderate values can be confirmed in bulk, low-confidence ones need a look each.',
+      'A second document of the same type never overwrites the first. Command keeps both and asks you which one is current.',
+    ],
+  },
+  {
     version: '0.12.0',
     date: '2026-08-08',
     title: 'Legal health, graded',

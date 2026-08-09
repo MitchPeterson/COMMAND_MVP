@@ -169,6 +169,34 @@ These caused repeated Vercel build failures:
 - **`signOut()` uses `scope: 'local'`** and clears `sb-*-auth-token` itself. The default `global` scope hits the network first and leaves the session intact when that fails, making sign-out a silent no-op.
 - **Never swallow a failure.** `uploadDocumentAsset`, `confirmInsuranceExtraction` and friends throw rather than returning `null`/`false`. Returning a falsy value that callers ignore produced several "nothing happens" bugs where the UI reported success.
 
+## Section anatomy
+
+Every pillar section (Insurance, Legal, Home, Finances, Taxes, Family, Credit) reads top to bottom
+in the same order, so the second section a user opens teaches them nothing new. Insurance and Legal
+are the reference implementations; match them.
+
+1. **The grade leads.** A `<SectionHealth>` card is the first element — letter grade, score out of
+   100, plain-language status, assessment confidence, findings, and a "what limits this assessment"
+   list. No page banner above it: the grade card *is* the header.
+2. **Items needing review** come next — extractions the user has not confirmed.
+3. **The inventory**, under a small label strip (`Your policies`, `Your documents`), grouped where
+   grouping helps.
+4. **Manual entry**, if the section has it.
+5. **The uploader last**, in a plain `bg-cmd-black/40` card. It is a means to the section's content,
+   not the point of the page — never put it at the top.
+
+The scoring module is `src/lib/<section>Health.ts` and always returns the same shape:
+`{ score, grade, status, findings, dataFindings, confidence, confidenceReason }`. Findings move the
+grade; `dataFindings` move confidence only. Weighting is shared: critical 30, attention 12, info 4.
+Reuse `gradeTone()` from `coverageHealth.ts` so an A looks the same everywhere.
+
+**The Dashboard is the summary layer and must never go stale.** `section_scores` and
+`priority_actions` are onboarding-time rows that nothing recalculates, so a section with a live
+scorer adds itself to the `liveScores` map in `Dashboard.tsx`, which overrides the stored row. When
+you add a section scorer, wire it there in the same commit — otherwise the section page and the
+dashboard disagree, and the dashboard is the one the user believes. Anything a document produced
+that is still waiting on the user belongs in the "Waiting on you" strip.
+
 ## Writing
 
 - **US English everywhere** — UI copy, comments, commit messages, release notes. recognize, not

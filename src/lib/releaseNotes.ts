@@ -25,6 +25,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.14.0',
+    date: '2026-08-09',
+    title: 'One shape for every section',
+    items: [
+      'Legal now reads like Insurance: the grade leads, your documents follow, and the uploader sits at the bottom where it belongs.',
+      'The dashboard no longer tells a stale story. Legal is scored live from your documents the way Insurance already was, so uploading or confirming something moves the household score immediately.',
+      'A new \'Waiting on you\' panel shows anything still being read, waiting for review, or that failed — and clicking it takes you straight there.',
+      'Section rows on the dashboard are clickable.',
+    ],
+  },
+  {
     version: '0.13.0',
     date: '2026-08-09',
     title: 'Review what Command read, then decide',

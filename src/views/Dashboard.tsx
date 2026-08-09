@@ -4,6 +4,7 @@ import { UploadDropzone } from '../components/UploadDropzone';
 import { DocumentExtractionReview } from '../components/DocumentExtractionReview';
 import { uploadDocumentAsset, invokeDocumentExtraction } from '../lib/supabase';
 import { computeCoverageHealth } from '../lib/coverageHealth';
+import { computeLegalHealth } from '../lib/legalHealth';
 import {
   Shield,
   FileText,
@@ -73,7 +74,11 @@ function getScoreState(score: number | null | undefined) {
   return { label: 'On track', className: 'text-emerald-400', borderClass: 'border-emerald-500' };
 }
 
-export function DashboardView() {
+interface DashboardProps {
+  onNavigate?: (view: string) => void;
+}
+
+export function DashboardView({ onNavigate }: DashboardProps) {
   const { data, refresh } = useHousehold();
 
   // Insurance is scored live from the policies and extracted documents on file,
@@ -84,22 +89,66 @@ export function DashboardView() {
     [data?.insurancePolicies, data?.insuranceExtractions, data?.profile],
   );
 
+  const legal = useMemo(
+    () =>
+      computeLegalHealth(
+        data?.legalExtractions ?? [],
+        data?.legalDocuments ?? [],
+        data?.profile,
+        data?.familyMembers ?? [],
+        data?.assets ?? [],
+      ),
+    [data?.legalExtractions, data?.legalDocuments, data?.profile, data?.familyMembers, data?.assets],
+  );
+
+  // Any section with a live score overrides its stored row. The stored rows were
+  // written once at onboarding and never recalculated, so without this an upload
+  // changes the section page and leaves the dashboard telling the old story.
+  const liveScores = useMemo(() => {
+    const live: Record<string, { score: number; status: string; summary: string }> = {};
+    if (coverage.score !== null) {
+      live.insurance = {
+        score: coverage.score,
+        status: coverage.status,
+        summary:
+          coverage.findings.length === 0
+            ? 'No inconsistencies found across the policies on file.'
+            : coverage.findings[0].title,
+      };
+    }
+    if (legal.score !== null) {
+      live.legal = {
+        score: legal.score,
+        status: legal.status,
+        summary:
+          legal.findings.length === 0
+            ? 'Nothing outstanding against the documents on file.'
+            : legal.findings[0].title,
+      };
+    }
+    return live;
+  }, [coverage, legal]);
+
   const sectionScores = useMemo(() => {
-    const rows = (data?.sectionScores ?? []).map((section) =>
-      section.section === 'insurance' && coverage.score !== null
-        ? {
-            ...section,
-            score: coverage.score,
-            status: coverage.status as typeof section.status,
-            summary:
-              coverage.findings.length === 0
-                ? 'No inconsistencies found across the policies on file.'
-                : coverage.findings[0].title,
-          }
-        : section,
-    );
+    const rows = (data?.sectionScores ?? []).map((section) => {
+      const live = liveScores[section.section];
+      return live
+        ? { ...section, score: live.score, status: live.status as typeof section.status, summary: live.summary }
+        : section;
+    });
     return rows.sort((a, b) => a.score - b.score);
-  }, [data?.sectionScores, coverage]);
+  }, [data?.sectionScores, liveScores]);
+
+  // Anything a document produced that is still waiting on the user. This is the
+  // dashboard's answer to "I just uploaded something — where did it go?".
+  const awaitingReview = useMemo(() => {
+    const legalPending = (data?.legalExtractions ?? []).filter((e) => e.review_status === 'pending_review');
+    const legalPartial = (data?.legalExtractions ?? []).filter((e) => e.review_status === 'partially_confirmed');
+    const insurancePending = (data?.insuranceExtractions ?? []).filter((e) => e.review_status === 'pending_review');
+    const processing = (data?.documents ?? []).filter((d) => d.status === 'uploaded');
+    const failed = (data?.documents ?? []).filter((d) => d.status === 'error');
+    return { legalPending, legalPartial, insurancePending, processing, failed };
+  }, [data?.legalExtractions, data?.insuranceExtractions, data?.documents]);
 
   // Aggregate follows the sections shown, so a change in coverage moves the
   // household score instead of leaving it stuck at its onboarding value.
@@ -191,6 +240,65 @@ export function DashboardView() {
             </div>
           </section>
 
+          {(awaitingReview.legalPending.length > 0 ||
+            awaitingReview.legalPartial.length > 0 ||
+            awaitingReview.insurancePending.length > 0 ||
+            awaitingReview.processing.length > 0 ||
+            awaitingReview.failed.length > 0) && (
+            <section className="rounded-3xl border border-cmd-gold/25 bg-cmd-charcoal p-6">
+              <div className="mb-4 flex items-center gap-3">
+                <Clock className="h-5 w-5 text-cmd-gold" />
+                <div>
+                  <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Waiting on you</p>
+                  <h2 className="mt-1 text-xl font-semibold text-cmd-offwhite">Uploads to finish</h2>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {awaitingReview.processing.length > 0 && (
+                  <p className="rounded-2xl border border-cmd-border bg-cmd-black/40 px-4 py-3 text-sm text-cmd-muted">
+                    {awaitingReview.processing.length} document{awaitingReview.processing.length === 1 ? ' is' : 's are'} still being read.
+                  </p>
+                )}
+                {awaitingReview.legalPending.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigate?.('legal')}
+                    className="w-full rounded-2xl border border-cmd-border bg-cmd-black/40 px-4 py-3 text-left text-sm text-cmd-offwhite transition hover:border-cmd-gold/40"
+                  >
+                    {awaitingReview.legalPending.length} legal document{awaitingReview.legalPending.length === 1 ? '' : 's'} read and waiting for your review — nothing is on your profile until you confirm.
+                  </button>
+                )}
+                {awaitingReview.legalPartial.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigate?.('legal')}
+                    className="w-full rounded-2xl border border-cmd-border bg-cmd-black/40 px-4 py-3 text-left text-sm text-cmd-offwhite transition hover:border-cmd-gold/40"
+                  >
+                    {awaitingReview.legalPartial.length} legal document{awaitingReview.legalPartial.length === 1 ? ' has' : 's have'} details you left for later.
+                  </button>
+                )}
+                {awaitingReview.insurancePending.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigate?.('insurance')}
+                    className="w-full rounded-2xl border border-cmd-border bg-cmd-black/40 px-4 py-3 text-left text-sm text-cmd-offwhite transition hover:border-cmd-gold/40"
+                  >
+                    {awaitingReview.insurancePending.length} insurance document{awaitingReview.insurancePending.length === 1 ? '' : 's'} waiting for your review.
+                  </button>
+                )}
+                {awaitingReview.failed.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => onNavigate?.('documents')}
+                    className="w-full rounded-2xl border border-red-500/25 bg-red-500/5 px-4 py-3 text-left text-sm text-red-200 transition hover:border-red-500/40"
+                  >
+                    {awaitingReview.failed.length} document{awaitingReview.failed.length === 1 ? '' : 's'} could not be read. The originals are safe — retry from the vault.
+                  </button>
+                )}
+              </div>
+            </section>
+          )}
+
           <section className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-6">
             <UploadDropzone
               contextLabel="Global document upload"
@@ -238,7 +346,11 @@ export function DashboardView() {
                   return (
                     <div
                       key={section.id}
-                      className={`flex flex-col gap-3 rounded-3xl border ${isCritical ? 'border-red-500/20' : 'border-cmd-border'} bg-cmd-black/40 p-4 xl:flex-row xl:items-center xl:justify-between`}
+                      role={onNavigate ? 'button' : undefined}
+                      tabIndex={onNavigate ? 0 : undefined}
+                      onClick={() => onNavigate?.(section.section)}
+                      onKeyDown={(e) => { if (onNavigate && (e.key === 'Enter' || e.key === ' ')) onNavigate(section.section); }}
+                      className={`flex flex-col gap-3 rounded-3xl border ${isCritical ? 'border-red-500/20' : 'border-cmd-border'} bg-cmd-black/40 p-4 xl:flex-row xl:items-center xl:justify-between ${onNavigate ? 'cursor-pointer transition hover:border-cmd-gold/40' : ''}`}
                     >
                       <div className="flex items-center gap-3">
                         <div className="rounded-2xl bg-white/5 p-3 text-cmd-gold">

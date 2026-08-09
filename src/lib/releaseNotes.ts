@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.19.1',
+    date: '2026-08-09',
+    title: 'Offer research that fits in the time it has',
+    items: [
+      'Researching card offers now runs as two shorter steps instead of one long one. The single call was exceeding the server\'s time limit and failing outright; each step now finishes comfortably.',
+      'The button reports which step it is on — searching, then reading what it found.',
+    ],
+  },
+  {
     version: '0.19.0',
     date: '2026-08-09',
     title: 'Rewards strategy, grounded and researched',

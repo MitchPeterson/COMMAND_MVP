@@ -67,6 +67,7 @@ export function CardStrategy({
   cards, statements, transactions, offers, householdId, onChanged,
 }: Props) {
   const [researching, setResearching] = useState(false);
+  const [stage, setStage] = useState<'searching' | 'reading' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<string | null>(null);
 
@@ -78,7 +79,7 @@ export function CardStrategy({
     setError(null);
     setResult(null);
     try {
-      const outcome = await researchCardOffers(householdId);
+      const outcome = await researchCardOffers(householdId, setStage);
       await onChanged();
       setResult(
         outcome.candidates === 0
@@ -89,6 +90,7 @@ export function CardStrategy({
       setError(err instanceof Error ? err.message : 'Could not research offers.');
     } finally {
       setResearching(false);
+      setStage(null);
     }
   };
 
@@ -223,7 +225,9 @@ export function CardStrategy({
 
         {researching && (
           <p className="mt-4 text-sm text-cmd-muted">
-            Running several web searches and reading the pages. This takes a minute or two.
+            {stage === 'reading'
+              ? 'Reading what the search found and checking every figure has a source…'
+              : 'Searching the web and opening the pages. This takes a minute or so…'}
           </p>
         )}
         {result && (

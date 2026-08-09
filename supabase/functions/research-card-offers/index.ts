@@ -197,14 +197,25 @@ Deno.serve(async (req: Request) => {
   const { data: userData, error: userError } = await caller.auth.getUser();
   if (userError || !userData?.user) return json({ error: 'Invalid or expired session' }, 401);
 
-  let body: { household_id?: unknown };
+  let body: { household_id?: unknown; research_id?: unknown };
   try {
     body = await req.json();
   } catch {
     return json({ error: 'Invalid JSON body' }, 400);
   }
+
+  // ── Stage two: normalize an existing search into candidates ────────────────
+  //
+  // The two passes are separate invocations rather than one call, because a
+  // search pass plus a structuring pass plus five web fetches exceeds the edge
+  // wall clock — measured at 150.5s before this split. Each stage now finishes
+  // in well under a minute, and the research row carries the state between them.
+  if (typeof body?.research_id === 'string') {
+    return await structureStage(body.research_id, userData.user.id);
+  }
+
   const householdId = body?.household_id;
-  if (typeof householdId !== 'string') return json({ error: 'Missing household_id' }, 400);
+  if (typeof householdId !== 'string') return json({ error: 'Missing household_id or research_id' }, 400);
 
   const { data: household } = await admin
     .from('households').select('id').eq('id', householdId).eq('user_id', userData.user.id).maybeSingle();
@@ -282,11 +293,11 @@ Deno.serve(async (req: Request) => {
     // half-read pages turn into confident fields.
     const searchStream = anthropic.beta.messages.stream({
       model: anthropicModel,
-      max_tokens: 16000,
+      max_tokens: 12000,
       betas: ['server-side-fallback-2026-07-01'],
       fallbacks: 'default',
-      output_config: { effort: 'high' },
-      tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 8 }],
+      output_config: { effort: 'medium' },
+      tools: [{ type: 'web_search_20260209', name: 'web_search', max_uses: 5 }],
       messages: [{
         role: 'user',
         content:
@@ -295,7 +306,7 @@ Deno.serve(async (req: Request) => {
           `Annual spending by category:\n${spendLines}\n\n` +
           `Cards already held (do not propose these again):\n${heldLines}\n\n` +
           `${RESEARCH_RULES}\n\n` +
-          `Find between three and six cards that fit this spending pattern. For each, report the issuer, ` +
+          `Find three or four cards that fit this spending pattern. For each, report the issuer, ` +
           `the card name, the annual fee, the earn rate for every category it advertises, any current ` +
           `sign-up bonus and what it requires, any introductory APR, notable benefits, and the credit ` +
           `standing it asks for — with the URL you read each one on and the date the page showed. ` +
@@ -315,6 +326,61 @@ Deno.serve(async (req: Request) => {
 
     if (!searchText.trim()) return await fail('The search returned nothing to work from.', 502);
 
+    // Park the raw findings on the research row and hand back. The caller
+    // invokes again with research_id to run the structuring pass.
+    await admin.from('card_offer_research')
+      .update({ search_summary: searchText, searches_run: searchesRun })
+      .eq('id', research.id);
+
+    return json({
+      research_id: research.id,
+      stage: 'searched',
+      searches_run: searchesRun,
+    }, 200);
+  } catch (error) {
+    return await fail(
+      `Research failed: ${error instanceof Error ? error.message : String(error)}`, 502,
+    );
+  }
+});
+
+/**
+ * Stage two. Reads the parked findings, normalizes them against the schema, and
+ * writes the candidates. No tools and no browsing — this pass only reorganizes
+ * text that stage one already gathered, which is why it is fast and why a
+ * half-read page cannot turn into a confident field here.
+ */
+async function structureStage(researchId: string, userId: string): Promise<Response> {
+  const { data: research } = await admin
+    .from('card_offer_research').select('*').eq('id', researchId).maybeSingle();
+  if (!research) return json({ error: 'Research not found' }, 404);
+
+  const { data: household } = await admin
+    .from('households').select('id').eq('id', research.household_id).eq('user_id', userId).maybeSingle();
+  if (!household) return json({ error: 'Research not found' }, 404);
+
+  if (!anthropic) return json({ error: 'Research is not configured: ANTHROPIC_API_KEY is missing.' }, 503);
+
+  const searchText: string = research.search_summary ?? '';
+  if (!searchText.trim()) return json({ error: 'That research run has no findings to normalize.' }, 400);
+
+  const spend: Record<string, number> = research.spend_profile ?? {};
+  const { data: periods } = await admin
+    .from('credit_statements')
+    .select('id')
+    .eq('household_id', research.household_id)
+    .in('review_status', ['confirmed', 'partially_confirmed']);
+  const months = Math.max((periods ?? []).length, 1);
+
+  const failStage = async (message: string, status: number) => {
+    await admin.from('card_offer_research')
+      .update({ status: 'failed', failure_reason: message, completed_at: new Date().toISOString() })
+      .eq('id', researchId);
+    console.error(message);
+    return json({ error: message, research_id: researchId }, status);
+  };
+
+  try {
     // ── Pass 2: structure ────────────────────────────────────────────────────
     const structureStream = anthropic.beta.messages.stream({
       model: anthropicModel,
@@ -350,8 +416,8 @@ Deno.serve(async (req: Request) => {
 
       const estimate = estimateAnnualValue(candidate, spend, months);
       rows.push({
-        research_id: research.id,
-        household_id: householdId,
+        research_id: researchId,
+        household_id: research.household_id,
         issuer,
         card_name: cardName,
         annual_fee: num(candidate.annual_fee),
@@ -376,25 +442,24 @@ Deno.serve(async (req: Request) => {
 
     if (rows.length > 0) {
       const { error: insertError } = await admin.from('card_offer_candidates').insert(rows);
-      if (insertError) return await fail(`Could not save the findings: ${insertError.message}`, 500);
+      if (insertError) return await failStage(`Could not save the findings: ${insertError.message}`, 500);
     }
 
     await admin.from('card_offer_research').update({
       status: 'complete',
       search_summary: text(parsed.summary),
-      searches_run: searchesRun,
       completed_at: new Date().toISOString(),
-    }).eq('id', research.id);
+    }).eq('id', researchId);
 
     return json({
-      research_id: research.id,
+      research_id: researchId,
+      stage: 'complete',
       candidates: rows.length,
-      searches_run: searchesRun,
       dropped_without_source: (parsed.candidates?.length ?? 0) - rows.length,
     }, 200);
   } catch (error) {
-    return await fail(
-      `Research failed: ${error instanceof Error ? error.message : String(error)}`, 502,
+    return await failStage(
+      `Could not normalize the findings: ${error instanceof Error ? error.message : String(error)}`, 502,
     );
   }
-});
+}

@@ -989,6 +989,361 @@ export interface CreditCard {
   rewards_value_ytd: number | null;
   annual_fee: number | null;
   created_at: string;
+  // Added with the statement extraction schema; optional because cards entered
+  // by hand before it do not carry them.
+  institution?: string | null;
+  last_four?: string | null;
+  account_nickname?: string | null;
+  primary_cardholder?: string | null;
+  statement_balance?: number | null;
+  statement_closing_date?: string | null;
+  minimum_payment_due?: number | null;
+  payment_due_date?: string | null;
+  available_credit?: number | null;
+  purchase_apr?: number | null;
+  rewards_balance?: number | null;
+  latest_statement_id?: string | null;
+  last_confirmed_at?: string | null;
+}
+
+/** One reading of one uploaded statement. Raw until confirmed. */
+export interface CreditStatement {
+  id: string;
+  household_id: string;
+  document_id: string;
+  credit_card_id: string | null;
+  institution: string | null;
+  card_product: string | null;
+  account_nickname: string | null;
+  last_four: string | null;
+  primary_cardholder: string | null;
+  statement_opening_date: string | null;
+  statement_closing_date: string | null;
+  payment_due_date: string | null;
+  previous_balance: number | null;
+  payments_and_credits: number | null;
+  purchases: number | null;
+  cash_advances: number | null;
+  balance_transfers: number | null;
+  fees_charged: number | null;
+  interest_charged: number | null;
+  statement_balance: number | null;
+  minimum_payment_due: number | null;
+  past_due_amount: number | null;
+  credit_limit: number | null;
+  available_credit: number | null;
+  current_balance: number | null;
+  annual_fee: number | null;
+  rewards_program: string | null;
+  rewards_beginning_balance: number | null;
+  rewards_earned: number | null;
+  rewards_redeemed: number | null;
+  rewards_ending_balance: number | null;
+  rewards_expiration_note: string | null;
+  processing_state: string;
+  review_status: 'pending_review' | 'confirmed' | 'partially_confirmed' | 'discarded';
+  failure_reason: string | null;
+  match_state: 'unmatched' | 'suggested' | 'confirmed' | 'rejected' | 'conflict';
+  match_confidence: number | null;
+  match_note: string | null;
+  extraction_version: number;
+  created_at: string;
+}
+
+export interface CreditStatementField {
+  id: string;
+  statement_id: string;
+  household_id: string;
+  field_code: string;
+  field_group: string | null;
+  value_text: string | null;
+  value_number: number | null;
+  value_date: string | null;
+  raw_value: string | null;
+  source_page: number | null;
+  source_section: string | null;
+  evidence: string | null;
+  confidence: number | null;
+  value_type: 'explicit' | 'calculated' | 'inferred' | 'unknown';
+  is_sensitive: boolean;
+  review_state: 'unreviewed' | 'confirmed' | 'edited' | 'rejected' | 'unresolved';
+  user_value: string | null;
+}
+
+export interface CreditAprTerm {
+  id: string;
+  statement_id: string;
+  apr_type: 'purchase' | 'cash_advance' | 'balance_transfer' | 'penalty' | 'promotional' | 'other';
+  apr_percent: number | null;
+  is_variable: boolean | null;
+  balance_subject_to_rate: number | null;
+  interest_charged: number | null;
+  promotional_balance: number | null;
+  promotional_expiration_date: string | null;
+  description: string | null;
+  source_page: number | null;
+  evidence: string | null;
+  confidence: number | null;
+}
+
+export interface CreditTransaction {
+  id: string;
+  statement_id: string;
+  household_id: string;
+  credit_card_id: string | null;
+  transaction_date: string | null;
+  posting_date: string | null;
+  merchant_description: string;
+  amount: number | null;
+  direction: 'charge' | 'credit';
+  category: string | null;
+  category_source: 'issuer_provided' | 'ai_classified' | 'user_set';
+  category_confidence: number | null;
+  cardholder: string | null;
+  source_page: number | null;
+  confidence: number | null;
+}
+
+export interface CreditStatementDetail {
+  fields: CreditStatementField[];
+  aprTerms: CreditAprTerm[];
+  transactions: CreditTransaction[];
+}
+
+export async function getCreditStatements(householdId: string): Promise<CreditStatement[]> {
+  const { data, error } = await supabase
+    .from('credit_statements')
+    .select('*')
+    .eq('household_id', householdId)
+    .neq('processing_state', 'deleted')
+    .order('statement_closing_date', { ascending: false, nullsFirst: false });
+  if (error) {
+    console.error('Error fetching credit statements:', error);
+    return [];
+  }
+  return (data ?? []) as CreditStatement[];
+}
+
+export async function getCreditStatementDetail(statementId: string): Promise<CreditStatementDetail> {
+  const [fields, aprTerms, transactions] = await Promise.all([
+    supabase.from('credit_statement_fields').select('*').eq('statement_id', statementId).order('field_code'),
+    supabase.from('credit_apr_terms').select('*').eq('statement_id', statementId).order('apr_type'),
+    supabase.from('credit_transactions').select('*').eq('statement_id', statementId)
+      .order('transaction_date', { ascending: false, nullsFirst: false }),
+  ]);
+  for (const result of [fields, aprTerms, transactions]) {
+    if (result.error) console.error('Error loading statement detail:', result.error);
+  }
+  return {
+    fields: (fields.data ?? []) as CreditStatementField[],
+    aprTerms: (aprTerms.data ?? []) as CreditAprTerm[],
+    transactions: (transactions.data ?? []) as CreditTransaction[],
+  };
+}
+
+export async function reviewCreditField(
+  fieldId: string,
+  decision: ReviewDecision,
+  userValue?: string | null,
+): Promise<boolean> {
+  const patch: Record<string, unknown> = { review_state: decision, reviewed_at: new Date().toISOString() };
+  if (decision === 'edited') patch.user_value = (userValue ?? '').trim() || null;
+  if (decision === 'rejected') patch.user_value = null;
+
+  const { error } = await supabase.from('credit_statement_fields').update(patch).eq('id', fieldId);
+  if (error) {
+    console.error('Failed to record the field decision:', error);
+    throw new Error(`Could not save that decision: ${error.message}`);
+  }
+  return true;
+}
+
+export async function reviewAllCreditFields(statementId: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('credit_statement_fields')
+    .select('id, confidence')
+    .eq('statement_id', statementId)
+    .eq('review_state', 'unreviewed');
+  if (error) throw new Error(`Could not confirm these details: ${error.message}`);
+
+  const targets = (data ?? []).filter((f) => confidenceBand(f.confidence as number | null) !== 'low');
+  if (targets.length === 0) return 0;
+
+  const { error: updateError } = await supabase
+    .from('credit_statement_fields')
+    .update({ review_state: 'confirmed', reviewed_at: new Date().toISOString() })
+    .in('id', targets.map((t) => t.id));
+  if (updateError) throw new Error(`Could not confirm these details: ${updateError.message}`);
+  return targets.length;
+}
+
+export interface CreditMatchCandidate {
+  card: CreditCard;
+  confidence: number;
+  reason: string;
+}
+
+/**
+ * Institution plus last four identifies an account. Either alone does not: a
+ * household can hold two Chase cards, and two issuers can both end in 4021.
+ * A partial match is offered as a question, never applied.
+ */
+export function matchCreditCard(statement: CreditStatement, cards: CreditCard[]): CreditMatchCandidate | null {
+  const institution = (statement.institution ?? '').trim().toLowerCase();
+  const lastFour = (statement.last_four ?? '').trim();
+
+  if (institution && lastFour) {
+    const exact = cards.find(
+      (c) => (c.institution ?? c.issuer ?? '').trim().toLowerCase() === institution && c.last_four === lastFour,
+    );
+    if (exact) return { card: exact, confidence: 0.97, reason: 'Same institution and last four digits.' };
+  }
+  if (lastFour) {
+    const byDigits = cards.filter((c) => c.last_four === lastFour);
+    if (byDigits.length === 1) {
+      return {
+        card: byDigits[0],
+        confidence: 0.6,
+        reason: 'The last four digits match, but the institution on file reads differently. Confirm this is the same card.',
+      };
+    }
+  }
+  if (institution) {
+    const byInstitution = cards.filter(
+      (c) => (c.institution ?? c.issuer ?? '').trim().toLowerCase() === institution,
+    );
+    if (byInstitution.length === 1 && !byInstitution[0].last_four) {
+      return {
+        card: byInstitution[0],
+        confidence: 0.45,
+        reason: 'Same institution, but the card on file has no last four digits recorded. Confirm before linking.',
+      };
+    }
+  }
+  return null;
+}
+
+export interface CreditConfirmationResult {
+  cardId: string;
+  created: boolean;
+  fieldsApplied: number;
+  partial: boolean;
+}
+
+/**
+ * Promotes a reviewed statement onto a card account.
+ *
+ * Only confirmed or edited values travel. The statement's own numbers are
+ * written to statement-scoped columns — `statement_balance`, not
+ * `current_balance` — because a closed period does not tell you what is owed
+ * today, and conflating them would make utilization quietly wrong.
+ *
+ * An older statement never overwrites a newer one's figures.
+ */
+export async function confirmCreditStatement(
+  statement: CreditStatement,
+  targetCardId: string | null,
+): Promise<CreditConfirmationResult> {
+  const { data: fieldRows, error } = await supabase
+    .from('credit_statement_fields')
+    .select('*')
+    .eq('statement_id', statement.id);
+  if (error) throw new Error(`Could not read this statement's fields: ${error.message}`);
+
+  const fields = (fieldRows ?? []) as CreditStatementField[];
+  const accepted = fields.filter((f) => f.review_state === 'confirmed' || f.review_state === 'edited');
+  if (accepted.length === 0) {
+    throw new Error('Nothing has been confirmed yet. Confirm at least one detail before adding this card.');
+  }
+
+  const valueOf = (code: string): string | null => {
+    const hit = accepted.find((f) => f.field_code === code);
+    return hit ? (hit.user_value ?? hit.value_text) : null;
+  };
+  const numberOf = (code: string): number | null => {
+    const raw = valueOf(code);
+    if (raw == null) return null;
+    const parsed = Number(String(raw).replace(/[^0-9.\-]/g, ''));
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  const institution = valueOf('institution') ?? statement.institution;
+  const lastFour = valueOf('last_four') ?? statement.last_four;
+  const closingDate = valueOf('statement_closing_date') ?? statement.statement_closing_date;
+  const limit = numberOf('credit_limit') ?? statement.credit_limit;
+  const balance = numberOf('statement_balance') ?? statement.statement_balance;
+
+  // Utilization from this statement's own limit and balance, marked as of its
+  // closing date rather than presented as today's number.
+  const utilization = limit && limit > 0 && balance != null ? (balance / limit) * 100 : null;
+
+  const cardValues = {
+    household_id: statement.household_id,
+    card_name: valueOf('card_product') ?? statement.card_product ?? 'Credit card',
+    issuer: institution,
+    institution,
+    last_four: lastFour,
+    account_nickname: valueOf('account_nickname') ?? statement.account_nickname,
+    primary_cardholder: valueOf('primary_cardholder') ?? statement.primary_cardholder,
+    credit_limit: limit,
+    available_credit: numberOf('available_credit') ?? statement.available_credit,
+    statement_balance: balance,
+    statement_closing_date: closingDate,
+    minimum_payment_due: numberOf('minimum_payment_due') ?? statement.minimum_payment_due,
+    payment_due_date: valueOf('payment_due_date') ?? statement.payment_due_date,
+    // Only when the statement said so outright.
+    current_balance: numberOf('current_balance') ?? statement.current_balance,
+    utilization_pct: utilization,
+    annual_fee: numberOf('annual_fee') ?? statement.annual_fee,
+    rewards_type: valueOf('rewards_program') ?? statement.rewards_program,
+    rewards_balance: numberOf('rewards_ending_balance') ?? statement.rewards_ending_balance,
+    latest_statement_id: statement.id,
+    source_document_id: statement.document_id,
+    last_confirmed_at: new Date().toISOString(),
+  };
+
+  let cardId = targetCardId;
+  let created = false;
+
+  if (cardId) {
+    const { data: existing } = await supabase
+      .from('credit_cards').select('statement_closing_date').eq('id', cardId).single();
+    const existingDate = existing?.statement_closing_date ?? null;
+    // An older statement contributes history, not a rewrite of the newest figures.
+    const isNewer = !existingDate || !closingDate || closingDate >= existingDate;
+    const patch = isNewer
+      ? cardValues
+      : { institution: cardValues.institution, last_four: cardValues.last_four };
+
+    const { error: updateError } = await supabase.from('credit_cards').update(patch).eq('id', cardId);
+    if (updateError) throw new Error(`Could not update this card: ${updateError.message}`);
+  } else {
+    const { data: inserted, error: insertError } = await supabase
+      .from('credit_cards').insert([cardValues]).select('id').single();
+    if (insertError || !inserted) {
+      throw new Error(`Could not add this card: ${insertError?.message ?? 'no row returned'}`);
+    }
+    cardId = inserted.id;
+    created = true;
+  }
+
+  const unreviewed = fields.filter((f) => f.review_state === 'unreviewed').length;
+  const partial = unreviewed > 0;
+
+  const { error: statementError } = await supabase
+    .from('credit_statements')
+    .update({
+      credit_card_id: cardId,
+      match_state: 'confirmed',
+      review_status: partial ? 'partially_confirmed' : 'confirmed',
+      processing_state: partial ? 'partially_confirmed' : 'confirmed',
+    })
+    .eq('id', statement.id);
+  if (statementError) throw new Error(`Could not link this statement: ${statementError.message}`);
+
+  await supabase.from('credit_transactions').update({ credit_card_id: cardId }).eq('statement_id', statement.id);
+
+  return { cardId: cardId as string, created, fieldsApplied: accepted.length, partial };
 }
 
 // ============================================================

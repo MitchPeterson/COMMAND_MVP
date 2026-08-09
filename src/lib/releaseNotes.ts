@@ -25,6 +25,18 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.18.0',
+    date: '2026-08-09',
+    title: 'Credit card statements, read properly',
+    items: [
+      'Upload a credit card statement and Command reads the whole thing: institution, card, cycle dates, every balance line, each interest rate separately, rewards earned and redeemed, and every transaction.',
+      'Confirm what it read and it creates or updates the card. A second statement for the same card builds history instead of overwriting it, and re-reading the same file never duplicates anything.',
+      'Only the last four digits of a card number are ever stored, and any longer run of digits is redacted before it reaches the database.',
+      'Statement balance and current balance are kept separate — a statement tells you what was owed at its closing date, not what you owe today.',
+      'Transaction categories the issuer printed are marked apart from the ones Command worked out itself.',
+    ],
+  },
+  {
     version: '0.17.0',
     date: '2026-08-09',
     title: 'Credit, graded',

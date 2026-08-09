@@ -1,14 +1,15 @@
 {
   "name": "command-app",
   "private": true,
-  "version": "0.10.0",
+  "version": "0.11.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "release": "node scripts/release.mjs"
+    "release": "node scripts/release.mjs",
+    "check:function": "deno check supabase/functions/extract-document/index.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",

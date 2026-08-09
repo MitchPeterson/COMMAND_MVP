@@ -16,7 +16,8 @@ import {
   typesInCategory,
   type LegalCategory,
 } from '../lib/legalTaxonomy';
-import { AlertTriangle, FileText, Gavel, Info, Scale, ShieldCheck } from 'lucide-react';
+import { LegalDocumentDetail } from '../components/LegalDocumentDetail';
+import { AlertTriangle, ChevronDown, ChevronRight, FileText, Gavel, Info, Scale, ShieldCheck } from 'lucide-react';
 
 function statusLabel(code: string | null | undefined): string {
   return LEGAL_DOCUMENT_STATUSES.find((s) => s.code === code)?.label ?? 'Not stated in the document';
@@ -114,6 +115,7 @@ function TypeCorrector({ extraction, onSaved }: TypeCorrectorProps) {
 
 export function LegalView() {
   const { data, refresh } = useHousehold();
+  const [openId, setOpenId] = useState<string | null>(null);
   const documents = data?.legalDocuments ?? [];
   const extractions = data?.legalExtractions ?? [];
   const flags = data?.legalIssueFlags ?? [];
@@ -275,7 +277,26 @@ export function LegalView() {
                         Reading v{extraction.extraction_version}
                       </span>
                       <TypeCorrector extraction={extraction} onSaved={refresh} />
+                      <button
+                        type="button"
+                        onClick={() => setOpenId((id) => (id === extraction.id ? null : extraction.id))}
+                        className="inline-flex items-center gap-1 rounded-lg border border-cmd-border px-3 py-1.5 text-xs text-cmd-offwhite transition hover:border-cmd-gold hover:text-cmd-gold"
+                      >
+                        {openId === extraction.id ? (
+                          <>
+                            <ChevronDown className="h-3.5 w-3.5" /> Hide what Command read
+                          </>
+                        ) : (
+                          <>
+                            <ChevronRight className="h-3.5 w-3.5" /> See what Command read
+                          </>
+                        )}
+                      </button>
                     </div>
+
+                    {openId === extraction.id && (
+                      <LegalDocumentDetail extraction={extraction} filePath={source?.file_path ?? null} />
+                    )}
                   </div>
                 );
               })}

@@ -457,6 +457,114 @@ export interface LegalIssueFlag {
   created_at: string;
 }
 
+/**
+ * One extracted value with the provenance that makes it checkable. No profile
+ * fact produced by extraction exists without one of these behind it.
+ */
+export interface LegalExtractedField {
+  id: string;
+  extraction_id: string;
+  household_id: string;
+  field_code: string;
+  field_group: string | null;
+  value_text: string | null;
+  value_number: number | null;
+  value_date: string | null;
+  raw_value: string | null;
+  source_page: number | null;
+  source_section: string | null;
+  evidence: string | null;
+  confidence: number | null;
+  value_type: 'explicit' | 'calculated' | 'inferred' | 'unknown';
+  is_sensitive: boolean;
+  review_state: 'unreviewed' | 'confirmed' | 'edited' | 'rejected' | 'unresolved';
+  user_value: string | null;
+}
+
+export interface LegalParty {
+  id: string;
+  extraction_id: string;
+  household_id: string;
+  party_kind: string;
+  name: string;
+  relationship: string | null;
+  address: string | null;
+  matched_family_member_id: string | null;
+  match_confidence: number | null;
+  match_state: 'unmatched' | 'suggested' | 'confirmed' | 'rejected' | 'conflict';
+  match_conflict: string | null;
+  source_page: number | null;
+  evidence: string | null;
+  confidence: number | null;
+}
+
+export interface LegalPartyRole {
+  id: string;
+  party_id: string;
+  extraction_id: string;
+  household_id: string;
+  role_code: string;
+  role_detail: string | null;
+  priority: number | null;
+  acts_jointly: string | null;
+  source_page: number | null;
+  evidence: string | null;
+  confidence: number | null;
+}
+
+export interface LegalProvision {
+  id: string;
+  extraction_id: string;
+  household_id: string;
+  extractor: string;
+  provision_code: string;
+  label: string | null;
+  summary: string | null;
+  document_language: string | null;
+  applies_to: string | null;
+  amount: number | null;
+  percentage: number | null;
+  effective_condition: string | null;
+  is_present: boolean | null;
+  source_page: number | null;
+  source_section: string | null;
+  evidence: string | null;
+  confidence: number | null;
+  value_type: 'explicit' | 'calculated' | 'inferred' | 'unknown';
+  review_state: 'unreviewed' | 'confirmed' | 'edited' | 'rejected' | 'unresolved';
+}
+
+export interface LegalExtractionDetail {
+  fields: LegalExtractedField[];
+  parties: LegalParty[];
+  roles: LegalPartyRole[];
+  provisions: LegalProvision[];
+  flags: LegalIssueFlag[];
+}
+
+/** Everything one reading produced. Loaded on demand — the review screen only. */
+export async function getLegalExtractionDetail(extractionId: string): Promise<LegalExtractionDetail> {
+  const [fields, parties, roles, provisions, flags] = await Promise.all([
+    supabase.from('legal_extracted_fields').select('*').eq('extraction_id', extractionId).order('field_code'),
+    supabase.from('legal_parties').select('*').eq('extraction_id', extractionId).order('name'),
+    supabase.from('legal_party_roles').select('*').eq('extraction_id', extractionId).order('priority'),
+    supabase.from('legal_provisions').select('*').eq('extraction_id', extractionId).order('provision_code'),
+    supabase.from('legal_issue_flags').select('*').eq('extraction_id', extractionId).eq('state', 'open'),
+  ]);
+
+  for (const result of [fields, parties, roles, provisions, flags]) {
+    if (result.error) console.error('Error loading legal extraction detail:', result.error);
+  }
+
+  return {
+    fields: (fields.data ?? []) as LegalExtractedField[],
+    parties: (parties.data ?? []) as LegalParty[],
+    roles: (roles.data ?? []) as LegalPartyRole[],
+    provisions: (provisions.data ?? []) as LegalProvision[],
+    flags: (flags.data ?? []) as LegalIssueFlag[],
+  };
+}
+
 /** Newest reading per document, newest first. */
 export async function getLegalExtractions(householdId: string): Promise<LegalDocumentExtraction[]> {
   const { data, error } = await supabase

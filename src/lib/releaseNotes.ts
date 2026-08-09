@@ -25,6 +25,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.11.0',
+    date: '2026-08-08',
+    title: 'Legal documents, read in full',
+    items: [
+      'Command now reads a legal document end to end: the dates, the jurisdiction, the recording details, everyone named in it and the role each one holds, and the provisions particular to that kind of document.',
+      'Every value shows the page it came from, the wording behind it and how confident Command is. Click through to open the document at that page and check it yourself.',
+      'What Command could not see is stated as plainly as what it could — a missing notarization page is reported as not detected in your copy, never as a judgement about the document.',
+      'Social Security numbers, tax IDs and account numbers are masked on screen until you choose to reveal them.',
+    ],
+  },
+  {
     version: '0.10.0',
     date: '2026-08-08',
     title: 'Legal documents, recognised',

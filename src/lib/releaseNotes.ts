@@ -25,6 +25,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.17.0',
+    date: '2026-08-09',
+    title: 'Credit, graded',
+    items: [
+      'Credit now works like Insurance and Legal: a grade at the top scored against your own limits and income, your cards below it worst-first, and the uploader at the bottom.',
+      'Utilization is checked overall and card by card, balances are weighed against household income, and annual fees are compared against the rewards actually recorded.',
+      'Command is clear about what it cannot see — payment history, account ages and any card you have not told it about are not part of this, and it is not a credit score.',
+      'Scores are whole numbers now.',
+    ],
+  },
+  {
     version: '0.16.0',
     date: '2026-08-09',
     title: 'A health score that tells the truth about a new profile',

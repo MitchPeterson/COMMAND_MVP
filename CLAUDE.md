@@ -172,8 +172,8 @@ These caused repeated Vercel build failures:
 ## Section anatomy
 
 Every pillar section (Insurance, Legal, Home, Finances, Taxes, Family, Credit) reads top to bottom
-in the same order, so the second section a user opens teaches them nothing new. Insurance and Legal
-are the reference implementations; match them.
+in the same order, so the second section a user opens teaches them nothing new. Insurance, Legal and
+Credit are the reference implementations; match them.
 
 1. **The grade leads.** A `<SectionHealth>` card is the first element — letter grade, score out of
    100, plain-language status, assessment confidence, findings, and a "what limits this assessment"

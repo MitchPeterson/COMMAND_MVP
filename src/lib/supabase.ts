@@ -405,6 +405,107 @@ export interface FamilyMember {
   created_at: string;
 }
 
+/**
+ * One model reading of one uploaded legal document. Raw, not canonical: nothing
+ * here reaches `legal_documents` until the user confirms it. Re-running the
+ * extraction adds a version rather than replacing this row.
+ */
+export interface LegalDocumentExtraction {
+  id: string;
+  household_id: string;
+  document_id: string;
+  recognition: 'legal' | 'possibly_legal' | 'not_legal';
+  document_type: string | null;
+  document_subtype: string | null;
+  category: string | null;
+  classification_confidence: number | null;
+  classification_reason: string | null;
+  user_document_type: string | null;
+  user_corrected_at: string | null;
+  document_status: string;
+  document_title: string | null;
+  execution_date: string | null;
+  effective_date: string | null;
+  expiration_date: string | null;
+  governing_jurisdiction: string | null;
+  page_count: number | null;
+  document_language: string | null;
+  plain_language_summary: string | null;
+  processing_state: string;
+  review_status: 'pending_review' | 'confirmed' | 'partially_confirmed' | 'discarded';
+  failure_reason: string | null;
+  extraction_version: number;
+  content_hash: string | null;
+  extractor_version: string | null;
+  model: string | null;
+  created_at: string;
+}
+
+export interface LegalIssueFlag {
+  id: string;
+  household_id: string;
+  extraction_id: string | null;
+  flag_code: string;
+  severity: 'informational' | 'worth_reviewing' | 'significant';
+  confidence: number | null;
+  explanation: string;
+  suggested_action: string | null;
+  attorney_review_suggested: boolean;
+  source_page: number | null;
+  evidence: string | null;
+  state: 'open' | 'acknowledged' | 'resolved' | 'dismissed';
+  created_at: string;
+}
+
+/** Newest reading per document, newest first. */
+export async function getLegalExtractions(householdId: string): Promise<LegalDocumentExtraction[]> {
+  const { data, error } = await supabase
+    .from('legal_document_extractions')
+    .select('*')
+    .eq('household_id', householdId)
+    .neq('processing_state', 'deleted')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching legal extractions:', error);
+    return [];
+  }
+  return (data ?? []) as LegalDocumentExtraction[];
+}
+
+export async function getLegalIssueFlags(householdId: string): Promise<LegalIssueFlag[]> {
+  const { data, error } = await supabase
+    .from('legal_issue_flags')
+    .select('*')
+    .eq('household_id', householdId)
+    .eq('state', 'open')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching legal issue flags:', error);
+    return [];
+  }
+  return (data ?? []) as LegalIssueFlag[];
+}
+
+/**
+ * The user's correction of a misclassified document. It is recorded alongside
+ * the model's answer, never over it — what Command thought and what the user
+ * says stay separately inspectable, and the reason text keeps making sense.
+ */
+export async function correctLegalDocumentType(extractionId: string, typeCode: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('legal_document_extractions')
+    .update({ user_document_type: typeCode, user_corrected_at: new Date().toISOString() })
+    .eq('id', extractionId);
+
+  if (error) {
+    console.error('Failed to correct the document type:', error);
+    throw new Error(`Could not change the document type: ${error.message}`);
+  }
+  return true;
+}
+
 export interface FamilyMilestone {
   id: string;
   family_member_id: string;

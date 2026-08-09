@@ -681,6 +681,8 @@ async function loadLegalTypes(): Promise<any[]> {
     .not('category', 'eq', 'unclassified')
     .order('sort_order');
   if (error) {
+    // Not fatal. An absent table means the legal migration has not been applied;
+    // the caller stands the legal branch down instead of erroring the upload.
     console.error('Could not load legal_document_types:', error.message);
     return [];
   }
@@ -1528,7 +1530,16 @@ Deno.serve(async (req: Request) => {
     // Legal documents. Insurance wins the tie — a title policy attached to a
     // homeowners binder is still handled by the insurance path — so this runs
     // only when the document is not insurance.
-    if (classification.legal_recognition === 'legal' || classification.legal_recognition === 'possibly_legal') {
+    //
+    // An empty registry means the legal migration has not been applied to this
+    // project yet. Migrations and function deploys are both manual here and can
+    // land in either order, so the branch stands down rather than failing every
+    // legal upload against tables that do not exist. The document still gets
+    // read by the generic path and the file is untouched either way.
+    if (
+      legalTypes.length > 0 &&
+      (classification.legal_recognition === 'legal' || classification.legal_recognition === 'possibly_legal')
+    ) {
       const resolved = resolveLegalType(classification.legal_type, legalTypes);
 
       // Duplicate detection works off the bytes, not the file name: the same

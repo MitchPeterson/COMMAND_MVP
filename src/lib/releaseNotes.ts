@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.10.0',
+    date: '2026-08-08',
+    title: 'Legal documents, recognised',
+    items: [
+      'Upload a will, trust, power of attorney, healthcare directive, deed or business agreement from the Legal section and Command tells you what it is — with the reason it thinks so and how confident it is.',
+      'Fifty-odd legal document types across five categories. When Command is not sure, it says so, keeps the file exactly as uploaded, and lets you set the type yourself.',
+      'Identical re-uploads are recognised as duplicates rather than filed twice, and re-reading a document adds a new version instead of overwriting the last one.',
+    ],
+  },
+  {
     version: '0.9.0',
     date: '2026-08-08',
     title: 'A profile you can edit',

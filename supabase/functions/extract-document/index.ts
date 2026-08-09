@@ -52,6 +52,10 @@ const LEGACY_TYPES = [
 
 const VALUE_TYPES = ['explicit', 'calculated', 'inferred', 'unknown'];
 
+// Stamped on every extraction row. Bump it when a prompt or schema changes in a
+// way that would make an old reading and a new one incomparable.
+const EXTRACTOR_VERSION = 'legal-2026.08.08-classify';
+
 // Canonical coverage vocabulary. Deliberately NOT a schema enum — ~60 values
 // blew the compiled-grammar budget. The model writes a loose code, we canonicalise
 // here, and insurance_coverages.coverage_code is free text by design.
@@ -294,6 +298,16 @@ const TERMS_SCHEMA = {
   additionalProperties: false,
 };
 
+const LEGAL_RECOGNITION = ['legal', 'possibly_legal', 'not_legal'];
+
+const LEGAL_DOCUMENT_STATUSES = [
+  'draft', 'executed', 'amended', 'revoked', 'expired', 'recorded', 'certified_copy', 'unknown',
+];
+
+// legal_type is a plain string, not an enum: the taxonomy is fifty-odd codes and
+// lives in the legal_document_types table, which is also what validates the
+// answer. Enumerating it in the grammar would repeat the mistake that made the
+// first insurance schema unshippable. The codes go in the prompt instead.
 const CLASSIFY_SCHEMA = {
   type: 'object',
   properties: {
@@ -302,10 +316,49 @@ const CLASSIFY_SCHEMA = {
     insurance_type: { type: 'string', enum: INSURANCE_TYPES },
     legacy_type: { type: 'string', enum: LEGACY_TYPES },
     confidence: { type: 'string', enum: ['high', 'medium', 'low'] },
+
+    // Legal classification. recognition is a separate judgement from type: a
+    // document can be plainly legal and of an uncertain type, and the review
+    // screen has to be able to say exactly that.
+    legal_recognition: { type: 'string', enum: LEGAL_RECOGNITION },
+    legal_type: { type: 'string' },
+    legal_subtype: { type: 'string' },
+    legal_confidence: { type: 'number' },
+    legal_reason: { type: 'string' },
+    document_title: { type: 'string' },
+    document_status: { type: 'string', enum: LEGAL_DOCUMENT_STATUSES },
+    page_count: { type: 'number' },
+    document_language: { type: 'string' },
   },
-  required: ['is_insurance', 'document_class', 'insurance_type', 'legacy_type', 'confidence'],
+  required: [
+    'is_insurance', 'document_class', 'insurance_type', 'legacy_type', 'confidence',
+    'legal_recognition', 'legal_type', 'legal_subtype', 'legal_confidence', 'legal_reason',
+    'document_title', 'document_status', 'page_count', 'document_language',
+  ],
   additionalProperties: false,
 };
+
+const LEGAL_CLASSIFY_RULES = `
+Legal classification rules:
+
+1. legal_recognition is "legal" only when the document is itself a legal instrument
+   or record — a will, trust, deed, court order, power of attorney, agreement.
+   A letter *about* a legal matter is "possibly_legal". A bank statement is "not_legal".
+2. legal_type must be one of the codes listed above, copied exactly. If none of them
+   fits, return "unknown_legal_document" — never invent a code and never force a
+   near-miss. An honest unknown is more useful than a confident mistake.
+3. legal_subtype is free text for a jurisdiction or form variant when the document
+   states one ("Minnesota statutory short form"). Empty string when it does not.
+4. legal_confidence is 0 to 1 for the *type*, independent of recognition.
+5. legal_reason is one sentence naming what in the document decided it — a title,
+   a recital, a signature block. This is shown to the user.
+6. document_status reports what the document says about itself: "draft" if it is
+   marked draft, "recorded" if it carries recording detail, "executed" if it is
+   signed and dated. Use "unknown" when the pages do not say. This is never a
+   judgement about whether the document is valid or effective.
+7. document_title is the document's own title, verbatim. Empty string if untitled.
+8. page_count is the number of pages provided. 0 if you cannot tell.
+`.trim();
 
 const GENERIC_FIELDS = [
   'lender', 'interest_rate', 'monthly_payment', 'escrow_balance', 'carrier',
@@ -359,6 +412,52 @@ Ground rules, in priority order:
 10. No recommendations or advice. Extract facts; the recommendation layer runs later
     with household context this document does not have.
 `.trim();
+
+// deno-lint-ignore no-explicit-any
+let legalTypeCache: any[] | null = null;
+
+/**
+ * The taxonomy, read from the database rather than duplicated here. The table is
+ * seeded from src/lib/legalTaxonomy.ts, so the app, the prompt and the validator
+ * cannot drift apart — and a new document type ships as a row without touching
+ * this function.
+ */
+// deno-lint-ignore no-explicit-any
+async function loadLegalTypes(): Promise<any[]> {
+  if (legalTypeCache) return legalTypeCache;
+  const { data, error } = await admin
+    .from('legal_document_types')
+    .select('code, label, category, extractor')
+    .eq('is_active', true)
+    .not('category', 'eq', 'unclassified')
+    .order('sort_order');
+  if (error) {
+    console.error('Could not load legal_document_types:', error.message);
+    return [];
+  }
+  legalTypeCache = data ?? [];
+  return legalTypeCache;
+}
+
+/**
+ * Validates the model's type against the registry. Anything unrecognised becomes
+ * unknown_legal_document: the document is kept, the user is told what Command
+ * thought and why, and they can set the type themselves. Guessing a near-miss
+ * would put a quitclaim deed in the wills pile and look authoritative doing it.
+ */
+// deno-lint-ignore no-explicit-any
+function resolveLegalType(raw: unknown, types: any[]): { code: string; category: string } {
+  const value = String(raw ?? '').trim().toLowerCase().replace(/\s+/g, '_');
+  const hit = types.find((t) => t.code === value);
+  if (hit) return { code: hit.code, category: hit.category };
+  return { code: 'unknown_legal_document', category: 'unclassified' };
+}
+
+function clamp01(value: unknown): number | null {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.min(Math.max(parsed, 0), 1);
+}
 
 function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
@@ -692,16 +791,21 @@ Deno.serve(async (req: Request) => {
   try {
     // Pass 1 — classify before extracting. A quote must not be filed as an active
     // policy, and an ID card must not be treated as a coverage source.
+    const legalTypes = await loadLegalTypes();
     const classification = await callClaude(
       content,
       `Classify this document. File name: ${document.name}\n\n` +
       `is_insurance is true only for insurance documents. document_class distinguishes a ` +
       `declarations page from a full contract, a quote, a renewal notice, an ID card, and so on — ` +
       `be precise, later processing depends on it. If not insurance, set legacy_type to the closest ` +
-      `financial-document category.`,
+      `financial-document category.\n\n` +
+      `Legal document type codes (copy one exactly into legal_type):\n` +
+      `${legalTypes.map((t) => `  ${t.code} — ${t.label}`).join('\n')}\n` +
+      `  unknown_legal_document — a legal document none of the above describes\n\n` +
+      `${LEGAL_CLASSIFY_RULES}`,
       CLASSIFY_SCHEMA,
       'low',
-      1024,
+      2048,
     );
 
     if (classification.is_insurance) {
@@ -832,6 +936,119 @@ Deno.serve(async (req: Request) => {
           has_full_policy: q.has_full_policy === true,
           limitations: q.limitations_summary ?? '',
         },
+      }, 200);
+    }
+
+    // Legal documents. Insurance wins the tie — a title policy attached to a
+    // homeowners binder is still handled by the insurance path — so this runs
+    // only when the document is not insurance.
+    if (classification.legal_recognition === 'legal' || classification.legal_recognition === 'possibly_legal') {
+      const resolved = resolveLegalType(classification.legal_type, legalTypes);
+
+      // Duplicate detection works off the bytes, not the file name: the same
+      // will uploaded twice under two names is one document, and a renamed
+      // scan is not a new version of anything.
+      const digest = await crypto.subtle.digest('SHA-256', bytes);
+      const contentHash = Array.from(new Uint8Array(digest))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+
+      const { data: priorVersions } = await admin
+        .from('legal_document_extractions')
+        .select('id, extraction_version')
+        .eq('document_id', document.id)
+        .order('extraction_version', { ascending: false })
+        .limit(1);
+      const previous = priorVersions?.[0] ?? null;
+
+      // Reprocessing adds a version rather than overwriting one, so the earlier
+      // reading — and anything the user already confirmed against it — survives.
+      const { data: inserted, error: insertError } = await admin
+        .from('legal_document_extractions')
+        .insert([{
+          household_id: document.household_id,
+          document_id: document.id,
+          recognition: classification.legal_recognition,
+          document_type: resolved.code,
+          document_subtype: text(classification.legal_subtype),
+          category: resolved.category,
+          classification_confidence: clamp01(classification.legal_confidence),
+          classification_reason: text(classification.legal_reason),
+          document_status: LEGAL_DOCUMENT_STATUSES.includes(classification.document_status)
+            ? classification.document_status
+            : 'unknown',
+          document_title: text(classification.document_title),
+          page_count: num(classification.page_count),
+          document_language: text(classification.document_language),
+          processing_state: 'needs_review',
+          review_status: 'pending_review',
+          extraction_version: (previous?.extraction_version ?? 0) + 1,
+          supersedes_extraction_id: previous?.id ?? null,
+          content_hash: contentHash,
+          extractor_version: EXTRACTOR_VERSION,
+          model: anthropicModel,
+        }])
+        .select('id')
+        .single();
+
+      if (insertError || !inserted) {
+        return await failDocument(
+          `Could not record the legal classification: ${insertError?.message ?? 'no row returned'}`, 500,
+        );
+      }
+
+      // Duplicate of an earlier upload — proposed, never applied. Which copy
+      // controls is the user's call, not an artefact of upload order.
+      const { data: sameContent } = await admin
+        .from('legal_document_extractions')
+        .select('id')
+        .eq('household_id', document.household_id)
+        .eq('content_hash', contentHash)
+        .neq('document_id', document.id)
+        .limit(1);
+
+      if (sameContent && sameContent.length > 0) {
+        await admin.from('legal_document_relationships').insert([{
+          household_id: document.household_id,
+          from_extraction_id: inserted.id,
+          to_extraction_id: sameContent[0].id,
+          relationship: 'duplicate_of',
+          rationale: 'The file contents are byte-for-byte identical to a document already uploaded.',
+          confidence: 1,
+          state: 'suggested',
+        }]);
+      }
+
+      if (resolved.code === 'unknown_legal_document') {
+        await admin.from('legal_issue_flags').insert([{
+          household_id: document.household_id,
+          extraction_id: inserted.id,
+          flag_code: 'type_not_recognised',
+          severity: 'worth_reviewing',
+          confidence: clamp01(classification.legal_confidence),
+          explanation:
+            'Command could not match this document to a type it knows. It has been kept exactly as ' +
+            'uploaded and nothing has been added to your profile.',
+          suggested_action: 'Set the document type yourself and Command will read it properly.',
+        }]);
+      }
+
+      // Group it in the vault, but never override a category the user chose.
+      if (!document.category || document.category === 'general') {
+        await admin.from('documents').update({ category: 'legal' }).eq('id', document.id);
+      }
+      await admin.from('documents').update({ status: 'processed' }).eq('id', document.id);
+
+      return json({
+        document_id: document.id,
+        mode: 'legal',
+        extraction_id: inserted.id,
+        recognition: classification.legal_recognition,
+        document_type: resolved.code,
+        category: resolved.category,
+        classification_confidence: clamp01(classification.legal_confidence),
+        duplicate_of: sameContent?.[0]?.id ?? null,
+        extraction_version: (previous?.extraction_version ?? 0) + 1,
       }, 200);
     }
 

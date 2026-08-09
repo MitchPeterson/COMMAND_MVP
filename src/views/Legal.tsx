@@ -18,7 +18,7 @@ import {
 } from '../lib/legalTaxonomy';
 import { LegalDocumentDetail } from '../components/LegalDocumentDetail';
 import { LegalHealth } from '../components/LegalHealth';
-import { AlertTriangle, ChevronDown, ChevronRight, FileText, Gavel, Info, Scale, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, FileText, Gavel, Info, ShieldCheck } from 'lucide-react';
 
 function statusLabel(code: string | null | undefined): string {
   return LEGAL_DOCUMENT_STATUSES.find((s) => s.code === code)?.label ?? 'Not stated in the document';
@@ -133,24 +133,8 @@ export function LegalView() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-8 shadow-sm shadow-black/10">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Legal documents</p>
-            <h1 className="mt-3 text-3xl font-semibold text-cmd-offwhite">Legal</h1>
-          </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-cmd-border bg-cmd-black/50 px-4 py-2 text-sm text-cmd-muted">
-            <Gavel className="h-4 w-4" /> {extractions.length + documents.length} document
-            {extractions.length + documents.length === 1 ? '' : 's'}
-          </div>
-        </div>
-        <p className="mt-6 flex items-start gap-2 text-xs text-cmd-muted/80">
-          <Scale className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-          Command organizes and reads your documents. It does not give legal advice, and nothing here
-          says whether a document is valid or currently in force — an attorney does that.
-        </p>
-      </section>
-
+      {/* The grade leads, as coverage does on Insurance. The upload is a means to
+          it, not the point of the page. */}
       <LegalHealth
         extractions={extractions}
         documents={documents}
@@ -158,19 +142,6 @@ export function LegalView() {
         familyMembers={data?.familyMembers ?? []}
         assets={data?.assets ?? []}
       />
-
-      <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
-        <UploadDropzone
-          contextLabel="Add a legal document"
-          buttonLabel="Upload a will, trust, directive or deed"
-          onUpload={async (file) => {
-            if (!data?.household?.id) return;
-            const document = await uploadDocumentAsset(data.household.id, file, 'legal');
-            await invokeDocumentExtraction(document.id);
-            await refresh();
-          }}
-        />
-      </section>
 
       {flags.length > 0 && (
         <section className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-6">
@@ -196,6 +167,11 @@ export function LegalView() {
           </ul>
         </section>
       )}
+
+      <div className="flex items-center gap-2 px-1">
+        <Gavel className="h-4 w-4 text-cmd-gold" />
+        <h2 className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Your documents</h2>
+      </div>
 
       {extractions.length === 0 ? (
         <section className="rounded-3xl border border-dashed border-cmd-border bg-cmd-black/50 p-8 text-center">
@@ -356,6 +332,20 @@ export function LegalView() {
           </div>
         </section>
       )}
+
+      {/* Demoted: still one click away, no longer the headline. */}
+      <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
+        <UploadDropzone
+          contextLabel="Add a legal document"
+          buttonLabel="Upload a will, trust, directive or deed"
+          onUpload={async (file) => {
+            if (!data?.household?.id) return;
+            const document = await uploadDocumentAsset(data.household.id, file, 'legal');
+            await invokeDocumentExtraction(document.id);
+            await refresh();
+          }}
+        />
+      </section>
     </div>
   );
 }

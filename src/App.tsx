@@ -104,7 +104,7 @@ function App() {
   const renderView = () => {
     switch (activeView) {
       case 'dashboard':
-        return <DashboardView />;
+        return <DashboardView onNavigate={setActiveView} />;
       case 'insurance':
         return <InsuranceView />;
       case 'legal':
@@ -124,7 +124,7 @@ function App() {
       case 'profile':
         return <ProfileView />;
       default:
-        return <DashboardView />;
+        return <DashboardView onNavigate={setActiveView} />;
     }
   };
 

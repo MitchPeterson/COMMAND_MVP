@@ -236,6 +236,18 @@ export interface LegalDocument {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  // Added with the legal extraction schema. Optional because rows written before
+  // that migration — and by onboarding — do not carry them.
+  document_type?: string | null;
+  document_subtype?: string | null;
+  category?: string | null;
+  execution_date?: string | null;
+  effective_date?: string | null;
+  expiration_date?: string | null;
+  governing_jurisdiction?: string | null;
+  document_status?: string | null;
+  source_document_id?: string | null;
+  source_extraction_id?: string | null;
 }
 
 export type AssetType = 'real_estate' | 'vehicle' | 'investment' | 'retirement' | 'business' | 'other';
@@ -1599,7 +1611,7 @@ export async function updateFamilyMember(
     console.error('Failed to update family member:', error);
     throw new Error(`Could not save this person: ${error.message}`);
   }
-  // Re-labelling the only spouse as something else vacates the role the same way
+  // Re-labeling the only spouse as something else vacates the role the same way
   // deleting them would.
   const vacated =
     previous && input.relationship !== undefined && previous.relationship !== input.relationship
@@ -1624,7 +1636,7 @@ export async function deleteFamilyMember(householdId: string, member: FamilyMemb
 }
 
 /**
- * household_profile carries denormalised copies of the household's people —
+ * household_profile carries denormalized copies of the household's people —
  * `partner_name`, `spouse_first_name`, `num_children` — which onboarding wrote
  * once and nothing has updated since. Scoring and the dashboard read them, so
  * every write to family_members reconciles them here.

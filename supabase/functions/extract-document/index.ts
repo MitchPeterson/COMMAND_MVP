@@ -57,7 +57,7 @@ const VALUE_TYPES = ['explicit', 'calculated', 'inferred', 'unknown'];
 const EXTRACTOR_VERSION = 'legal-2026.08.08-extract';
 
 // Canonical coverage vocabulary. Deliberately NOT a schema enum — ~60 values
-// blew the compiled-grammar budget. The model writes a loose code, we canonicalise
+// blew the compiled-grammar budget. The model writes a loose code, we canonicalize
 // here, and insurance_coverages.coverage_code is free text by design.
 const COVERAGE_CODE_ALIASES: Record<string, string> = {
   'coverage_a': 'dwelling', 'coverage a': 'dwelling', 'dwelling': 'dwelling',
@@ -602,7 +602,7 @@ Ground rules, in priority order:
 7. Dates are YYYY-MM-DD. Amounts are digits only: "250000.00". Percentages are
    numbers without the sign: "33.3".
 8. Mark is_sensitive true for Social Security numbers, tax IDs, account numbers
-   and driver's licence numbers, and keep the evidence excerpt for those short.
+   and driver's license numbers, and keep the evidence excerpt for those short.
 9. A person named several ways in one document is one party. Merge them, keep the
    fullest form as name, and record each distinct role separately.
 10. Where two provisions conflict, record both and describe the conflict. Do not
@@ -689,7 +689,7 @@ async function loadLegalTypes(): Promise<any[]> {
 }
 
 /**
- * Validates the model's type against the registry. Anything unrecognised becomes
+ * Validates the model's type against the registry. Anything unrecognized becomes
  * unknown_legal_document: the document is kept, the user is told what Command
  * thought and why, and they can set the type themselves. Guessing a near-miss
  * would put a quitclaim deed in the wills pile and look authoritative doing it.

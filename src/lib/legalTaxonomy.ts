@@ -453,7 +453,7 @@ export const LEGAL_DOCUMENT_TYPES: LegalDocumentType[] = [
   // ── Unclassified ───────────────────────────────────────────────────────────
   {
     code: 'unknown_legal_document',
-    label: 'Unrecognised legal document',
+    label: 'Unrecognized legal document',
     category: 'unclassified',
     extractor: 'generic',
     hint: 'Kept exactly as uploaded. Tell Command what it is and it will read it properly.',
@@ -490,7 +490,7 @@ export function legalType(code: string | null | undefined): LegalDocumentType | 
 }
 
 export function legalTypeLabel(code: string | null | undefined): string {
-  return legalType(code)?.label ?? 'Unrecognised legal document';
+  return legalType(code)?.label ?? 'Unrecognized legal document';
 }
 
 export function legalCategoryLabel(category: string | null | undefined): string {

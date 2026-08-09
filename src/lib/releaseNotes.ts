@@ -25,6 +25,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.15.0',
+    date: '2026-08-09',
+    title: 'A dashboard that points at the work',
+    items: [
+      'Action items are now ranked by what actually matters — live findings from your coverage and legal documents, merged with your saved actions, ordered by severity and value. Stale items the current data has overtaken drop off.',
+      'Each action links straight to the section that resolves it.',
+      'Anything waiting on you is listed by document name, and clicking it opens that document\'s review directly rather than dropping you at the top of a page.',
+      'Document upload moved to the bottom of the dashboard. The summary comes first.',
+    ],
+  },
+  {
     version: '0.14.0',
     date: '2026-08-09',
     title: 'One shape for every section',

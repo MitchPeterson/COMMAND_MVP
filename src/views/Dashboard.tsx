@@ -5,6 +5,7 @@ import { DocumentExtractionReview } from '../components/DocumentExtractionReview
 import { uploadDocumentAsset, invokeDocumentExtraction } from '../lib/supabase';
 import { computeCoverageHealth } from '../lib/coverageHealth';
 import { computeLegalHealth } from '../lib/legalHealth';
+import { buildPriorityActions, type RankedAction, type RankedSeverity } from '../lib/priorityActions';
 import {
   Shield,
   FileText,
@@ -16,6 +17,7 @@ import {
   Calendar,
   Clock,
   AlertTriangle,
+  ArrowRight,
 } from 'lucide-react';
 
 const severityOrder = ['critical', 'high', 'medium', 'low'] as const;
@@ -75,7 +77,8 @@ function getScoreState(score: number | null | undefined) {
 }
 
 interface DashboardProps {
-  onNavigate?: (view: string) => void;
+  /** `focusId` deep-links to one record inside the section, not just the page. */
+  onNavigate?: (view: string, focusId?: string) => void;
 }
 
 export function DashboardView({ onNavigate }: DashboardProps) {
@@ -158,23 +161,24 @@ export function DashboardView({ onNavigate }: DashboardProps) {
     return Math.round((total / sectionScores.length) * 10) / 10;
   }, [sectionScores, data?.household?.health_score]);
 
-  const priorityActions = useMemo(
-    () => (data?.priorityActions ?? []).filter((item) => item.status !== 'dismissed'),
-    [data?.priorityActions]
+  // Ranked, not merely listed: the stored rows are onboarding-era and the live
+  // findings know what is true now, so they are merged and ordered by impact.
+  const rankedActions = useMemo(
+    () => buildPriorityActions(data?.priorityActions ?? [], coverage, legal),
+    [data?.priorityActions, coverage, legal],
   );
 
+  // Only the top of the list gets read. Showing forty items is the same as
+  // showing none.
+  const TOP_ACTIONS = 6;
+  const topActions = rankedActions.slice(0, TOP_ACTIONS);
+  const remainingActions = rankedActions.length - topActions.length;
+
   const groupedPriorities = useMemo(() => {
-    const groups: Record<string, typeof priorityActions> = {
-      critical: [],
-      high: [],
-      medium: [],
-      low: [],
-    };
-    priorityActions.forEach((item) => {
-      groups[item.severity]?.push(item);
-    });
+    const groups: Record<string, RankedAction[]> = { critical: [], high: [], medium: [], low: [] };
+    topActions.forEach((item) => { groups[item.severity]?.push(item); });
     return groups;
-  }, [priorityActions]);
+  }, [topActions]);
 
   const timelineEvents = useMemo(() => {
     const today = new Date();
@@ -195,7 +199,7 @@ export function DashboardView({ onNavigate }: DashboardProps) {
   }, [data?.timelineEvents]);
 
   const scoreState = getScoreState(healthScore);
-  const openPriorityCount = priorityActions.length;
+  const openPriorityCount = rankedActions.length;
 
   return (
     <div className="min-h-screen bg-cmd-black p-6 text-cmd-offwhite">
@@ -259,24 +263,28 @@ export function DashboardView({ onNavigate }: DashboardProps) {
                     {awaitingReview.processing.length} document{awaitingReview.processing.length === 1 ? ' is' : 's are'} still being read.
                   </p>
                 )}
-                {awaitingReview.legalPending.length > 0 && (
+                {[...awaitingReview.legalPending, ...awaitingReview.legalPartial].map((extraction) => (
                   <button
+                    key={extraction.id}
                     type="button"
-                    onClick={() => onNavigate?.('legal')}
-                    className="w-full rounded-2xl border border-cmd-border bg-cmd-black/40 px-4 py-3 text-left text-sm text-cmd-offwhite transition hover:border-cmd-gold/40"
+                    onClick={() => onNavigate?.('legal', extraction.id)}
+                    className="flex w-full items-center justify-between gap-3 rounded-2xl border border-cmd-border bg-cmd-black/40 px-4 py-3 text-left text-sm text-cmd-offwhite transition hover:border-cmd-gold/40"
                   >
-                    {awaitingReview.legalPending.length} legal document{awaitingReview.legalPending.length === 1 ? '' : 's'} read and waiting for your review — nothing is on your profile until you confirm.
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">
+                        {extraction.document_title || 'Untitled legal document'}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-cmd-muted">
+                        {extraction.review_status === 'partially_confirmed'
+                          ? 'Some details are still waiting on you'
+                          : 'Read and waiting for your review — nothing reaches your profile until you confirm'}
+                      </span>
+                    </span>
+                    <span className="inline-flex shrink-0 items-center gap-1 text-xs text-cmd-gold">
+                      Review <ArrowRight className="h-3 w-3" />
+                    </span>
                   </button>
-                )}
-                {awaitingReview.legalPartial.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => onNavigate?.('legal')}
-                    className="w-full rounded-2xl border border-cmd-border bg-cmd-black/40 px-4 py-3 text-left text-sm text-cmd-offwhite transition hover:border-cmd-gold/40"
-                  >
-                    {awaitingReview.legalPartial.length} legal document{awaitingReview.legalPartial.length === 1 ? ' has' : 's have'} details you left for later.
-                  </button>
-                )}
+                ))}
                 {awaitingReview.insurancePending.length > 0 && (
                   <button
                     type="button"
@@ -300,30 +308,6 @@ export function DashboardView({ onNavigate }: DashboardProps) {
           )}
 
           <section className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-6">
-            <UploadDropzone
-              contextLabel="Global document upload"
-              buttonLabel="Add a document"
-              className="mb-6"
-              onUpload={async (file) => {
-                if (!data?.household?.id) return;
-                const document = await uploadDocumentAsset(data.household.id, file, 'general');
-                await invokeDocumentExtraction(document.id);
-                await refresh();
-              }}
-            />
-            <DocumentExtractionReview
-              householdId={data?.household?.id ?? ''}
-              extractions={(data?.documentExtractions ?? []).filter(
-                // Insurance documents are reviewed on the Insurance page against the
-                // full extraction. Showing the compatibility row here too gave two
-                // routes to confirm the same document, creating duplicate policies.
-                (extraction) =>
-                  !(data?.insuranceExtractions ?? []).some(
-                    (insurance) => insurance.document_id === extraction.document_id,
-                  ),
-              )}
-              onChange={refresh}
-            />
             <div className="mb-6 flex items-center justify-between">
               <div>
                 <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Section status</p>
@@ -398,7 +382,7 @@ export function DashboardView({ onNavigate }: DashboardProps) {
               </div>
             ) : (
               <div className="space-y-4">
-                {severityOrder.map((severity) => {
+                {severityOrder.map((severity: RankedSeverity) => {
                   const items = groupedPriorities[severity] ?? [];
                   if (!items.length) return null;
                   const { label, accent } = severityLabels[severity];
@@ -411,25 +395,44 @@ export function DashboardView({ onNavigate }: DashboardProps) {
                       <div className="space-y-3">
                         {items.map((item) => (
                           <div key={item.id} className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-4">
-                            <div className="mb-3 flex items-center justify-between gap-4">
+                            <div className="mb-3 flex items-start justify-between gap-4">
                               <div className="text-sm font-semibold text-cmd-offwhite">{item.title}</div>
-                              <div className="font-mono text-xs uppercase tracking-[0.2em] text-cmd-muted">
-                                {formatDateLabel(item.due_date)}
-                              </div>
+                              {item.dueDate && (
+                                <div className="shrink-0 font-mono text-xs uppercase tracking-[0.2em] text-cmd-muted">
+                                  {formatDateLabel(item.dueDate)}
+                                </div>
+                              )}
                             </div>
-                            <p className="text-sm leading-6 text-cmd-muted">{item.description ?? 'No additional detail available.'}</p>
-                            {item.estimated_value != null ? (
+                            <p className="text-sm leading-6 text-cmd-muted">{item.detail || 'No additional detail available.'}</p>
+                            {item.attorneyReview && (
+                              <p className="mt-2 text-xs text-cmd-gold">An attorney is the right person to answer this one.</p>
+                            )}
+                            {item.estimatedValue != null ? (
                               <div className="mt-4 flex items-center justify-between rounded-3xl bg-white/5 px-4 py-3 text-sm">
                                 <span className="text-cmd-gold">Estimated value</span>
-                                <span className="font-mono text-cmd-offwhite">${item.estimated_value.toLocaleString()}</span>
+                                <span className="font-mono text-cmd-offwhite">${item.estimatedValue.toLocaleString()}</span>
                               </div>
                             ) : null}
+                            {item.section && onNavigate && (
+                              <button
+                                type="button"
+                                onClick={() => onNavigate(item.section as string)}
+                                className="mt-3 inline-flex items-center gap-1 text-xs text-cmd-gold transition hover:underline"
+                              >
+                                Open {sectionLabels[item.section] ?? item.section} <ArrowRight className="h-3 w-3" />
+                              </button>
+                            )}
                           </div>
                         ))}
                       </div>
                     </div>
                   );
                 })}
+                {remainingActions > 0 && (
+                  <p className="pt-1 text-xs text-cmd-muted/70">
+                    {remainingActions} lower-priority item{remainingActions === 1 ? '' : 's'} not shown.
+                  </p>
+                )}
               </div>
             )}
           </section>
@@ -471,6 +474,38 @@ export function DashboardView({ onNavigate }: DashboardProps) {
           </section>
         </div>
       </div>
+
+      {/* Demoted, as on every section page: uploading is a means to the summary
+          above, not the thing a dashboard is for. */}
+      <section className="mt-6 rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
+        <UploadDropzone
+          contextLabel="Global document upload"
+          buttonLabel="Add a document"
+          className="mb-6"
+          onUpload={async (file) => {
+            if (!data?.household?.id) return;
+            const document = await uploadDocumentAsset(data.household.id, file, 'general');
+            await invokeDocumentExtraction(document.id);
+            await refresh();
+          }}
+        />
+        <DocumentExtractionReview
+          householdId={data?.household?.id ?? ''}
+          extractions={(data?.documentExtractions ?? []).filter(
+            // Insurance and legal documents are reviewed on their own pages against
+            // the full extraction. Showing the compatibility row here too gave two
+            // routes to confirm the same document, creating duplicates.
+            (extraction) =>
+              !(data?.insuranceExtractions ?? []).some(
+                (insurance) => insurance.document_id === extraction.document_id,
+              ) &&
+              !(data?.legalExtractions ?? []).some(
+                (legalExtraction) => legalExtraction.document_id === extraction.document_id,
+              ),
+          )}
+          onChange={refresh}
+        />
+      </section>
     </div>
   );
 }

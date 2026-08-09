@@ -1181,22 +1181,42 @@ export async function getLatestCardResearch(householdId: string): Promise<CardOf
  * Runs a fresh search. Slow by nature — several web searches and two model
  * passes — so the UI shows it working rather than pretending it is instant.
  */
-export async function researchCardOffers(householdId: string): Promise<{ candidates: number }> {
+export async function researchCardOffers(
+  householdId: string,
+  onStage?: (stage: 'searching' | 'reading') => void,
+): Promise<{ candidates: number }> {
   const { data: session } = await supabase.auth.getSession();
   const token = session?.session?.access_token;
   if (!token) throw new Error('You need to be signed in to research offers.');
 
-  const response = await fetch(`${supabaseUrl}/functions/v1/research-card-offers`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ household_id: householdId }),
-  });
+  const call = async (body: Record<string, string>) => {
+    const response = await fetch(`${supabaseUrl}/functions/v1/research-card-offers`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      // A worker resource limit is the edge wall clock, not a bad request — say
+      // which it was, because the fix is different.
+      const detail =
+        payload?.code === 'WORKER_RESOURCE_LIMIT'
+          ? 'The search ran longer than the server allows. Try again — it usually completes on a second run.'
+          : payload?.error ?? `Research failed (${response.status}).`;
+      throw new Error(detail);
+    }
+    return payload;
+  };
 
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    throw new Error(payload?.error ?? `Research failed (${response.status}).`);
-  }
-  return { candidates: payload.candidates ?? 0 };
+  // Two invocations, not one. Searching and normalizing together exceed the
+  // Edge Function wall clock; each stage on its own finishes comfortably.
+  onStage?.('searching');
+  const searched = await call({ household_id: householdId });
+  if (!searched?.research_id) throw new Error('The search did not start.');
+
+  onStage?.('reading');
+  const structured = await call({ research_id: searched.research_id });
+  return { candidates: structured.candidates ?? 0 };
 }
 
 /** The user's verdict on a researched offer. Nothing else moves it. */

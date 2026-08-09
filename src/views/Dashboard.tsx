@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useHousehold } from '../useHousehold';
 import { UploadDropzone } from '../components/UploadDropzone';
 import { DocumentExtractionReview } from '../components/DocumentExtractionReview';
@@ -139,8 +139,18 @@ export function DashboardView({ onNavigate }: DashboardProps) {
         ? { ...section, score: live.score, status: live.status as typeof section.status, summary: live.summary }
         : section;
     });
-    return rows.sort((a, b) => a.score - b.score);
+    // A zero means nothing has been put into that section, not that it is
+    // failing. Ranking those first put the sections with the least information
+    // at the top of the page, which is the opposite of useful.
+    return rows.sort((a, b) => {
+      const aStarted = a.score > 0;
+      const bStarted = b.score > 0;
+      if (aStarted !== bStarted) return aStarted ? -1 : 1;
+      return a.score - b.score;
+    });
   }, [data?.sectionScores, liveScores]);
+
+  const startedSections = useMemo(() => sectionScores.filter((s) => s.score > 0), [sectionScores]);
 
   // Anything a document produced that is still waiting on the user. This is the
   // dashboard's answer to "I just uploaded something — where did it go?".
@@ -153,13 +163,39 @@ export function DashboardView({ onNavigate }: DashboardProps) {
     return { legalPending, legalPartial, insurancePending, processing, failed };
   }, [data?.legalExtractions, data?.insuranceExtractions, data?.documents]);
 
-  // Aggregate follows the sections shown, so a change in coverage moves the
-  // household score instead of leaving it stuck at its onboarding value.
-  const healthScore = useMemo(() => {
-    if (sectionScores.length === 0) return data?.household?.health_score ?? null;
-    const total = sectionScores.reduce((sum, s) => sum + s.score, 0);
-    return Math.round((total / sectionScores.length) * 10) / 10;
-  }, [sectionScores, data?.household?.health_score]);
+  // Two honest answers to one question, because averaging an untouched section
+  // as a zero says the household is failing when it has simply not started. A
+  // half-built profile scoring 13 is discouraging and wrong; a half-built
+  // profile scoring 78 across what exists, with four sections still empty, is
+  // both true and useful. Neither number is hidden.
+  const average = (rows: typeof sectionScores) =>
+    rows.length === 0 ? null : Math.round((rows.reduce((sum, s) => sum + s.score, 0) / rows.length) * 10) / 10;
+
+  const startedScore = useMemo(() => average(startedSections), [startedSections]);
+  const fullScore = useMemo(() => average(sectionScores), [sectionScores]);
+
+  const [scoreMode, setScoreMode] = useState<'started' | 'all'>(() => {
+    try {
+      return window.localStorage.getItem('command:score-mode') === 'all' ? 'all' : 'started';
+    } catch {
+      return 'started';
+    }
+  });
+
+  const chooseScoreMode = (mode: 'started' | 'all') => {
+    setScoreMode(mode);
+    try {
+      window.localStorage.setItem('command:score-mode', mode);
+    } catch {
+      // Preference only. Losing it costs nothing.
+    }
+  };
+
+  const untouched = sectionScores.length - startedSections.length;
+  const healthScore =
+    scoreMode === 'all'
+      ? fullScore ?? data?.household?.health_score ?? null
+      : startedScore ?? data?.household?.health_score ?? null;
 
   // Ranked, not merely listed: the stored rows are onboarding-era and the live
   // findings know what is true now, so they are merged and ordered by impact.
@@ -202,9 +238,12 @@ export function DashboardView({ onNavigate }: DashboardProps) {
   const openPriorityCount = rankedActions.length;
 
   return (
-    <div className="min-h-screen bg-cmd-black p-6 text-cmd-offwhite">
-      <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
-        <div className="space-y-6">
+    <div className="space-y-6">
+      {/* min-w-0 on both tracks: a grid child defaults to min-width:auto, so a
+          single long document title stretched the left column past its fraction
+          and pushed Priority Actions off the side of the page. */}
+      <div className="grid min-w-0 gap-6 xl:grid-cols-[1.4fr_minmax(0,1fr)]">
+        <div className="min-w-0 space-y-6">
           <section className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-8 shadow-sm shadow-black/10">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
               <div>
@@ -213,33 +252,63 @@ export function DashboardView({ onNavigate }: DashboardProps) {
                   <span className="text-[80px] font-bold leading-none font-mono text-cmd-offwhite">
                     {healthScore ?? '--'}
                   </span>
-                  <div className="space-y-2">
+                  <div className="min-w-0 space-y-2">
                     <div className={`text-sm font-semibold uppercase tracking-[0.2em] ${scoreState.className}`}>
                       {scoreState.label}
                     </div>
                     <div className="max-w-md text-sm text-cmd-muted">
-                      {healthScore != null
-                        ? `${sectionScores.length} sections analyzed • ${openPriorityCount} open action${openPriorityCount === 1 ? '' : 's'}`
-                        : 'No health score data available yet.'}
+                      {healthScore == null
+                        ? 'No health score data available yet.'
+                        : scoreMode === 'started'
+                          ? `${startedSections.length} section${startedSections.length === 1 ? '' : 's'} you have started • ${openPriorityCount} open action${openPriorityCount === 1 ? '' : 's'}`
+                          : `all ${sectionScores.length} sections • ${openPriorityCount} open action${openPriorityCount === 1 ? '' : 's'}`}
                     </div>
+                    {untouched > 0 && (
+                      <div className="text-xs text-cmd-muted/70">
+                        {scoreMode === 'started'
+                          ? `${untouched} section${untouched === 1 ? '' : 's'} not started yet — counting ${untouched === 1 ? 'it' : 'them'} would read ${fullScore ?? '--'}.`
+                          : `Counting ${untouched} section${untouched === 1 ? '' : 's'} you have not started. What you have built reads ${startedScore ?? '--'}.`}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {['60', '70', '80', '90', '100'].map((label) => (
-                  <div
-                    key={label}
-                    className={`h-1 w-10 rounded-full ${
-                      Number(label) <= (healthScore ?? 0)
-                        ? healthScore && healthScore < 60
-                          ? 'bg-red-500'
-                          : healthScore && healthScore < 75
-                          ? 'bg-cmd-gold'
-                          : 'bg-emerald-500'
-                        : 'bg-cmd-border'
-                    }`}
-                  />
-                ))}
+              <div className="shrink-0">
+                <div className="inline-flex rounded-2xl border border-cmd-border bg-cmd-black/50 p-1">
+                  {([
+                    { mode: 'started' as const, label: 'What you have built' },
+                    { mode: 'all' as const, label: 'Full picture' },
+                  ]).map((option) => (
+                    <button
+                      key={option.mode}
+                      type="button"
+                      onClick={() => chooseScoreMode(option.mode)}
+                      className={`rounded-xl px-3 py-1.5 text-xs font-medium transition ${
+                        scoreMode === option.mode
+                          ? 'bg-cmd-gold/15 text-cmd-gold'
+                          : 'text-cmd-muted hover:text-cmd-offwhite'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  {['60', '70', '80', '90', '100'].map((label) => (
+                    <div
+                      key={label}
+                      className={`h-1 w-10 rounded-full ${
+                        Number(label) <= (healthScore ?? 0)
+                          ? healthScore && healthScore < 60
+                            ? 'bg-red-500'
+                            : healthScore && healthScore < 75
+                            ? 'bg-cmd-gold'
+                            : 'bg-emerald-500'
+                          : 'bg-cmd-border'
+                      }`}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
           </section>
@@ -271,7 +340,7 @@ export function DashboardView({ onNavigate }: DashboardProps) {
                     className="flex w-full items-center justify-between gap-3 rounded-2xl border border-cmd-border bg-cmd-black/40 px-4 py-3 text-left text-sm text-cmd-offwhite transition hover:border-cmd-gold/40"
                   >
                     <span className="min-w-0">
-                      <span className="block truncate font-medium">
+                      <span className="block truncate font-medium" title={extraction.document_title ?? ''}>
                         {extraction.document_title || 'Untitled legal document'}
                       </span>
                       <span className="mt-0.5 block text-xs text-cmd-muted">
@@ -340,21 +409,29 @@ export function DashboardView({ onNavigate }: DashboardProps) {
                         <div className="rounded-2xl bg-white/5 p-3 text-cmd-gold">
                           <Icon className="h-5 w-5" />
                         </div>
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-sm font-semibold text-cmd-offwhite">{sectionLabels[section.section] ?? section.section}</p>
-                          <p className="mt-1 text-sm text-cmd-muted">{section.summary ?? 'No summary available'}</p>
+                          <p className="mt-1 text-sm text-cmd-muted">
+                            {section.score === 0
+                              ? 'Nothing here yet. Add something and Command will start scoring it.'
+                              : section.summary ?? 'No summary available'}
+                          </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3 text-sm">
-                        <span className="font-mono text-base font-semibold text-cmd-offwhite">{formatScore(section.score)}</span>
-                        <span className={`rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em] ${
-                          isCritical
+                      <div className="flex shrink-0 items-center gap-3 text-sm">
+                        <span className="font-mono text-base font-semibold text-cmd-offwhite">
+                          {section.score > 0 ? formatScore(section.score) : '--'}
+                        </span>
+                        <span className={`whitespace-nowrap rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.16em] ${
+                          section.score === 0
+                            ? 'bg-cmd-black/60 text-cmd-muted'
+                            : isCritical
                             ? 'bg-red-500/10 text-red-300'
                             : isWarning
                             ? 'bg-cmd-gold/10 text-cmd-gold'
                             : 'bg-emerald-500/10 text-emerald-300'
-                        }`}> 
-                          {section.status.replace('_', ' ')}
+                        }`}>
+                          {section.score === 0 ? 'not started' : section.status.replace('_', ' ')}
                         </span>
                       </div>
                     </div>
@@ -365,10 +442,10 @@ export function DashboardView({ onNavigate }: DashboardProps) {
           </section>
         </div>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <section className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-6">
             <div className="mb-6 flex items-center justify-between gap-4">
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Priority actions</p>
                 <h2 className="mt-3 text-2xl font-semibold text-cmd-offwhite">Action items</h2>
               </div>
@@ -477,7 +554,7 @@ export function DashboardView({ onNavigate }: DashboardProps) {
 
       {/* Demoted, as on every section page: uploading is a means to the summary
           above, not the thing a dashboard is for. */}
-      <section className="mt-6 rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
+      <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
         <UploadDropzone
           contextLabel="Global document upload"
           buttonLabel="Add a document"

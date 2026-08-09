@@ -777,6 +777,15 @@ function flagsFromObservations(observations: any[], header: any): any[] {
   const seen = (code: string, state: string) =>
     observations.some((o) => String(o.observation_code ?? '').includes(code) && o.state === state);
 
+  /**
+   * Only flag an absence when nothing affirmed the same thing. A signed will
+   * whose scan shows a conformed "/s/" signature produces two observations —
+   * the signature is there, a wet-ink mark is not — and flagging on the second
+   * while ignoring the first told the user their signed will looked unsigned.
+   * An affirmative observation wins over a qualified one about the same subject.
+   */
+  const missing = (code: string) => seen(code, 'not_observed') && !seen(code, 'observed');
+
   const add = (
     flag_code: string,
     severity: string,
@@ -785,18 +794,18 @@ function flagsFromObservations(observations: any[], header: any): any[] {
     attorney = false,
   ) => flags.push({ flag_code, severity, explanation, suggested_action, attorney_review_suggested: attorney });
 
-  if (seen('signature', 'not_observed')) {
+  if (missing('signature')) {
     add('signature_not_detected', 'worth_reviewing',
       'Command did not detect a signature in this uploaded copy.',
       'Check whether the signature page was included in the scan.');
   }
-  if (seen('notariz', 'not_observed')) {
+  if (missing('notariz')) {
     add('notarization_not_detected', 'worth_reviewing',
       'Command did not detect a notarization page in this uploaded copy.',
       'Check whether the notary page was included. Whether one is required depends on the document and the state.',
       true);
   }
-  if (seen('witness', 'not_observed')) {
+  if (missing('witness')) {
     add('witness_signatures_not_detected', 'worth_reviewing',
       'Command did not detect witness signatures in this uploaded copy.',
       'Check whether the witness page was included in the scan.',
@@ -807,12 +816,12 @@ function flagsFromObservations(observations: any[], header: any): any[] {
       'This document is marked as a draft.',
       'If a signed version exists, uploading it will give Command the executed terms.');
   }
-  if (seen('attachment', 'not_observed') || seen('exhibit', 'not_observed') || seen('schedule', 'not_observed')) {
+  if (missing('attachment') || missing('exhibit') || missing('schedule')) {
     add('referenced_attachment_missing', 'worth_reviewing',
       'The document refers to an exhibit, schedule or attachment that was not part of this upload.',
       'Upload the missing pages so Command can read them.');
   }
-  if (seen('page', 'not_observed')) {
+  if (missing('page')) {
     add('pages_may_be_missing', 'worth_reviewing',
       'The page numbering suggests pages may be missing from this upload.',
       'Re-scan the full document and upload it again.');
@@ -997,13 +1006,13 @@ async function persistLegalExtraction(
       .filter(Boolean),
   );
   const derivedFlags = flagsFromObservations(common.execution_observations ?? [], headerPatch);
-  const gap = (has: string, successor: string, label: string) => {
+  const gap = (has: string, successor: string, label: string, word = 'successor') => {
     if (roleCodes.has(has) && !roleCodes.has(successor)) {
       derivedFlags.push({
-        flag_code: `${has}_without_successor`,
+        flag_code: `${has}_without_${word}`,
         severity: 'worth_reviewing',
-        explanation: `A ${label} is named, but Command did not find a successor or alternate named in this document.`,
-        suggested_action: `Check whether a successor ${label} appears elsewhere in the document or in a later amendment.`,
+        explanation: `A ${label} is named, but Command did not find ${word === 'alternate' ? 'an alternate' : 'a successor'} named in this document.`,
+        suggested_action: `Check whether ${word === 'alternate' ? 'an alternate' : 'a successor'} ${label} appears elsewhere in the document or in a later amendment.`,
         attorney_review_suggested: true,
       });
     }
@@ -1011,7 +1020,7 @@ async function persistLegalExtraction(
   gap('executor', 'successor_executor', 'executor');
   gap('trustee', 'successor_trustee', 'trustee');
   gap('agent', 'successor_agent', 'agent');
-  gap('guardian', 'alternate_guardian', 'guardian');
+  gap('guardian', 'alternate_guardian', 'guardian', 'alternate');
 
   if (derivedFlags.length > 0) {
     const { error } = await admin.from('legal_issue_flags').insert(

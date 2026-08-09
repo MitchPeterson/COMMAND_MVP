@@ -24,6 +24,7 @@ import {
   getInsurancePolicyExtractions,
   getLegalExtractions,
   getLegalIssueFlags,
+  getCreditStatements,
   type Household,
   type InsurancePolicy,
   type LegalDocument,
@@ -45,6 +46,7 @@ import {
   type InsurancePolicyExtraction,
   type LegalDocumentExtraction,
   type LegalIssueFlag,
+  type CreditStatement,
 } from './lib/supabase';
 
 export interface HouseholdData {
@@ -69,6 +71,7 @@ export interface HouseholdData {
   insuranceExtractions: InsurancePolicyExtraction[];
   legalExtractions: LegalDocumentExtraction[];
   legalIssueFlags: LegalIssueFlag[];
+  creditStatements: CreditStatement[];
 }
 
 export interface UseHouseholdReturn {
@@ -101,6 +104,7 @@ const EMPTY_DATA: HouseholdData = {
   insuranceExtractions: [],
   legalExtractions: [],
   legalIssueFlags: [],
+  creditStatements: [],
 };
 
 /**
@@ -159,6 +163,7 @@ function useHouseholdState(): UseHouseholdReturn {
         insuranceExtractions,
         legalExtractions,
         legalIssueFlags,
+        creditStatements,
       ] = await Promise.all([
         supabase
           .from('household_profile')
@@ -185,6 +190,7 @@ function useHouseholdState(): UseHouseholdReturn {
         getInsurancePolicyExtractions(hid),
         getLegalExtractions(hid),
         getLegalIssueFlags(hid),
+        getCreditStatements(hid),
       ]);
 
       setData({
@@ -209,6 +215,7 @@ function useHouseholdState(): UseHouseholdReturn {
         insuranceExtractions,
         legalExtractions,
         legalIssueFlags,
+        creditStatements,
       });
     } catch (err) {
       console.error('Failed to load household data:', err);

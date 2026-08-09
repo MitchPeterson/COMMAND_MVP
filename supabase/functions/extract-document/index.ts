@@ -54,7 +54,7 @@ const VALUE_TYPES = ['explicit', 'calculated', 'inferred', 'unknown'];
 
 // Stamped on every extraction row. Bump it when a prompt or schema changes in a
 // way that would make an old reading and a new one incomparable.
-const EXTRACTOR_VERSION = 'legal-2026.08.08-extract';
+const EXTRACTOR_VERSION = 'extract-2026.08.09';
 
 // Canonical coverage vocabulary. Deliberately NOT a schema enum — ~60 values
 // blew the compiled-grammar budget. The model writes a loose code, we canonicalize
@@ -609,6 +609,139 @@ Ground rules, in priority order:
     resolve it — the dates and the user decide that, not you.
 `.trim();
 
+// ─────────────────────────────────────────────────────────────
+// Credit card statements
+//
+// Two passes: the statement itself (identity, balances, terms, rewards) and its
+// transaction list. Separate because a statement with 120 lines needs its own
+// token budget, and because losing the transactions must not cost the balances.
+// ─────────────────────────────────────────────────────────────
+
+const APR_TYPES = ['purchase', 'cash_advance', 'balance_transfer', 'penalty', 'promotional', 'other'];
+
+const CREDIT_FIELD_CODES = `
+  institution, card_product, account_nickname, last_four, primary_cardholder,
+  statement_opening_date, statement_closing_date, payment_due_date,
+  previous_balance, payments_and_credits, purchases, cash_advances,
+  balance_transfers, fees_charged, interest_charged, statement_balance,
+  minimum_payment_due, past_due_amount, credit_limit, available_credit,
+  current_balance, annual_fee, rewards_program, rewards_beginning_balance,
+  rewards_earned, rewards_redeemed, rewards_ending_balance, rewards_expiration_note
+`.trim();
+
+const CREDIT_STATEMENT_SCHEMA = {
+  type: 'object',
+  properties: {
+    fields: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          field_code: { type: 'string' },
+          value: { type: 'string' },
+          raw_value: { type: 'string' },
+          value_type: { type: 'string', enum: VALUE_TYPES },
+          source_page: { type: 'number' },
+          source_section: { type: 'string' },
+          evidence: { type: 'string' },
+          confidence: { type: 'number' },
+        },
+        required: ['field_code', 'value', 'raw_value', 'value_type', 'source_page',
+          'source_section', 'evidence', 'confidence'],
+        additionalProperties: false,
+      },
+    },
+    apr_terms: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          apr_type: { type: 'string', enum: APR_TYPES },
+          apr_percent: { type: 'string' },
+          is_variable: { type: 'boolean' },
+          balance_subject_to_rate: { type: 'string' },
+          interest_charged: { type: 'string' },
+          promotional_balance: { type: 'string' },
+          promotional_expiration_date: { type: 'string' },
+          description: { type: 'string' },
+          source_page: { type: 'number' },
+          evidence: { type: 'string' },
+          confidence: { type: 'number' },
+        },
+        required: ['apr_type', 'apr_percent', 'is_variable', 'balance_subject_to_rate',
+          'interest_charged', 'promotional_balance', 'promotional_expiration_date',
+          'description', 'source_page', 'evidence', 'confidence'],
+        additionalProperties: false,
+      },
+    },
+    unresolved_items: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { item: { type: 'string' }, why_unresolved: { type: 'string' } },
+        required: ['item', 'why_unresolved'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['fields', 'apr_terms', 'unresolved_items'],
+  additionalProperties: false,
+};
+
+const CREDIT_TRANSACTIONS_SCHEMA = {
+  type: 'object',
+  properties: {
+    transactions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          transaction_date: { type: 'string' },
+          posting_date: { type: 'string' },
+          merchant_description: { type: 'string' },
+          amount: { type: 'string' },
+          direction: { type: 'string', enum: ['charge', 'credit'] },
+          category: { type: 'string' },
+          category_from_issuer: { type: 'boolean' },
+          cardholder: { type: 'string' },
+          source_page: { type: 'number' },
+          confidence: { type: 'number' },
+        },
+        required: ['transaction_date', 'posting_date', 'merchant_description', 'amount',
+          'direction', 'category', 'category_from_issuer', 'cardholder', 'source_page', 'confidence'],
+        additionalProperties: false,
+      },
+    },
+    transaction_count_stated: { type: 'number' },
+    truncated: { type: 'boolean' },
+  },
+  required: ['transactions', 'transaction_count_stated', 'truncated'],
+  additionalProperties: false,
+};
+
+const CREDIT_RULES = `
+Ground rules, in priority order:
+
+1. Record only the last four digits of any card number, in last_four. Never output
+   a full or partial account number anywhere else, including in evidence excerpts —
+   truncate the excerpt instead.
+2. A statement is a record of a closed period, not a live balance. statement_balance
+   is the new balance the statement reports. Only fill current_balance if the
+   document explicitly labels a current or present balance; otherwise omit it.
+3. Keep statement_balance, minimum_payment_due, available_credit and credit_limit
+   distinct. They are different numbers and are often confused.
+4. Do not infer an APR, a fee, a promotional end date, a rewards rule, a benefit,
+   autopay status or a renewal date. If it is not printed, omit the field.
+5. Emit one apr_terms entry per rate the statement lists. A card commonly carries
+   different rates for purchases, cash advances, balance transfers and promotions,
+   with different balances subject to each. Do not merge them or pick one.
+6. annual_fee only when the statement explicitly shows one charged or disclosed.
+   A fee you did not see is not zero — it is absent.
+7. Amounts are digits only: "1250.75". Payments and credits are positive numbers;
+   direction carries the sign. Dates are YYYY-MM-DD. Percentages are plain: "24.99".
+8. Quote evidence verbatim and keep it to the line the value came from.
+`.trim();
+
 const GENERIC_FIELDS = [
   'lender', 'interest_rate', 'monthly_payment', 'escrow_balance', 'carrier',
   'policy_type', 'policy_number', 'coverage_amount', 'premium', 'renewal_date',
@@ -1042,10 +1175,208 @@ async function persistLegalExtraction(
   };
 }
 
+const CREDIT_NUMERIC_FIELDS = new Set([
+  'previous_balance', 'payments_and_credits', 'purchases', 'cash_advances',
+  'balance_transfers', 'fees_charged', 'interest_charged', 'statement_balance',
+  'minimum_payment_due', 'past_due_amount', 'credit_limit', 'available_credit',
+  'current_balance', 'annual_fee', 'rewards_beginning_balance', 'rewards_earned',
+  'rewards_redeemed', 'rewards_ending_balance',
+]);
+
+const CREDIT_DATE_FIELDS = new Set([
+  'statement_opening_date', 'statement_closing_date', 'payment_due_date',
+]);
+
+/**
+ * Last four digits, whatever arrived. A model told to return four digits mostly
+ * does; "mostly" is not a control. Anything longer is truncated here so a full
+ * account number cannot reach the database through a prompt that was ignored.
+ */
+function lastFourOnly(value: unknown): string | null {
+  const digits = String(value ?? '').replace(/\D/g, '');
+  if (digits.length === 0) return null;
+  return digits.slice(-4);
+}
+
+/** Redacts any run of 12+ digits, so an evidence excerpt cannot carry a PAN. */
+function scrubCardNumbers(text: string | null): string | null {
+  if (!text) return text;
+  return text.replace(/\b(?:\d[ -]?){12,19}\b/g, (match) => {
+    const digits = match.replace(/\D/g, '');
+    return `•••• ${digits.slice(-4)}`;
+  });
+}
+
+/** Stable identity for one line on one statement. */
+async function transactionFingerprint(
+  date: string | null,
+  description: string,
+  amount: number | null,
+  direction: string,
+): Promise<string> {
+  const basis = `${date ?? ''}|${description.trim().toLowerCase().replace(/\s+/g, ' ')}|${amount ?? ''}|${direction}`;
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(basis));
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32);
+}
+
 function clamp01(value: unknown): number | null {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return null;
   return Math.min(Math.max(parsed, 0), 1);
+}
+
+/**
+ * Writes one statement reading. Everything lands at 'pending_review' — no card
+ * account is created or changed here. Promotion happens on confirmation, where
+ * the user also settles which account this statement belongs to.
+ */
+async function persistCreditStatement(
+  statementId: string,
+  householdId: string,
+  // deno-lint-ignore no-explicit-any
+  statement: any,
+  // deno-lint-ignore no-explicit-any
+  transactions: any,
+): Promise<{ fields: number; aprs: number; transactions: number; truncated: boolean }> {
+  // deno-lint-ignore no-explicit-any
+  const header: Record<string, any> = {};
+  // deno-lint-ignore no-explicit-any
+  const fieldRows: any[] = [];
+
+  for (const field of statement.fields ?? []) {
+    const code = text(field.field_code);
+    const rawValue = text(field.value);
+    if (!code || !rawValue) continue;
+
+    const isLastFour = code === 'last_four';
+    const value = isLastFour ? lastFourOnly(rawValue) : rawValue;
+    if (!value) continue;
+
+    const isNumeric = CREDIT_NUMERIC_FIELDS.has(code);
+    const isDate = CREDIT_DATE_FIELDS.has(code);
+
+    fieldRows.push({
+      statement_id: statementId,
+      household_id: householdId,
+      field_code: code,
+      field_group: code.startsWith('rewards')
+        ? 'rewards'
+        : isNumeric
+          ? 'balances'
+          : isDate
+            ? 'identity'
+            : 'identity',
+      value_text: value,
+      value_number: isNumeric ? num(value) : null,
+      value_date: isDate ? date(value) : null,
+      raw_value: isLastFour ? value : scrubCardNumbers(text(field.raw_value)),
+      source_page: num(field.source_page),
+      source_section: text(field.source_section),
+      evidence: scrubCardNumbers(text(field.evidence)),
+      confidence: clamp01(field.confidence),
+      value_type: VALUE_TYPES.includes(field.value_type) ? field.value_type : 'explicit',
+      is_sensitive: isLastFour,
+    });
+
+    // Promote to the header so statements are comparable without a join.
+    header[code] = isNumeric ? num(value) : isDate ? date(value) : value;
+  }
+
+  if (fieldRows.length > 0) {
+    const { error } = await admin
+      .from('credit_statement_fields')
+      .upsert(fieldRows, { onConflict: 'statement_id,field_code' });
+    if (error) console.error('Failed to write statement fields:', error.message);
+  }
+
+  // APR terms, one row per rate category. Never collapsed.
+  // deno-lint-ignore no-explicit-any
+  const aprRows: any[] = [];
+  for (const term of statement.apr_terms ?? []) {
+    if (!APR_TYPES.includes(term.apr_type)) continue;
+    aprRows.push({
+      statement_id: statementId,
+      household_id: householdId,
+      apr_type: term.apr_type,
+      apr_percent: num(term.apr_percent),
+      is_variable: term.is_variable === true,
+      balance_subject_to_rate: num(term.balance_subject_to_rate),
+      interest_charged: num(term.interest_charged),
+      promotional_balance: num(term.promotional_balance),
+      promotional_expiration_date: date(term.promotional_expiration_date),
+      description: text(term.description) ?? term.apr_type,
+      source_page: num(term.source_page),
+      evidence: scrubCardNumbers(text(term.evidence)),
+      confidence: clamp01(term.confidence),
+    });
+  }
+  if (aprRows.length > 0) {
+    const { error } = await admin
+      .from('credit_apr_terms')
+      .upsert(aprRows, { onConflict: 'statement_id,apr_type,description' });
+    if (error) console.error('Failed to write APR terms:', error.message);
+  }
+  // The purchase APR is the one the card page shows, so promote it.
+  const purchase = aprRows.find((a) => a.apr_type === 'purchase');
+  if (purchase?.apr_percent != null) header.purchase_apr_promoted = purchase.apr_percent;
+
+  // Transactions. Fingerprinted so a re-read updates rather than duplicates.
+  // deno-lint-ignore no-explicit-any
+  const txRows: any[] = [];
+  for (const tx of transactions.transactions ?? []) {
+    const description = text(tx.merchant_description);
+    if (!description) continue;
+    const amount = num(tx.amount);
+    const direction = tx.direction === 'credit' ? 'credit' : 'charge';
+    const txDate = date(tx.transaction_date);
+    txRows.push({
+      statement_id: statementId,
+      household_id: householdId,
+      transaction_date: txDate,
+      posting_date: date(tx.posting_date),
+      merchant_description: scrubCardNumbers(description),
+      amount,
+      direction,
+      category: text(tx.category),
+      // An issuer-printed category is a fact; ours is a classification. Spending
+      // analysis has to be able to tell them apart.
+      category_source: tx.category_from_issuer === true ? 'issuer_provided' : 'ai_classified',
+      category_confidence: clamp01(tx.confidence),
+      cardholder: text(tx.cardholder),
+      source_page: num(tx.source_page),
+      confidence: clamp01(tx.confidence),
+      fingerprint: await transactionFingerprint(txDate, description, amount, direction),
+    });
+  }
+  if (txRows.length > 0) {
+    // Chunked: a statement can carry a few hundred lines and one oversized
+    // insert is a worse failure than several ordinary ones.
+    for (let i = 0; i < txRows.length; i += 100) {
+      const { error } = await admin
+        .from('credit_transactions')
+        .upsert(txRows.slice(i, i + 100), { onConflict: 'statement_id,fingerprint' });
+      if (error) console.error('Failed to write transactions:', error.message);
+    }
+  }
+
+  delete header.purchase_apr_promoted;
+
+  const { error: headerError } = await admin
+    .from('credit_statements')
+    .update({
+      ...header,
+      unresolved_items: statement.unresolved_items ?? [],
+      processing_state: 'needs_review',
+    })
+    .eq('id', statementId);
+  if (headerError) console.error('Failed to update the statement header:', headerError.message);
+
+  return {
+    fields: fieldRows.length,
+    aprs: aprRows.length,
+    transactions: txRows.length,
+    truncated: transactions.truncated === true,
+  };
 }
 
 function json(body: unknown, status: number): Response {
@@ -1359,6 +1690,11 @@ Deno.serve(async (req: Request) => {
     // user can retry without re-uploading.
     await admin
       .from('legal_document_extractions')
+      .update({ processing_state: 'failed', failure_reason: message })
+      .eq('document_id', document.id)
+      .in('processing_state', ['uploaded', 'queued', 'processing']);
+    await admin
+      .from('credit_statements')
       .update({ processing_state: 'failed', failure_reason: message })
       .eq('document_id', document.id)
       .in('processing_state', ['uploaded', 'queued', 'processing']);
@@ -1735,6 +2071,118 @@ Deno.serve(async (req: Request) => {
         duplicate_of: sameContent?.[0]?.id ?? null,
         extraction_version: (previous?.extraction_version ?? 0) + 1,
         counts,
+      }, 200);
+    }
+
+    // Credit card statements. The existing classifier already recognizes these
+    // as 'credit_card_statement'; until now they fell through to the one-field
+    // generic path, which read a statement as a handful of loose strings.
+    if (classification.legacy_type === 'credit_card_statement') {
+      const digest = await crypto.subtle.digest('SHA-256', bytes);
+      const contentHash = Array.from(new Uint8Array(digest))
+        .map((b) => b.toString(16).padStart(2, '0'))
+        .join('');
+
+      // Same file already read? Reuse the row. Re-reading a statement must not
+      // produce a second one — the database enforces it, and this avoids the
+      // error path entirely for the common case.
+      const { data: existingStatement } = await admin
+        .from('credit_statements')
+        .select('id, extraction_version')
+        .eq('household_id', document.household_id)
+        .eq('content_hash', contentHash)
+        .maybeSingle();
+
+      let statementId: string;
+      if (existingStatement) {
+        statementId = existingStatement.id;
+        await admin
+          .from('credit_statements')
+          .update({
+            processing_state: 'processing',
+            extraction_version: (existingStatement.extraction_version ?? 1) + 1,
+            document_id: document.id,
+            extractor_version: EXTRACTOR_VERSION,
+            model: anthropicModel,
+          })
+          .eq('id', statementId);
+      } else {
+        const { data: inserted, error: insertError } = await admin
+          .from('credit_statements')
+          .insert([{
+            household_id: document.household_id,
+            document_id: document.id,
+            processing_state: 'processing',
+            review_status: 'pending_review',
+            content_hash: contentHash,
+            extractor_version: EXTRACTOR_VERSION,
+            model: anthropicModel,
+          }])
+          .select('id')
+          .single();
+        if (insertError || !inserted) {
+          return await failDocument(
+            `Could not record the statement: ${insertError?.message ?? 'no row returned'}`, 500,
+          );
+        }
+        statementId = inserted.id;
+      }
+
+      const creditContext = `File name: ${document.name}\n\n${CREDIT_RULES}`;
+
+      const statementPass = callClaude(
+        content,
+        `${creditContext}\n\nExtract this credit card statement. Emit one entry in fields per value ` +
+        `genuinely printed, using these codes:\n${CREDIT_FIELD_CODES}\n\n` +
+        `Omit a code entirely rather than guessing. Give every entry its page and a short verbatim ` +
+        `excerpt — truncated if the line contains an account number.\n\n` +
+        `In apr_terms, emit one entry per interest rate the statement lists, with the balance ` +
+        `subject to that rate and the interest charged at it where shown. Promotional rates carry ` +
+        `their balance and expiration date when printed.`,
+        CREDIT_STATEMENT_SCHEMA, 'high', 12000,
+      ).catch((err) => {
+        console.warn('Credit statement pass failed:', err instanceof Error ? err.message : String(err));
+        return {
+          fields: [], apr_terms: [],
+          unresolved_items: [{ item: 'Statement summary', why_unresolved: 'The extraction pass failed. Retry from the document vault.' }],
+        };
+      });
+
+      const transactionsPass = callClaude(
+        content,
+        `${creditContext}\n\nList every transaction on this statement in order. Give the ` +
+        `transaction date, the posting date where both are shown, the merchant description as ` +
+        `printed, the amount as a positive number, and direction 'charge' or 'credit'.\n\n` +
+        `If the issuer prints a category for a line, copy it and set category_from_issuer true. ` +
+        `Otherwise classify it yourself with a short lowercase category — groceries, dining, fuel, ` +
+        `travel, utilities, subscriptions, health, retail, entertainment, transfer, fee, interest, ` +
+        `payment, other — and set category_from_issuer false. The distinction matters: one is what ` +
+        `the issuer said, the other is your reading of it.\n\n` +
+        `Set truncated true if you could not fit every line, and transaction_count_stated to the ` +
+        `count the statement itself reports if it prints one.`,
+        CREDIT_TRANSACTIONS_SCHEMA, 'high', 24000,
+      ).catch((err) => {
+        console.warn('Credit transactions pass failed:', err instanceof Error ? err.message : String(err));
+        return { transactions: [], transaction_count_stated: 0, truncated: false };
+      });
+
+      const [statementData, transactionData] = await Promise.all([statementPass, transactionsPass]);
+      const counts = await persistCreditStatement(
+        statementId, document.household_id, statementData, transactionData,
+      );
+
+      if (!document.category || document.category === 'general') {
+        await admin.from('documents').update({ category: 'credit' }).eq('id', document.id);
+      }
+      await admin.from('documents').update({ status: 'processed' }).eq('id', document.id);
+
+      return json({
+        document_id: document.id,
+        mode: 'credit',
+        statement_id: statementId,
+        reprocessed: Boolean(existingStatement),
+        counts,
+        transactions_truncated: transactionData.truncated === true,
       }, 200);
     }
 

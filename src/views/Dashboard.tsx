@@ -174,10 +174,13 @@ export function DashboardView({ onNavigate }: DashboardProps) {
     const legalPending = (data?.legalExtractions ?? []).filter((e) => e.review_status === 'pending_review');
     const legalPartial = (data?.legalExtractions ?? []).filter((e) => e.review_status === 'partially_confirmed');
     const insurancePending = (data?.insuranceExtractions ?? []).filter((e) => e.review_status === 'pending_review');
+    const creditPending = (data?.creditStatements ?? []).filter(
+      (s) => s.review_status === 'pending_review' || s.review_status === 'partially_confirmed',
+    );
     const processing = (data?.documents ?? []).filter((d) => d.status === 'uploaded');
     const failed = (data?.documents ?? []).filter((d) => d.status === 'error');
-    return { legalPending, legalPartial, insurancePending, processing, failed };
-  }, [data?.legalExtractions, data?.insuranceExtractions, data?.documents]);
+    return { legalPending, legalPartial, insurancePending, creditPending, processing, failed };
+  }, [data?.legalExtractions, data?.insuranceExtractions, data?.creditStatements, data?.documents]);
 
   // Two honest answers to one question, because averaging an untouched section
   // as a zero says the household is failing when it has simply not started. A
@@ -333,6 +336,7 @@ export function DashboardView({ onNavigate }: DashboardProps) {
 
           {(awaitingReview.legalPending.length > 0 ||
             awaitingReview.legalPartial.length > 0 ||
+            awaitingReview.creditPending.length > 0 ||
             awaitingReview.insurancePending.length > 0 ||
             awaitingReview.processing.length > 0 ||
             awaitingReview.failed.length > 0) && (
@@ -365,6 +369,27 @@ export function DashboardView({ onNavigate }: DashboardProps) {
                         {extraction.review_status === 'partially_confirmed'
                           ? 'Some details are still waiting on you'
                           : 'Read and waiting for your review — nothing reaches your profile until you confirm'}
+                      </span>
+                    </span>
+                    <span className="inline-flex shrink-0 items-center gap-1 text-xs text-cmd-gold">
+                      Review <ArrowRight className="h-3 w-3" />
+                    </span>
+                  </button>
+                ))}
+                {awaitingReview.creditPending.map((statement) => (
+                  <button
+                    key={statement.id}
+                    type="button"
+                    onClick={() => onNavigate?.('credit')}
+                    className="flex w-full items-center justify-between gap-3 rounded-2xl border border-cmd-border bg-cmd-black/40 px-4 py-3 text-left text-sm text-cmd-offwhite transition hover:border-cmd-gold/40"
+                  >
+                    <span className="min-w-0">
+                      <span className="block truncate font-medium">
+                        {statement.institution ?? 'Card'} statement
+                        {statement.last_four ? ` ••••${statement.last_four}` : ''}
+                      </span>
+                      <span className="mt-0.5 block text-xs text-cmd-muted">
+                        Read and waiting for your review — no card is added or changed until you confirm
                       </span>
                     </span>
                     <span className="inline-flex shrink-0 items-center gap-1 text-xs text-cmd-gold">
@@ -596,6 +621,9 @@ export function DashboardView({ onNavigate }: DashboardProps) {
               ) &&
               !(data?.legalExtractions ?? []).some(
                 (legalExtraction) => legalExtraction.document_id === extraction.document_id,
+              ) &&
+              !(data?.creditStatements ?? []).some(
+                (statement) => statement.document_id === extraction.document_id,
               ),
           )}
           onChange={refresh}

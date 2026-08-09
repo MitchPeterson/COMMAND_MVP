@@ -54,7 +54,7 @@ const VALUE_TYPES = ['explicit', 'calculated', 'inferred', 'unknown'];
 
 // Stamped on every extraction row. Bump it when a prompt or schema changes in a
 // way that would make an old reading and a new one incomparable.
-const EXTRACTOR_VERSION = 'legal-2026.08.08-classify';
+const EXTRACTOR_VERSION = 'legal-2026.08.08-extract';
 
 // Canonical coverage vocabulary. Deliberately NOT a schema enum — ~60 values
 // blew the compiled-grammar budget. The model writes a loose code, we canonicalise
@@ -360,6 +360,255 @@ Legal classification rules:
 8. page_count is the number of pages provided. 0 if you cannot tell.
 `.trim();
 
+// ─────────────────────────────────────────────────────────────
+// Legal extraction
+//
+// Three passes, run concurrently against the same document: common fields,
+// parties and their roles, and the type-specific provisions. Same reasoning as
+// insurance — sequentially they exceed the ~150s edge wall clock on a long
+// trust; concurrently the cost is the slowest pass rather than their sum.
+//
+// The field and provision vocabularies live in prompt text, never in the
+// grammar. Forty field codes and thirty provision codes as enums would blow the
+// compiled-grammar budget the way the first insurance schema did.
+// ─────────────────────────────────────────────────────────────
+
+const OBSERVATION_STATES = ['observed', 'not_observed', 'indeterminate'];
+const PRESENCE_STATES = ['present', 'not_present', 'not_determinable'];
+const PARTY_KINDS = ['person', 'trust', 'business', 'court', 'agency', 'unknown'];
+
+const LEGAL_COMMON_FIELD_CODES = `
+  document_title, document_type_stated, document_subtype, execution_date,
+  effective_date, expiration_date, amendment_date, recording_date,
+  governing_jurisdiction, county, filing_authority, court_name, case_number,
+  instrument_number, recording_number, book_and_page, notary_name,
+  notary_commission_expiration, notary_county, witness_names, attorney_name,
+  law_firm, attorney_address, property_address, legal_description,
+  parcel_identification_number, business_name, entity_type, state_of_formation,
+  trust_name, trust_date, referenced_documents, referenced_attachments,
+  future_review_date, revocation_reference, tax_identification_number,
+  social_security_number, account_number, drivers_license_number
+`.trim();
+
+const LEGAL_COMMON_SCHEMA = {
+  type: 'object',
+  properties: {
+    document_title: { type: 'string' },
+    document_status: { type: 'string', enum: LEGAL_DOCUMENT_STATUSES },
+    page_count: { type: 'number' },
+    document_language: { type: 'string' },
+    plain_language_summary: { type: 'string' },
+    fields: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          field_code: { type: 'string' },
+          value: { type: 'string' },
+          raw_value: { type: 'string' },
+          value_type: { type: 'string', enum: VALUE_TYPES },
+          is_sensitive: { type: 'boolean' },
+          source_page: { type: 'number' },
+          source_section: { type: 'string' },
+          evidence: { type: 'string' },
+          confidence: { type: 'number' },
+        },
+        required: ['field_code', 'value', 'raw_value', 'value_type', 'is_sensitive',
+          'source_page', 'source_section', 'evidence', 'confidence'],
+        additionalProperties: false,
+      },
+    },
+    execution_observations: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          observation_code: { type: 'string' },
+          state: { type: 'string', enum: OBSERVATION_STATES },
+          detail: { type: 'string' },
+          source_page: { type: 'number' },
+          evidence: { type: 'string' },
+          confidence: { type: 'number' },
+        },
+        required: ['observation_code', 'state', 'detail', 'source_page', 'evidence', 'confidence'],
+        additionalProperties: false,
+      },
+    },
+    unresolved_items: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { item: { type: 'string' }, why_unresolved: { type: 'string' } },
+        required: ['item', 'why_unresolved'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['document_title', 'document_status', 'page_count', 'document_language',
+    'plain_language_summary', 'fields', 'execution_observations', 'unresolved_items'],
+  additionalProperties: false,
+};
+
+// One row per party-role pair. Flattened deliberately: a nested roles array
+// costs grammar budget, and the server splits the pairs back into
+// legal_parties + legal_party_roles anyway.
+const LEGAL_PARTIES_SCHEMA = {
+  type: 'object',
+  properties: {
+    parties: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          name_raw: { type: 'string' },
+          party_kind: { type: 'string', enum: PARTY_KINDS },
+          role_code: { type: 'string' },
+          role_detail: { type: 'string' },
+          priority: { type: 'number' },
+          acts_jointly: { type: 'string', enum: ['jointly', 'severally', 'successively', 'not_stated'] },
+          relationship: { type: 'string' },
+          address: { type: 'string' },
+          source_page: { type: 'number' },
+          evidence: { type: 'string' },
+          confidence: { type: 'number' },
+          value_type: { type: 'string', enum: VALUE_TYPES },
+        },
+        required: ['name', 'name_raw', 'party_kind', 'role_code', 'role_detail', 'priority',
+          'acts_jointly', 'relationship', 'address', 'source_page', 'evidence', 'confidence', 'value_type'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['parties'],
+  additionalProperties: false,
+};
+
+const LEGAL_PROVISIONS_SCHEMA = {
+  type: 'object',
+  properties: {
+    provisions: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          provision_code: { type: 'string' },
+          label: { type: 'string' },
+          summary: { type: 'string' },
+          document_language: { type: 'string' },
+          applies_to: { type: 'string' },
+          amount: { type: 'string' },
+          percentage: { type: 'string' },
+          effective_condition: { type: 'string' },
+          presence: { type: 'string', enum: PRESENCE_STATES },
+          source_page: { type: 'number' },
+          source_section: { type: 'string' },
+          evidence: { type: 'string' },
+          confidence: { type: 'number' },
+          value_type: { type: 'string', enum: VALUE_TYPES },
+        },
+        required: ['provision_code', 'label', 'summary', 'document_language', 'applies_to',
+          'amount', 'percentage', 'effective_condition', 'presence', 'source_page',
+          'source_section', 'evidence', 'confidence', 'value_type'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['provisions'],
+  additionalProperties: false,
+};
+
+// The modular part. One guide per extractor key from the taxonomy — adding a
+// document type usually means pointing it at one of these, not writing code.
+const PROVISION_GUIDES: Record<string, string> = {
+  will: `provision codes to look for: marital_status_stated, executor_nomination,
+    successor_executor, guardian_nomination, alternate_guardian, trustee_named,
+    specific_bequest, residuary_distribution, distribution_condition,
+    disinheritance_language, survivorship_requirement, simultaneous_death_provision,
+    digital_asset_authority, pet_care_provision, funeral_instructions,
+    bond_requirement, bond_waiver, self_proving_affidavit, revocation_of_prior_wills,
+    related_trust_reference, codicil_reference.
+    Report observable execution detail. Never call the will valid or invalid.`,
+
+  trust: `provision codes to look for: trust_full_legal_name, trust_type, original_trust_date,
+    amendment_date, restatement_date, initial_trustee, current_trustee, successor_trustee,
+    beneficiary_designation, distribution_rule, age_or_milestone_distribution,
+    incapacity_provision, trustee_removal_provision, trust_protector, power_of_appointment,
+    revocability, governing_law, identified_trust_asset, schedule_reference, tax_id_reference.
+    A trust document proves the trust exists. It does not prove any asset was ever
+    transferred into it — never treat a schedule of assets as evidence of funding.`,
+
+  power_of_attorney: `provision codes to look for: principal_named, agent_named, successor_agent,
+    agents_act_jointly, scope_of_authority, power_granted, power_withheld, effective_trigger,
+    durability_language, guardian_nomination, digital_asset_authority, gifting_authority,
+    real_estate_authority, business_authority, healthcare_authority, expiration_condition,
+    termination_condition, revocation_reference, physician_certification_requirement,
+    agent_acceptance.
+    State the observable terms and dates. Never say the power of attorney is currently
+    enforceable — that depends on facts outside this document.`,
+
+  healthcare_directive: `provision codes to look for: declarant_named, healthcare_agent,
+    alternate_agent, agent_priority, effective_trigger, treatment_preference,
+    life_support_preference, nutrition_hydration_preference, pain_management_preference,
+    organ_donation_direction, disposition_wishes, pregnancy_provision, religious_instruction,
+    hipaa_authorization, primary_physician, dnr_status, expiration_condition,
+    revocation_reference, document_location_instruction.
+    This is sensitive medical information. Extract only what the document states.`,
+
+  deed_property: `provision codes to look for: deed_type_stated, grantor_named, grantee_named,
+    property_address, legal_description, parcel_identification_number, consideration_amount,
+    vesting_language, ownership_form, transfer_date, recording_date, recording_number,
+    recorders_office, reserved_life_estate, transfer_on_death_beneficiary, joint_tenancy_language,
+    survivorship_language, marital_property_language, trust_ownership, easement_or_restriction,
+    exception_or_reservation.
+    Report the parties as the document states them. An unrecorded or historical deed is
+    not evidence of who owns the property now — never present it as current ownership.`,
+
+  family: `provision codes to look for: parties_named, effective_date, court_name, case_number,
+    children_involved, decision_making_authority, custody_term, parenting_time_term,
+    support_obligation, property_provision, expiration_or_review_date, stated_restriction.
+    Extract only what is expressly stated. This material is sensitive.`,
+
+  business: `provision codes to look for: legal_business_name, entity_type, state_of_formation,
+    formation_date, owner_named, ownership_percentage, manager_or_officer, voting_right,
+    transfer_restriction, buy_sell_trigger, valuation_provision, succession_provision,
+    death_provision, disability_provision, divorce_provision, retirement_provision,
+    permitted_transferee, insurance_funding_reference, personal_guarantee, governing_law,
+    amendment_requirement.`,
+
+  generic: `provision codes: use short snake_case codes describing what each operative
+    provision does. Extract the terms that would matter to a household — parties, dates,
+    obligations, money, termination — and nothing more.`,
+};
+
+const LEGAL_EXTRACTION_RULES = `
+Ground rules, in priority order:
+
+1. Never infer that a signature, notarization, witness, attachment or clause exists.
+   If it is not visible in these pages, its state is "not_observed" — which is a
+   statement about this copy, not about the document in the world.
+2. Quote evidence verbatim, and keep it to the operative sentence — roughly 300
+   characters, never a whole section. Every entry carries its page.
+3. "Not found in these pages" and "not present in the document" are different
+   claims. value_type "unknown" is the first; a provision with presence
+   "not_present" is the second. Do not conflate them.
+4. Preserve the document's own wording in document_language. Legally meaningful
+   phrasing must survive summarization; the plain-language summary sits alongside
+   it, never instead of it.
+5. No legal conclusions. Do not say a document is valid, invalid, enforceable,
+   sufficient, controlling, revoked-in-fact or current. Report what it says and
+   what you can see.
+6. Do not predict outcomes, fill in missing clauses, or infer intent.
+7. Dates are YYYY-MM-DD. Amounts are digits only: "250000.00". Percentages are
+   numbers without the sign: "33.3".
+8. Mark is_sensitive true for Social Security numbers, tax IDs, account numbers
+   and driver's licence numbers, and keep the evidence excerpt for those short.
+9. A person named several ways in one document is one party. Merge them, keep the
+   fullest form as name, and record each distinct role separately.
+10. Where two provisions conflict, record both and describe the conflict. Do not
+    resolve it — the dates and the user decide that, not you.
+`.trim();
+
 const GENERIC_FIELDS = [
   'lender', 'interest_rate', 'monthly_payment', 'escrow_balance', 'carrier',
   'policy_type', 'policy_number', 'coverage_amount', 'premium', 'renewal_date',
@@ -451,6 +700,335 @@ function resolveLegalType(raw: unknown, types: any[]): { code: string; category:
   const hit = types.find((t) => t.code === value);
   if (hit) return { code: hit.code, category: hit.category };
   return { code: 'unknown_legal_document', category: 'unclassified' };
+}
+
+/** Header columns that mirror a common field, so the inventory can be queried. */
+const FIELD_TO_HEADER: Record<string, string> = {
+  execution_date: 'execution_date',
+  effective_date: 'effective_date',
+  expiration_date: 'expiration_date',
+  amendment_date: 'amendment_date',
+  recording_date: 'recording_date',
+  governing_jurisdiction: 'governing_jurisdiction',
+  county: 'county',
+  filing_authority: 'filing_authority',
+  instrument_number: 'instrument_number',
+};
+
+const DATE_FIELDS = new Set([
+  'execution_date', 'effective_date', 'expiration_date', 'amendment_date',
+  'recording_date', 'trust_date', 'formation_date', 'future_review_date',
+  'notary_commission_expiration',
+]);
+
+const SENSITIVE_FIELDS = new Set([
+  'social_security_number', 'tax_identification_number', 'account_number',
+  'drivers_license_number',
+]);
+
+/** Comparable form of a person's name: case, punctuation and ordering removed. */
+function nameKey(raw: string): string {
+  return String(raw ?? '')
+    .toLowerCase()
+    .replace(/\b(jr|sr|iii|ii|iv|md|esq)\b/g, '')
+    .replace(/[^a-z\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .sort()
+    .join(' ');
+}
+
+/**
+ * Suggests, never asserts. A differing spelling or address is not grounds to
+ * rewrite a household record — the match is recorded at a confidence for the
+ * user to confirm, and a partial hit is flagged as a conflict rather than
+ * silently accepted.
+ */
+// deno-lint-ignore no-explicit-any
+function suggestMatch(name: string, members: any[]): { id: string | null; confidence: number | null; state: string } {
+  const key = nameKey(name);
+  if (!key) return { id: null, confidence: null, state: 'unmatched' };
+
+  for (const member of members) {
+    if (nameKey(member.name) === key) return { id: member.id, confidence: 0.95, state: 'suggested' };
+  }
+  // Same surname and first initial: a plausible person, not a confident one.
+  const parts = key.split(' ');
+  for (const member of members) {
+    const memberParts = nameKey(member.name).split(' ');
+    const sharedSurname = parts.some((p) => p.length > 2 && memberParts.includes(p));
+    if (sharedSurname) return { id: member.id, confidence: 0.5, state: 'conflict' };
+  }
+  return { id: null, confidence: null, state: 'unmatched' };
+}
+
+/**
+ * Turns what was observed into carefully worded flags. Every one of these is a
+ * statement about the uploaded copy, never about the document's legal standing:
+ * "Command did not detect a notarization page" is a fact about our reading;
+ * "this document is not notarized" would be a claim we cannot support.
+ */
+// deno-lint-ignore no-explicit-any
+function flagsFromObservations(observations: any[], header: any): any[] {
+  // deno-lint-ignore no-explicit-any
+  const flags: any[] = [];
+  const seen = (code: string, state: string) =>
+    observations.some((o) => String(o.observation_code ?? '').includes(code) && o.state === state);
+
+  const add = (
+    flag_code: string,
+    severity: string,
+    explanation: string,
+    suggested_action: string,
+    attorney = false,
+  ) => flags.push({ flag_code, severity, explanation, suggested_action, attorney_review_suggested: attorney });
+
+  if (seen('signature', 'not_observed')) {
+    add('signature_not_detected', 'worth_reviewing',
+      'Command did not detect a signature in this uploaded copy.',
+      'Check whether the signature page was included in the scan.');
+  }
+  if (seen('notariz', 'not_observed')) {
+    add('notarization_not_detected', 'worth_reviewing',
+      'Command did not detect a notarization page in this uploaded copy.',
+      'Check whether the notary page was included. Whether one is required depends on the document and the state.',
+      true);
+  }
+  if (seen('witness', 'not_observed')) {
+    add('witness_signatures_not_detected', 'worth_reviewing',
+      'Command did not detect witness signatures in this uploaded copy.',
+      'Check whether the witness page was included in the scan.',
+      true);
+  }
+  if (seen('draft', 'observed') || header.document_status === 'draft') {
+    add('marked_draft', 'significant',
+      'This document is marked as a draft.',
+      'If a signed version exists, uploading it will give Command the executed terms.');
+  }
+  if (seen('attachment', 'not_observed') || seen('exhibit', 'not_observed') || seen('schedule', 'not_observed')) {
+    add('referenced_attachment_missing', 'worth_reviewing',
+      'The document refers to an exhibit, schedule or attachment that was not part of this upload.',
+      'Upload the missing pages so Command can read them.');
+  }
+  if (seen('page', 'not_observed')) {
+    add('pages_may_be_missing', 'worth_reviewing',
+      'The page numbering suggests pages may be missing from this upload.',
+      'Re-scan the full document and upload it again.');
+  }
+  if (header.expiration_date && header.expiration_date < new Date().toISOString().slice(0, 10)) {
+    add('past_stated_end_date', 'worth_reviewing',
+      'The end date stated in this document has passed.',
+      'Confirm whether a newer version replaced it.',
+      true);
+  }
+  return flags;
+}
+
+/**
+ * Writes one reading. Everything lands as raw extraction rows at
+ * review_status 'pending_review' — nothing here touches legal_documents or any
+ * other canonical record. Promotion happens only on user confirmation.
+ */
+async function persistLegalExtraction(
+  extractionId: string,
+  householdId: string,
+  extractor: string,
+  // deno-lint-ignore no-explicit-any
+  common: any,
+  // deno-lint-ignore no-explicit-any
+  parties: any,
+  // deno-lint-ignore no-explicit-any
+  provisions: any,
+): Promise<{ fields: number; parties: number; provisions: number; flags: number }> {
+  // deno-lint-ignore no-explicit-any
+  const headerPatch: Record<string, any> = {
+    document_title: text(common.document_title),
+    page_count: num(common.page_count),
+    document_language: text(common.document_language),
+    plain_language_summary: text(common.plain_language_summary),
+    execution_observations: common.execution_observations ?? [],
+    unresolved_items: common.unresolved_items ?? [],
+  };
+  if (LEGAL_DOCUMENT_STATUSES.includes(common.document_status)) {
+    headerPatch.document_status = common.document_status;
+  }
+
+  // Common fields, one row each, provenance attached.
+  // deno-lint-ignore no-explicit-any
+  const fieldRows: any[] = [];
+  for (const field of common.fields ?? []) {
+    const code = text(field.field_code);
+    const value = text(field.value);
+    if (!code || !value) continue;
+
+    const isDate = DATE_FIELDS.has(code);
+    fieldRows.push({
+      extraction_id: extractionId,
+      household_id: householdId,
+      field_code: code,
+      field_group: 'common',
+      value_text: value,
+      value_date: isDate ? date(value) : null,
+      value_number: !isDate ? num(field.value) : null,
+      raw_value: text(field.raw_value),
+      source_page: num(field.source_page),
+      source_section: text(field.source_section),
+      evidence: text(field.evidence),
+      confidence: clamp01(field.confidence),
+      value_type: VALUE_TYPES.includes(field.value_type) ? field.value_type : 'explicit',
+      is_sensitive: field.is_sensitive === true || SENSITIVE_FIELDS.has(code),
+    });
+
+    // Promote the handful of fields the inventory queries by.
+    const headerColumn = FIELD_TO_HEADER[code];
+    if (headerColumn && headerPatch[headerColumn] == null) {
+      headerPatch[headerColumn] = isDate ? date(value) : value;
+    }
+  }
+  if (fieldRows.length > 0) {
+    const { error } = await admin.from('legal_extracted_fields').insert(fieldRows);
+    if (error) console.error('Failed to write legal fields:', error.message);
+  }
+
+  // Parties, merged by name, with their roles as separate rows.
+  const { data: familyMembers } = await admin
+    .from('family_members').select('id, name').eq('household_id', householdId);
+
+  const partyIdByName = new Map<string, string>();
+  let roleCount = 0;
+  for (const entry of parties.parties ?? []) {
+    const name = text(entry.name);
+    if (!name) continue;
+    const key = nameKey(name);
+
+    let partyId = partyIdByName.get(key);
+    if (!partyId) {
+      const match = suggestMatch(name, familyMembers ?? []);
+      const { data: inserted, error } = await admin
+        .from('legal_parties')
+        .insert([{
+          extraction_id: extractionId,
+          household_id: householdId,
+          party_kind: PARTY_KINDS.includes(entry.party_kind) ? entry.party_kind : 'unknown',
+          name,
+          name_raw: text(entry.name_raw),
+          relationship: text(entry.relationship),
+          address: text(entry.address),
+          matched_family_member_id: match.id,
+          match_confidence: match.confidence,
+          match_state: match.state,
+          match_conflict: match.state === 'conflict'
+            ? 'A household member has a similar name. Confirm whether this is the same person.'
+            : null,
+          source_page: num(entry.source_page),
+          evidence: text(entry.evidence),
+          confidence: clamp01(entry.confidence),
+          value_type: VALUE_TYPES.includes(entry.value_type) ? entry.value_type : 'explicit',
+        }])
+        .select('id')
+        .single();
+      if (error || !inserted) {
+        console.error('Failed to write legal party:', error?.message);
+        continue;
+      }
+      partyId = inserted.id as string;
+      partyIdByName.set(key, partyId);
+    }
+
+    const roleCode = text(entry.role_code);
+    if (!roleCode) continue;
+    const { error: roleError } = await admin.from('legal_party_roles').insert([{
+      party_id: partyId,
+      extraction_id: extractionId,
+      household_id: householdId,
+      role_code: roleCode.toLowerCase().replace(/\s+/g, '_'),
+      role_detail: text(entry.role_detail),
+      priority: num(entry.priority),
+      acts_jointly: ['jointly', 'severally', 'successively', 'not_stated'].includes(entry.acts_jointly)
+        ? entry.acts_jointly
+        : 'not_stated',
+      source_page: num(entry.source_page),
+      evidence: text(entry.evidence),
+      confidence: clamp01(entry.confidence),
+    }]);
+    if (roleError) console.error('Failed to write legal role:', roleError.message);
+    else roleCount += 1;
+  }
+
+  // Type-specific provisions.
+  // deno-lint-ignore no-explicit-any
+  const provisionRows: any[] = [];
+  for (const provision of provisions.provisions ?? []) {
+    const code = text(provision.provision_code);
+    if (!code) continue;
+    provisionRows.push({
+      extraction_id: extractionId,
+      household_id: householdId,
+      extractor,
+      provision_code: code.toLowerCase().replace(/\s+/g, '_'),
+      label: text(provision.label),
+      summary: text(provision.summary),
+      document_language: text(provision.document_language),
+      applies_to: text(provision.applies_to),
+      amount: num(provision.amount),
+      percentage: num(provision.percentage),
+      effective_condition: text(provision.effective_condition),
+      // 'not_determinable' stays NULL: the document did not say, which is not
+      // the same as the provision being absent.
+      is_present: provision.presence === 'present' ? true : provision.presence === 'not_present' ? false : null,
+      source_page: num(provision.source_page),
+      source_section: text(provision.source_section),
+      evidence: text(provision.evidence),
+      confidence: clamp01(provision.confidence),
+      value_type: VALUE_TYPES.includes(provision.value_type) ? provision.value_type : 'explicit',
+    });
+  }
+  if (provisionRows.length > 0) {
+    const { error } = await admin.from('legal_provisions').insert(provisionRows);
+    if (error) console.error('Failed to write legal provisions:', error.message);
+  }
+
+  // Fiduciary gaps: named but with no successor or alternate named alongside.
+  const roleCodes = new Set(
+    (parties.parties ?? [])
+      .map((p: { role_code?: string }) => String(p.role_code ?? '').toLowerCase())
+      .filter(Boolean),
+  );
+  const derivedFlags = flagsFromObservations(common.execution_observations ?? [], headerPatch);
+  const gap = (has: string, successor: string, label: string) => {
+    if (roleCodes.has(has) && !roleCodes.has(successor)) {
+      derivedFlags.push({
+        flag_code: `${has}_without_successor`,
+        severity: 'worth_reviewing',
+        explanation: `A ${label} is named, but Command did not find a successor or alternate named in this document.`,
+        suggested_action: `Check whether a successor ${label} appears elsewhere in the document or in a later amendment.`,
+        attorney_review_suggested: true,
+      });
+    }
+  };
+  gap('executor', 'successor_executor', 'executor');
+  gap('trustee', 'successor_trustee', 'trustee');
+  gap('agent', 'successor_agent', 'agent');
+  gap('guardian', 'alternate_guardian', 'guardian');
+
+  if (derivedFlags.length > 0) {
+    const { error } = await admin.from('legal_issue_flags').insert(
+      derivedFlags.map((f) => ({ ...f, household_id: householdId, extraction_id: extractionId, confidence: 0.8 })),
+    );
+    if (error) console.error('Failed to write legal flags:', error.message);
+  }
+
+  headerPatch.processing_state = 'needs_review';
+  const { error: headerError } = await admin
+    .from('legal_document_extractions').update(headerPatch).eq('id', extractionId);
+  if (headerError) console.error('Failed to update legal extraction header:', headerError.message);
+
+  return {
+    fields: fieldRows.length,
+    parties: partyIdByName.size,
+    provisions: provisionRows.length,
+    flags: derivedFlags.length,
+  };
 }
 
 function clamp01(value: unknown): number | null {
@@ -765,6 +1343,14 @@ Deno.serve(async (req: Request) => {
 
   const failDocument = async (message: string, status: number) => {
     await admin.from('documents').update({ status: 'error' }).eq('id', document.id);
+    // A legal reading that got as far as a header row must not sit in
+    // 'processing' forever. The row and the original upload both survive, so the
+    // user can retry without re-uploading.
+    await admin
+      .from('legal_document_extractions')
+      .update({ processing_state: 'failed', failure_reason: message })
+      .eq('document_id', document.id)
+      .in('processing_state', ['uploaded', 'queued', 'processing']);
     console.error(message);
     return json({ error: message, document_id: document.id }, status);
   };
@@ -1037,8 +1623,86 @@ Deno.serve(async (req: Request) => {
       if (!document.category || document.category === 'general') {
         await admin.from('documents').update({ category: 'legal' }).eq('id', document.id);
       }
+
+      // ── Extraction ───────────────────────────────────────────────────────
+      // Three passes over the same pages, concurrent for the same reason the
+      // insurance passes are: a sixty-page trust read three times in sequence
+      // does not finish inside the edge wall clock.
+      const extractor = legalTypes.find((t) => t.code === resolved.code)?.extractor ?? 'generic';
+      const legalContext =
+        `File name: ${document.name}\n` +
+        `Classified as: ${resolved.code}${classification.legal_subtype ? ` (${classification.legal_subtype})` : ''}\n\n` +
+        `${LEGAL_EXTRACTION_RULES}`;
+
+      await admin.from('legal_document_extractions')
+        .update({ processing_state: 'processing' }).eq('id', inserted.id);
+
+      // Each pass is caught inline: losing one must not discard the other two.
+      // A document with unreadable provisions still has usable parties and dates.
+      // deno-lint-ignore no-explicit-any
+      const degrade = (label: string, empty: any) => (err: unknown) => {
+        console.warn(`Legal ${label} pass failed:`, err instanceof Error ? err.message : String(err));
+        return empty;
+      };
+
+      const commonPass = callClaude(
+        content,
+        `${legalContext}\n\nExtract the common attributes of this document. Emit one entry in ` +
+        `fields per attribute genuinely present, using these codes:\n${LEGAL_COMMON_FIELD_CODES}\n\n` +
+        `Omit a code entirely rather than guessing at it. Give every entry its page, the section ` +
+        `or clause heading where one exists, and a short verbatim excerpt.\n\n` +
+        `In execution_observations, report what you can and cannot see about how the document was ` +
+        `executed: signatures, notarization, witness signatures, a draft marking, referenced ` +
+        `exhibits or schedules that are not attached, and page numbering that suggests missing ` +
+        `pages. Use "observed" only when it is visible on these pages, "not_observed" when you ` +
+        `looked and it is not there, and "indeterminate" when the scan quality leaves it unclear. ` +
+        `Use short snake_case observation codes such as signature_present, notarization_present, ` +
+        `witness_signatures_present, marked_draft, referenced_attachment_present, pages_complete.\n\n` +
+        `The plain-language summary is two or three sentences describing what the document does, ` +
+        `in the words you would use to a friend. No advice, no assessment.`,
+        LEGAL_COMMON_SCHEMA, 'high', 12000,
+      ).catch(degrade('common', {
+        document_title: '', document_status: 'unknown', page_count: 0, document_language: '',
+        plain_language_summary: '', fields: [], execution_observations: [],
+        unresolved_items: [{ item: 'Common document attributes', why_unresolved: 'The extraction pass failed. Retry from the document vault.' }],
+      }));
+
+      const partiesPass = callClaude(
+        content,
+        `${legalContext}\n\nList every person, trust, business, court and agency named in this ` +
+        `document, with the role each one holds. Emit one entry per person-and-role pair: someone ` +
+        `who is both trustee and beneficiary gets two entries with the same name.\n\n` +
+        `Role codes are short snake_case terms taken from the document's own language — testator, ` +
+        `grantor, trustee, successor_trustee, executor, successor_executor, beneficiary, ` +
+        `contingent_beneficiary, guardian, alternate_guardian, principal, agent, successor_agent, ` +
+        `healthcare_agent, declarant, witness, notary, attorney, grantee, business_owner, party.\n\n` +
+        `Where an order of succession is stated, put it in priority (1 for first in line). Where ` +
+        `the document says how multiple agents or trustees act together, set acts_jointly. Include ` +
+        `addresses and stated relationships where given — they matter for matching people to the ` +
+        `household later — but never assert a match yourself.`,
+        LEGAL_PARTIES_SCHEMA, 'high', 12000,
+      ).catch(degrade('parties', { parties: [] }));
+
+      const provisionsPass = callClaude(
+        content,
+        `${legalContext}\n\nExtract the operative provisions of this document.\n\n` +
+        `${PROVISION_GUIDES[extractor] ?? PROVISION_GUIDES.generic}\n\n` +
+        `Emit one entry per provision actually present. Set presence to "present" when the ` +
+        `document contains it, "not_present" when the document affirmatively states its absence ` +
+        `or waives it, and "not_determinable" when these pages simply do not settle it. Put the ` +
+        `document's own operative wording in document_language and your plain-language reading in ` +
+        `summary — never replace the first with the second.`,
+        LEGAL_PROVISIONS_SCHEMA, 'high', 16000,
+      ).catch(degrade('provisions', { provisions: [] }));
+
+      const [common, partyData, provisionData] = await Promise.all([commonPass, partiesPass, provisionsPass]);
+      const counts = await persistLegalExtraction(
+        inserted.id, document.household_id, extractor, common, partyData, provisionData,
+      );
+
       await admin.from('documents').update({ status: 'processed' }).eq('id', document.id);
 
+      // Counts and codes only. Document contents never reach the logs.
       return json({
         document_id: document.id,
         mode: 'legal',
@@ -1046,9 +1710,11 @@ Deno.serve(async (req: Request) => {
         recognition: classification.legal_recognition,
         document_type: resolved.code,
         category: resolved.category,
+        extractor,
         classification_confidence: clamp01(classification.legal_confidence),
         duplicate_of: sameContent?.[0]?.id ?? null,
         extraction_version: (previous?.extraction_version ?? 0) + 1,
+        counts,
       }, 200);
     }
 

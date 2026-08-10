@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.25.2',
+    date: '2026-08-10',
+    title: 'The dashboard and the Taxes page were not the same section',
+    items: [
+      'Section rows written at onboarding under "tax" and "healthcare" now resolve to the Taxes and Health sections — the live tax grade reaches the dashboard instead of silently missing it',
+      'Sections with no page no longer look clickable',
+      'Two rows that resolve to the same section collapse into one',
+    ],
+  },
+  {
     version: '0.25.1',
     date: '2026-08-10',
     title: 'Planning for households that itemize',

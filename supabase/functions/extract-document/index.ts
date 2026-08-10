@@ -931,6 +931,9 @@ Ground rules, in priority order:
    return actually used, not from whether a Schedule A is present in the file.
 5. Report Schedule A components only when Schedule A is present and used. Do not
    reconstruct them from a 1098 or from anything else in the bundle.
+   itemized_charitable is total gifts to charity. Where Schedule A prints only
+   the parts — gifts by cash or check, and gifts other than cash — add them and
+   mark the result "calculated". This is the one figure you may add up.
 6. Carryforwards are the figures carried *out* of this year into the next —
    from the Capital Loss Carryover Worksheet, or a charitable carryover
    statement. Omit them entirely if the return does not print them.

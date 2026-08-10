@@ -2059,11 +2059,21 @@ export async function invokeDocumentExtraction(documentId: string): Promise<bool
     // Platform failures — chiefly the edge wall clock — carry `code` and
     // `message`, which the old code ignored, so a timeout surfaced as
     // "returned a non-2xx status code" and told the user nothing.
-    const message =
-      detail?.code === 'WORKER_RESOURCE_LIMIT'
+    const raw: string = detail?.error ?? detail?.message ?? error.message ?? '';
+
+    // Out of API credit is the one failure that is neither a bad document nor a
+    // bug, and the raw message buries that under a wall of JSON. Say what it is
+    // and where to fix it.
+    const outOfCredit = /credit balance is too low|insufficient.{0,20}credit/i.test(raw);
+
+    const message = outOfCredit
+      ? 'your Anthropic API account is out of credits, so nothing can be read right now. ' +
+        'Top it up at platform.claude.com under Plans & Billing — the file is safe here and you ' +
+        'can run extraction again from the vault afterwards.'
+      : detail?.code === 'WORKER_RESOURCE_LIMIT'
         ? 'the document took longer to read than the server allows. Large or multi-account ' +
           'statements can exceed it — try a single statement, or retry from the vault.'
-        : detail?.error ?? detail?.message ?? error.message;
+        : raw;
 
     console.error('Error invoking extraction function:', message);
     // The file is safely stored and the document row exists, so this is not a

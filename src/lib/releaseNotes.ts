@@ -25,6 +25,18 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.20.0',
+    date: '2026-08-10',
+    title: 'Home, rebuilt around what wears out',
+    items: [
+      'The Home section now tracks your major systems and appliances — furnace, water heater, roof, dishwasher, driveway — with make, model, age, warranty and where the paperwork lives.',
+      'A replacement timeline shows what is likely to need money and roughly when, grouped by year with running totals, so an expensive year is something you see coming rather than something that happens to you.',
+      'Equity, mortgage rate, balance and payment sit at the top. Add the loan by hand, or upload a statement.',
+      'Service lives and replacement costs are typical figures, clearly labeled as estimates. Anything you enter yourself replaces them everywhere it appears.',
+      'Children no longer appear on the Home page — they live on your profile and in Family.',
+    ],
+  },
+  {
     version: '0.19.2',
     date: '2026-08-09',
     title: 'A vault that says what went wrong',

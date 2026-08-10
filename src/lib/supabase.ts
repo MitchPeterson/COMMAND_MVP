@@ -395,6 +395,48 @@ export interface TaxDocument {
   amount: number | null;
   source: string | null;
   created_at: string;
+  // Added with tax year tracking.
+  form_type?: string | null;
+  issuer?: string | null;
+  received_on?: string | null;
+  document_id?: string | null;
+  notes?: string | null;
+  /** The derived expectation this document satisfies, if any. */
+  satisfies_expectation?: string | null;
+}
+
+/** Records that a form has arrived, ticking it off the derived checklist. */
+export async function markTaxFormReceived(
+  householdId: string,
+  taxYear: number,
+  expectationKey: string,
+  form: string,
+  issuer?: string | null,
+  documentId?: string | null,
+): Promise<boolean> {
+  const { error } = await supabase.from('tax_documents').insert([{
+    household_id: householdId,
+    name: issuer ? `${form} — ${issuer}` : form,
+    tax_year: taxYear,
+    doc_type: form,
+    form_type: form,
+    issuer: issuer ?? null,
+    status: 'received',
+    received_on: new Date().toISOString().slice(0, 10),
+    document_id: documentId ?? null,
+    satisfies_expectation: expectationKey,
+  }]);
+  if (error) {
+    console.error('Failed to record the form:', error);
+    throw new Error(`Could not record that: ${error.message}`);
+  }
+  return true;
+}
+
+export async function unmarkTaxForm(documentId: string): Promise<boolean> {
+  const { error } = await supabase.from('tax_documents').delete().eq('id', documentId);
+  if (error) throw new Error(`Could not undo that: ${error.message}`);
+  return true;
 }
 
 export interface TaxRecommendation {
@@ -2518,6 +2560,8 @@ export interface MortgageStatement {
   past_due_amount: number | null;
   interest_paid_ytd: number | null;
   principal_paid_ytd: number | null;
+  taxes_paid_ytd: number | null;
+  insurance_paid_ytd: number | null;
   processing_state: string;
   review_status: 'pending_review' | 'confirmed' | 'partially_confirmed' | 'discarded';
   created_at: string;

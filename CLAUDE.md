@@ -222,8 +222,19 @@ that is still waiting on the user belongs in the "Waiting on you" strip.
 | `adam@command-test.com` | `Command2026!` | Seeded (Adam Bailey persona) |
 | `rachel@command-test.com` | `Command2026!` | Auth only |
 | `tom@command-test.com` | `Command2026!` | Auth only |
+| `test@command.com` | `Command123` | Seeded demo (Whitfield persona) — the one to show people |
 
 Adam: user `21a95967-4bcf-4793-8076-92b4be9ffcf0`, household `a1b2c3d4-0001-0001-0001-000000000001`.
+
+**Deleting a household needs its children removed first.** A plain
+`DELETE FROM households` fails: the cascade removes tracked child rows, their
+`AFTER DELETE` trigger writes `record_history`, and the household that row
+points at is already gone. Clear the child tables, then the household.
+
+**A section only appears in the dashboard's Section Status if it has a
+`section_scores` row.** `liveScores` overrides a stored row; it does not create
+one. A section with a live scorer and no stored row is invisible on the
+dashboard while its own page grades it.
 
 Useful for end-to-end testing without the browser: sign in via `/auth/v1/token?grant_type=password`, upload to Storage, insert a `documents` row, then invoke the function with that JWT. Clean up afterwards — it is a real household.
 
@@ -234,6 +245,20 @@ Dual-income homeowners, $100k–$500k HHI, meaningful asset complexity.
 - **Adam** 44 (45 on May 15, 2026) · **Sarah** 42 · **Emma** 12 · **Jack** 9
 - HHI $325K · Net worth $2.8M · Home $750K at 1847 Oakwood Drive, Savage MN 55378
 - Drives the demo findings: no trust, outdated will, $1M umbrella against $2.8M net worth, 14-year-old HVAC
+
+## Whitfield demo persona — `test@command.com`
+
+The household to put in front of someone. Every figure is consistent across
+sections, so the findings agree with each other rather than each inventing a story.
+
+- **Marcus** 47 · **Priya** 44 · **Nina** 16 (17 on Oct 5) · **Dev** 10 · **Kai** infant
+- Edina MN · HHI $412K · net worth $3.65M · home $985K · mortgage $421,840 at 3.125%
+- Drives: $2M umbrella against $3.65M net worth, wills executed 2016 before Kai,
+  no financial POA for Priya, a 19-year-old furnace flagged at its last service,
+  a Citi card carrying $9,413 at 24.49%, and a 2025 return that puts the
+  safe harbor at $78,364 with a $9,200 capital loss carrying forward.
+- Six real PDFs in the vault: two declarations pages, a will, a mortgage
+  statement, a card statement and the 1040.
 
 ## Roadmap
 

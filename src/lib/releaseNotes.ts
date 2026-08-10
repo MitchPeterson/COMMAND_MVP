@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.23.0',
+    date: '2026-08-10',
+    title: 'Family, on a calendar',
+    items: [
+      'The Family section now builds a timeline from birth dates alone — when a child can drive and what that does to your auto premium, when they turn 18 and you lose the right to their medical information, when college starts, when custodial accounts transfer, and when they come off your health plan.',
+      'A protection estimate shows what the family would need if a parent died against the life cover actually on file, with every line of the arithmetic and every assumption named. It uses your income, net worth, mortgage balance and extracted policies — nothing new to enter.',
+      'Trump accounts: Command works out from birth dates which children qualify for the one-time $1,000 federal contribution and which can only hold an account, and says plainly that for education a 529 usually still wins.',
+    ],
+  },
+  {
     version: '0.22.1',
     date: '2026-08-10',
     title: 'Read any document again',

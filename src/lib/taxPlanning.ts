@@ -126,6 +126,29 @@ export function computeTaxPlanning(
     }
   }
 
+  // The mirror case: a household that already itemizes gets the benefit of
+  // charitable giving from the first dollar, which is different guidance
+  // entirely from the bunching advice above and is easy to get backwards.
+  if (priorReturn.took_standard_deduction === false && priorReturn.itemized_total) {
+    const standard = priorReturn.standard_deduction_amount;
+    const margin = standard ? priorReturn.itemized_total - standard : null;
+    items.push({
+      title: 'You itemized last year',
+      finding:
+        `${money(priorReturn.itemized_total)} of itemized deductions in ${priorReturn.tax_year}` +
+        (margin != null
+          ? `, ${money(Math.abs(margin))} ${margin >= 0 ? 'above' : 'below'} the standard deduction. `
+          : '. ') +
+        'While that holds, giving counts from the first dollar rather than only above a threshold ' +
+        '— the opposite of the position a household taking the standard deduction is in.',
+      question:
+        'Is this year tracking to itemize again, and does that change when giving is worth doing?',
+      horizon: 'anytime',
+      magnitude: priorReturn.itemized_total,
+      basis: `Schedule A on your ${priorReturn.tax_year} return`,
+    });
+  }
+
   // ── Carryforwards, the thing that gets lost between preparers ──────────────
   if (priorReturn.capital_loss_carryforward && priorReturn.capital_loss_carryforward > 0) {
     items.push({

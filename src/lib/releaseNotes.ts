@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.25.1',
+    date: '2026-08-10',
+    title: 'Planning for households that itemize',
+    items: [
+      'A household that itemized gets its own planning item — giving counts from the first dollar, which is the opposite of the bunching case',
+      'Schedule A charitable totals are summed from their parts when the return prints only the components',
+    ],
+  },
+  {
     version: '0.25.0',
     date: '2026-08-10',
     title: 'Tax planning against last year\'s return',

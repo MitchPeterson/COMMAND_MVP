@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.21.0',
+    date: '2026-08-10',
+    title: 'Cheaper to run, clearer when it can\'t',
+    items: [
+      'Reading a document costs roughly a third of what it did. The document is now sent to Claude once per extraction instead of three times, and classification runs on a smaller, cheaper model.',
+      'When extraction stops because the Anthropic account is out of credits, Command says exactly that and where to fix it, instead of showing a raw API error.',
+    ],
+  },
+  {
     version: '0.20.0',
     date: '2026-08-10',
     title: 'Home, rebuilt around what wears out',

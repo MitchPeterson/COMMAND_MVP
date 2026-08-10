@@ -7,6 +7,21 @@ const storageBucket = Deno.env.get('SUPABASE_STORAGE_BUCKET') ?? 'raw-uploads';
 const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
 const anthropicModel = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-opus-5';
 
+// A model per role rather than one for everything.
+//
+// Classification is a routing decision over a document we are about to read
+// properly anyway — Haiku does it at a fifth of Opus's price, and a wrong
+// classification surfaces immediately as the wrong review screen rather than as
+// a quiet error in someone's profile.
+//
+// The extraction passes stay on the main model together, deliberately. Prompt
+// caches are scoped to a model, so splitting the passes across tiers would
+// forfeit the document cache below — and caching the document beats downgrading
+// the model, because the document is the bulk of the input and it is sent three
+// times.
+const CLASSIFY_MODEL = Deno.env.get('ANTHROPIC_CLASSIFY_MODEL') ?? 'claude-haiku-4-5';
+const GENERIC_MODEL = Deno.env.get('ANTHROPIC_GENERIC_MODEL') ?? 'claude-sonnet-5';
+
 if (!supabaseUrl || !supabaseServiceRole) {
   throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for this function.');
 }
@@ -1425,19 +1440,93 @@ function buildDocumentContent(bytes: Uint8Array, mimeType: string | null): unkno
   return decoded ? [{ type: 'text', text: decoded.slice(0, 200_000) }] : [];
 }
 
+/**
+ * Marks the document as the cacheable prefix.
+ *
+ * Every pass sends the same document and then a different instruction, which is
+ * the textbook shared-prefix shape: the breakpoint goes on the last document
+ * block, so the instructions that follow can differ freely without invalidating
+ * anything. On a ten-page statement the document is the overwhelming majority of
+ * the input, and it was being paid for in full three times.
+ */
+function withDocumentCache(content: unknown[]): unknown[] {
+  if (content.length === 0) return content;
+  return content.map((block, index) =>
+    index === content.length - 1
+      ? { ...(block as Record<string, unknown>), cache_control: { type: 'ephemeral' } }
+      : block,
+  );
+}
+
+/**
+ * A cache entry is readable only once its own response has started arriving, so
+ * firing all the passes at once means every one of them pays full price. This
+ * releases the rest the moment the first pass starts streaming — or after a
+ * ceiling, because a missed cache read costs money and a stalled function costs
+ * the whole extraction.
+ */
+function cacheGate(timeoutMs = 12000) {
+  let release: () => void = () => {};
+  const opened = new Promise<void>((resolve) => { release = resolve; });
+  return {
+    onFirstEvent: () => release(),
+    wait: () => Promise.race([opened, new Promise<void>((r) => setTimeout(r, timeoutMs))]),
+  };
+}
+
 // deno-lint-ignore no-explicit-any
-async function callClaude(content: unknown[], instructions: string, schema: unknown, effort: string, maxTokens: number): Promise<any> {
+interface CallOptions {
+  model?: string;
+  /** Fires when the response starts arriving — the moment its cache entry becomes readable. */
+  onFirstEvent?: () => void;
+}
+
+// deno-lint-ignore no-explicit-any
+async function callClaude(
+  content: unknown[],
+  instructions: string,
+  schema: unknown,
+  effort: string,
+  maxTokens: number,
+  options: CallOptions = {},
+): Promise<any> {
+  const model = options.model ?? anthropicModel;
+
+  // Haiku rejects output_config.effort, and the server-side fallback list is
+  // scoped to the requested model — both are per-model, so they are set here
+  // rather than assumed.
+  const isHaiku = model.includes('haiku');
+  const outputConfig: Record<string, unknown> = { format: { type: 'json_schema', schema } };
+  if (!isHaiku) outputConfig.effort = effort;
+
+  const request: Record<string, unknown> = {
+    model,
+    max_tokens: maxTokens,
+    output_config: outputConfig,
+    messages: [{ role: 'user', content: [...content, { type: 'text', text: instructions }] }],
+  };
+  if (model.startsWith('claude-opus-5') || model.startsWith('claude-fable-5')) {
+    request.betas = ['server-side-fallback-2026-07-01'];
+    request.fallbacks = 'default';
+  }
+
   // Streamed: a long policy needs a high max_tokens, and non-streaming requests
   // at that size risk HTTP timeouts. finalMessage() still gives one whole reply.
-  const stream = anthropic!.beta.messages.stream({
-    model: anthropicModel,
-    max_tokens: maxTokens,
-    betas: ['server-side-fallback-2026-07-01'],
-    fallbacks: 'default',
-    output_config: { effort, format: { type: 'json_schema', schema } },
-    messages: [{ role: 'user', content: [...content, { type: 'text', text: instructions }] }],
-    // deno-lint-ignore no-explicit-any
-  } as any);
+  // deno-lint-ignore no-explicit-any
+  const stream = anthropic!.beta.messages.stream(request as any);
+
+  if (options.onFirstEvent) {
+    let fired = false;
+    const fire = () => { if (!fired) { fired = true; options.onFirstEvent!(); } };
+    try {
+      // deno-lint-ignore no-explicit-any
+      (stream as any).on('streamEvent', fire);
+    } catch {
+      // If the SDK does not expose the event, the caller's timeout releases the
+      // other passes instead. A missed cache read costs money, never correctness.
+    }
+  }
+
   const response = await stream.finalMessage();
 
   if (response.stop_reason === 'refusal') {
@@ -1739,6 +1828,9 @@ Deno.serve(async (req: Request) => {
       CLASSIFY_SCHEMA,
       'low',
       2048,
+      // Not cached: caches are per-model, so an entry written here would never
+      // be read by the extraction passes below.
+      { model: CLASSIFY_MODEL },
     );
 
     if (classification.is_insurance) {
@@ -1752,8 +1844,11 @@ Deno.serve(async (req: Request) => {
       // is inside Supabase's ~150s edge wall-clock only by luck; a real carrier
       // PDF exceeded it and the function was killed mid-extraction. Concurrently
       // the cost is the slowest single pass, not their sum.
+      const cached = withDocumentCache(content);
+      const gate = cacheGate();
+
       const identityPass = callClaude(
-        content,
+        cached,
         `${context}\n\nExtract policy identity and lifecycle, every insured party, every insured ` +
         `asset, every premium component (including taxes, fees, surcharges and discounts as ` +
         `separate entries), and the valuation methodology for each property category. Include ` +
@@ -1767,11 +1862,16 @@ Deno.serve(async (req: Request) => {
         `lienholders, mortgagees, loss payees and other financial interests are not people ` +
         `covered by the policy: give them role "other" and state what they hold in relationship, ` +
         `so they are never mistaken for drivers or insureds.`,
-        IDENTITY_SCHEMA, 'high', 16000,
+        IDENTITY_SCHEMA, 'high', 16000, { onFirstEvent: gate.onFirstEvent },
       );
 
+      // The other two wait for the first response to begin, which is when its
+      // document cache becomes readable. They then read it instead of re-sending
+      // the document.
+      await gate.wait();
+
       const coveragePass = callClaude(
-        content,
+        cached,
         `${context}\n\nExtract every coverage and every deductible. For each coverage give the ` +
         `standardized code, the carrier's own wording verbatim, the limit and its basis, any ` +
         `deductible, the valuation basis, and whether it is included, excluded, or simply not ` +
@@ -1796,7 +1896,7 @@ Deno.serve(async (req: Request) => {
         underlying_requirements: [], conflicts: [], unresolved_items: [],
       };
       const termsPass = callClaude(
-        content,
+        cached,
         `${context}\n\nExtract exclusions, sublimits and restrictions, every endorsement or ` +
         `rider, beneficiary and ownership designations, and any underlying limits an umbrella ` +
         `requires. Quote policy language exactly. Do not infer exclusions that are not written ` +
@@ -2001,8 +2101,11 @@ Deno.serve(async (req: Request) => {
         return empty;
       };
 
+      const legalCached = withDocumentCache(content);
+      const legalGate = cacheGate();
+
       const commonPass = callClaude(
-        content,
+        legalCached,
         `${legalContext}\n\nExtract the common attributes of this document. Emit one entry in ` +
         `fields per attribute genuinely present, using these codes:\n${LEGAL_COMMON_FIELD_CODES}\n\n` +
         `Omit a code entirely rather than guessing at it. Give every entry its page, the section ` +
@@ -2016,15 +2119,19 @@ Deno.serve(async (req: Request) => {
         `witness_signatures_present, marked_draft, referenced_attachment_present, pages_complete.\n\n` +
         `The plain-language summary is two or three sentences describing what the document does, ` +
         `in the words you would use to a friend. No advice, no assessment.`,
-        LEGAL_COMMON_SCHEMA, 'high', 12000,
+        LEGAL_COMMON_SCHEMA, 'high', 12000, { onFirstEvent: legalGate.onFirstEvent },
       ).catch(degrade('common', {
         document_title: '', document_status: 'unknown', page_count: 0, document_language: '',
         plain_language_summary: '', fields: [], execution_observations: [],
         unresolved_items: [{ item: 'Common document attributes', why_unresolved: 'The extraction pass failed. Retry from the document vault.' }],
       }));
 
+      // Released once the first pass starts streaming, so these two read the
+      // cached document rather than re-sending it.
+      await legalGate.wait();
+
       const partiesPass = callClaude(
-        content,
+        legalCached,
         `${legalContext}\n\nList every person, trust, business, court and agency named in this ` +
         `document, with the role each one holds. Emit one entry per person-and-role pair: someone ` +
         `who is both trustee and beneficiary gets two entries with the same name.\n\n` +
@@ -2040,7 +2147,7 @@ Deno.serve(async (req: Request) => {
       ).catch(degrade('parties', { parties: [] }));
 
       const provisionsPass = callClaude(
-        content,
+        legalCached,
         `${legalContext}\n\nExtract the operative provisions of this document.\n\n` +
         `${PROVISION_GUIDES[extractor] ?? PROVISION_GUIDES.generic}\n\n` +
         `Emit one entry per provision actually present. Set presence to "present" when the ` +
@@ -2130,8 +2237,11 @@ Deno.serve(async (req: Request) => {
 
       const creditContext = `File name: ${document.name}\n\n${CREDIT_RULES}`;
 
+      const creditCached = withDocumentCache(content);
+      const creditGate = cacheGate();
+
       const statementPass = callClaude(
-        content,
+        creditCached,
         `${creditContext}\n\nExtract this credit card statement. Emit one entry in fields per value ` +
         `genuinely printed, using these codes:\n${CREDIT_FIELD_CODES}\n\n` +
         `Omit a code entirely rather than guessing. Give every entry its page and a short verbatim ` +
@@ -2139,7 +2249,7 @@ Deno.serve(async (req: Request) => {
         `In apr_terms, emit one entry per interest rate the statement lists, with the balance ` +
         `subject to that rate and the interest charged at it where shown. Promotional rates carry ` +
         `their balance and expiration date when printed.`,
-        CREDIT_STATEMENT_SCHEMA, 'high', 12000,
+        CREDIT_STATEMENT_SCHEMA, 'high', 12000, { onFirstEvent: creditGate.onFirstEvent },
       ).catch((err) => {
         console.warn('Credit statement pass failed:', err instanceof Error ? err.message : String(err));
         return {
@@ -2148,8 +2258,10 @@ Deno.serve(async (req: Request) => {
         };
       });
 
+      await creditGate.wait();
+
       const transactionsPass = callClaude(
-        content,
+        creditCached,
         `${creditContext}\n\nList every transaction on this statement in order. Give the ` +
         `transaction date, the posting date where both are shown, the merchant description as ` +
         `printed, the amount as a positive number, and direction 'charge' or 'credit'.\n\n` +
@@ -2202,6 +2314,7 @@ Deno.serve(async (req: Request) => {
       GENERIC_SCHEMA,
       'medium',
       4096,
+      { model: GENERIC_MODEL },
     );
 
     const fields: Record<string, string> = {};

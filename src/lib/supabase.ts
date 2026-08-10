@@ -2250,6 +2250,238 @@ export async function getDocumentExtractions(householdId: string): Promise<Docum
   return data ?? [];
 }
 
+// ─────────────────────────────────────────────────────────────
+// Home systems and the mortgage
+// ─────────────────────────────────────────────────────────────
+
+export interface HomeSystem {
+  id: string;
+  household_id: string;
+  name: string;
+  category: string;
+  location: string | null;
+  make: string | null;
+  model: string | null;
+  serial_number: string | null;
+  installed_on: string | null;
+  approximate_age_years: number | null;
+  purchase_price: number | null;
+  purchased_from: string | null;
+  expected_life_years: number | null;
+  user_expected_life_years: number | null;
+  replacement_cost_estimate: number | null;
+  user_replacement_cost: number | null;
+  warranty_provider: string | null;
+  warranty_type: string | null;
+  warranty_expires_on: string | null;
+  warranty_notes: string | null;
+  condition_note: string | null;
+  last_serviced_on: string | null;
+  notes: string | null;
+  entry_source: string;
+  source_document_id: string | null;
+  created_at: string;
+}
+
+export interface HomeSystemDocument {
+  id: string;
+  household_id: string;
+  system_id: string;
+  document_id: string;
+  doc_role: 'warranty' | 'manual' | 'receipt' | 'invoice' | 'service_contract' | 'inspection' | 'other';
+}
+
+export interface MortgageAccount {
+  id: string;
+  household_id: string;
+  servicer: string | null;
+  loan_number_last4: string | null;
+  property_address: string | null;
+  original_amount: number | null;
+  principal_balance: number | null;
+  interest_rate: number | null;
+  rate_type: string | null;
+  term_months: number | null;
+  origination_date: string | null;
+  maturity_date: string | null;
+  monthly_payment: number | null;
+  escrow_payment: number | null;
+  escrow_balance: number | null;
+  pmi_amount: number | null;
+  payment_due_date: string | null;
+  balance_as_of: string | null;
+  entry_source: string;
+  latest_statement_id: string | null;
+  last_confirmed_at: string | null;
+}
+
+export async function getHomeSystems(householdId: string): Promise<HomeSystem[]> {
+  const { data, error } = await supabase
+    .from('home_systems').select('*').eq('household_id', householdId).order('category');
+  if (error) {
+    console.error('Error fetching home systems:', error);
+    return [];
+  }
+  return (data ?? []) as HomeSystem[];
+}
+
+export async function getHomeSystemDocuments(householdId: string): Promise<HomeSystemDocument[]> {
+  const { data, error } = await supabase
+    .from('home_system_documents').select('*').eq('household_id', householdId);
+  if (error) {
+    console.error('Error fetching system documents:', error);
+    return [];
+  }
+  return (data ?? []) as HomeSystemDocument[];
+}
+
+export async function getMortgageAccount(householdId: string): Promise<MortgageAccount | null> {
+  const { data, error } = await supabase
+    .from('mortgage_accounts').select('*').eq('household_id', householdId)
+    .order('updated_at', { ascending: false }).limit(1).maybeSingle();
+  if (error) {
+    console.error('Error fetching mortgage:', error);
+    return null;
+  }
+  return (data as MortgageAccount) ?? null;
+}
+
+/**
+ * Form fields arrive as strings; the row stores numbers and dates. Widening the
+ * numeric fields here means the caller passes what the input element gave it and
+ * the parsing lives in one place, rather than every form doing its own Number().
+ */
+type FromForm<T> = { [K in keyof T]?: T[K] extends number | null ? string | number | null : T[K] };
+
+export type HomeSystemInput = FromForm<Omit<HomeSystem, 'id' | 'household_id' | 'created_at'>> & {
+  name: string;
+  category: string;
+};
+
+/** Numbers arrive from text inputs; empty means "not known", not zero. */
+function numberOrNull(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  const parsed = Number(String(value).replace(/[^0-9.\-]/g, ''));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeSystem(input: Partial<HomeSystemInput>): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  const text = (v: unknown) => (String(v ?? '').trim() || null);
+
+  if (input.name !== undefined) patch.name = String(input.name).trim();
+  if (input.category !== undefined) patch.category = input.category;
+  for (const key of ['location', 'make', 'model', 'serial_number', 'purchased_from', 'warranty_provider',
+    'warranty_notes', 'condition_note', 'notes'] as const) {
+    if (input[key] !== undefined) patch[key] = text(input[key]);
+  }
+  for (const key of ['installed_on', 'warranty_expires_on', 'last_serviced_on'] as const) {
+    if (input[key] !== undefined) patch[key] = (input[key] as string) || null;
+  }
+  for (const key of ['approximate_age_years', 'purchase_price', 'user_expected_life_years',
+    'user_replacement_cost'] as const) {
+    if (input[key] !== undefined) patch[key] = numberOrNull(input[key]);
+  }
+  if (input.warranty_type !== undefined) patch.warranty_type = input.warranty_type || null;
+  return patch;
+}
+
+export async function addHomeSystem(householdId: string, input: HomeSystemInput): Promise<HomeSystem> {
+  const { data, error } = await supabase
+    .from('home_systems')
+    .insert([{ household_id: householdId, entry_source: 'manual', ...normalizeSystem(input) }])
+    .select('*')
+    .single();
+  if (error || !data) {
+    console.error('Failed to add the system:', error);
+    throw new Error(`Could not add that: ${error?.message ?? 'no row returned'}`);
+  }
+  return data as HomeSystem;
+}
+
+export async function updateHomeSystem(systemId: string, input: Partial<HomeSystemInput>): Promise<boolean> {
+  const patch = normalizeSystem(input);
+  patch.updated_at = new Date().toISOString();
+  const { error } = await supabase.from('home_systems').update(patch).eq('id', systemId);
+  if (error) {
+    console.error('Failed to update the system:', error);
+    throw new Error(`Could not save that: ${error.message}`);
+  }
+  return true;
+}
+
+export async function deleteHomeSystem(systemId: string): Promise<boolean> {
+  const { error } = await supabase.from('home_systems').delete().eq('id', systemId);
+  if (error) {
+    console.error('Failed to remove the system:', error);
+    throw new Error(`Could not remove that: ${error.message}`);
+  }
+  return true;
+}
+
+/** Files a document against a system, which is how "where is the warranty" gets answered. */
+export async function attachDocumentToSystem(
+  householdId: string,
+  systemId: string,
+  documentId: string,
+  role: HomeSystemDocument['doc_role'] = 'warranty',
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('home_system_documents')
+    .upsert(
+      { household_id: householdId, system_id: systemId, document_id: documentId, doc_role: role },
+      { onConflict: 'system_id,document_id,doc_role' },
+    );
+  if (error) {
+    console.error('Failed to attach the document:', error);
+    throw new Error(`Could not attach that document: ${error.message}`);
+  }
+  return true;
+}
+
+export type MortgageInput = FromForm<Omit<MortgageAccount, 'id' | 'household_id'>>;
+
+/**
+ * One mortgage per household in this version. A second property is a real case
+ * and a real schema change; pretending to support it with an unlabeled second
+ * row would be worse than saying so.
+ */
+export async function saveMortgage(householdId: string, input: MortgageInput): Promise<MortgageAccount> {
+  const patch: Record<string, unknown> = {};
+  const text = (v: unknown) => (String(v ?? '').trim() || null);
+
+  for (const key of ['servicer', 'property_address', 'rate_type'] as const) {
+    if (input[key] !== undefined) patch[key] = text(input[key]);
+  }
+  if (input.loan_number_last4 !== undefined) {
+    const digits = String(input.loan_number_last4 ?? '').replace(/\D/g, '');
+    patch.loan_number_last4 = digits ? digits.slice(-4) : null;
+  }
+  for (const key of ['original_amount', 'principal_balance', 'interest_rate', 'term_months',
+    'monthly_payment', 'escrow_payment', 'escrow_balance', 'pmi_amount'] as const) {
+    if (input[key] !== undefined) patch[key] = numberOrNull(input[key]);
+  }
+  for (const key of ['origination_date', 'maturity_date', 'payment_due_date', 'balance_as_of'] as const) {
+    if (input[key] !== undefined) patch[key] = (input[key] as string) || null;
+  }
+  patch.updated_at = new Date().toISOString();
+
+  const existing = await getMortgageAccount(householdId);
+  if (existing) {
+    const { error } = await supabase.from('mortgage_accounts').update(patch).eq('id', existing.id);
+    if (error) throw new Error(`Could not save the mortgage: ${error.message}`);
+    return { ...existing, ...(patch as unknown as Partial<MortgageAccount>) };
+  }
+
+  const { data, error } = await supabase
+    .from('mortgage_accounts')
+    .insert([{ household_id: householdId, entry_source: 'manual', ...patch }])
+    .select('*')
+    .single();
+  if (error || !data) throw new Error(`Could not save the mortgage: ${error?.message ?? 'no row returned'}`);
+  return data as MortgageAccount;
+}
+
 export async function getAssets(householdId: string): Promise<Asset[]> {
   const { data, error } = await supabase
     .from('assets')

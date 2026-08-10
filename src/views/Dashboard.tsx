@@ -6,6 +6,7 @@ import { uploadDocumentAsset, invokeDocumentExtraction } from '../lib/supabase';
 import { computeCoverageHealth } from '../lib/coverageHealth';
 import { computeLegalHealth } from '../lib/legalHealth';
 import { computeCreditHealth } from '../lib/creditHealth';
+import { computeHomeHealth } from '../lib/homeHealth';
 import { buildPriorityActions, type RankedAction, type RankedSeverity } from '../lib/priorityActions';
 import {
   Shield,
@@ -110,6 +111,15 @@ export function DashboardView({ onNavigate }: DashboardProps) {
     [data?.creditCards, data?.profile],
   );
 
+  const home = useMemo(
+    () => computeHomeHealth(
+      (data?.homeSystems ?? []) as never,
+      data?.profile,
+      data?.mortgage?.principal_balance ?? null,
+    ),
+    [data?.homeSystems, data?.profile, data?.mortgage],
+  );
+
   // Any section with a live score overrides its stored row. The stored rows were
   // written once at onboarding and never recalculated, so without this an upload
   // changes the section page and leaves the dashboard telling the old story.
@@ -145,8 +155,18 @@ export function DashboardView({ onNavigate }: DashboardProps) {
             : credit.findings[0].title,
       };
     }
+    if (home.score !== null) {
+      live.home = {
+        score: home.score,
+        status: home.status,
+        summary:
+          home.findings.length === 0
+            ? 'Nothing on file is near the end of its service life.'
+            : home.findings[0].title,
+      };
+    }
     return live;
-  }, [coverage, legal, credit]);
+  }, [coverage, legal, credit, home]);
 
   const sectionScores = useMemo(() => {
     const rows = (data?.sectionScores ?? []).map((section) => {

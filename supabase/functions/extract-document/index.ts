@@ -315,6 +315,19 @@ const TERMS_SCHEMA = {
 
 const LEGAL_RECOGNITION = ['legal', 'possibly_legal', 'not_legal'];
 
+// Mirrors SYSTEM_CATEGORIES in src/lib/homeSystems.ts. Kept in the prompt rather
+// than the grammar for the same reason the legal taxonomy is.
+const HOME_CATEGORY_CODES =
+  'furnace, air_conditioner, heat_pump, water_heater, water_softener, sump_pump, ' +
+  'electrical_panel, roof_asphalt, roof_metal, windows, siding, gutters, garage_door, ' +
+  'refrigerator, range, dishwasher, washer, dryer, microwave, garbage_disposal, ' +
+  'deck, driveway, fence, other';
+
+const HOME_DOCUMENT_TYPES = [
+  'mortgage_statement', 'appliance_warranty', 'appliance_manual', 'appliance_receipt',
+  'service_contract', 'home_inspection', 'contractor_invoice', 'none',
+];
+
 const LEGAL_DOCUMENT_STATUSES = [
   'draft', 'executed', 'amended', 'revoked', 'expired', 'recorded', 'certified_copy', 'unknown',
 ];
@@ -344,11 +357,16 @@ const CLASSIFY_SCHEMA = {
     document_status: { type: 'string', enum: LEGAL_DOCUMENT_STATUSES },
     page_count: { type: 'number' },
     document_language: { type: 'string' },
+
+    // Home paperwork. A mortgage statement was already recognized as a legacy
+    // financial type and read as loose strings; a warranty had no home at all.
+    home_document_type: { type: 'string', enum: HOME_DOCUMENT_TYPES },
   },
   required: [
     'is_insurance', 'document_class', 'insurance_type', 'legacy_type', 'confidence',
     'legal_recognition', 'legal_type', 'legal_subtype', 'legal_confidence', 'legal_reason',
     'document_title', 'document_status', 'page_count', 'document_language',
+    'home_document_type',
   ],
   additionalProperties: false,
 };
@@ -367,12 +385,17 @@ Legal classification rules:
 4. legal_confidence is 0 to 1 for the *type*, independent of recognition.
 5. legal_reason is one sentence naming what in the document decided it — a title,
    a recital, a signature block. This is shown to the user.
-6. document_status reports what the document says about itself: "draft" if it is
+6. home_document_type identifies paperwork about the house itself. A mortgage
+   statement, a warranty card or certificate, an appliance manual, a purchase
+   receipt for equipment, a home service contract, an inspection report, or a
+   contractor's invoice. Anything else is "none" — this is a narrow field, not a
+   catch-all for documents that happen to mention a house.
+7. document_status reports what the document says about itself: "draft" if it is
    marked draft, "recorded" if it carries recording detail, "executed" if it is
    signed and dated. Use "unknown" when the pages do not say. This is never a
    judgement about whether the document is valid or effective.
-7. document_title is the document's own title, verbatim. Empty string if untitled.
-8. page_count is the number of pages provided. 0 if you cannot tell.
+8. document_title is the document's own title, verbatim. Empty string if untitled.
+9. page_count is the number of pages provided. 0 if you cannot tell.
 `.trim();
 
 // ─────────────────────────────────────────────────────────────
@@ -756,6 +779,138 @@ Ground rules, in priority order:
    direction carries the sign. Dates are YYYY-MM-DD. Percentages are plain: "24.99".
 8. Quote evidence verbatim and keep it to the line the value came from.
 `.trim();
+
+
+// ─────────────────────────────────────────────────────────────
+// Home documents
+//
+// One pass each. A mortgage statement is a page of figures and a warranty is a
+// page of terms — neither carries the transaction list or the forty-field
+// vocabulary that made the credit and legal paths multi-pass.
+// ─────────────────────────────────────────────────────────────
+
+const MORTGAGE_FIELD_CODES = `
+  servicer, loan_number_last4, property_address, borrower, statement_date,
+  payment_due_date, principal_balance, original_amount, interest_rate, rate_type,
+  maturity_date, monthly_payment, principal_portion, interest_portion,
+  escrow_portion, escrow_balance, pmi_amount, past_due_amount,
+  interest_paid_ytd, principal_paid_ytd, taxes_paid_ytd, insurance_paid_ytd
+`.trim();
+
+const MORTGAGE_SCHEMA = {
+  type: 'object',
+  properties: {
+    fields: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          field_code: { type: 'string' },
+          value: { type: 'string' },
+          raw_value: { type: 'string' },
+          value_type: { type: 'string', enum: VALUE_TYPES },
+          source_page: { type: 'number' },
+          evidence: { type: 'string' },
+          confidence: { type: 'number' },
+        },
+        required: ['field_code', 'value', 'raw_value', 'value_type', 'source_page', 'evidence', 'confidence'],
+        additionalProperties: false,
+      },
+    },
+    unresolved_items: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { item: { type: 'string' }, why_unresolved: { type: 'string' } },
+        required: ['item', 'why_unresolved'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['fields', 'unresolved_items'],
+  additionalProperties: false,
+};
+
+const MORTGAGE_RULES = `
+Ground rules, in priority order:
+
+1. Record only the last four digits of the loan number, in loan_number_last4.
+   Never output a full loan or account number anywhere, including in evidence —
+   truncate the excerpt instead.
+2. principal_balance is what is still owed. It is not the original loan amount,
+   not the payoff quote, and not the escrow balance. Keep all four apart.
+3. The monthly payment usually breaks into principal, interest and escrow. Record
+   the total and each part it prints; do not compute a part it does not show.
+4. Do not infer an interest rate, a maturity date or PMI. If the statement does
+   not print it, omit the field — a rate you worked out from the payment is not
+   the rate on the note.
+5. Amounts are digits only: "1842.19". Rates are plain numbers: "6.25". Dates are
+   YYYY-MM-DD.
+6. Quote evidence verbatim and keep it to the line the value came from.
+`.trim();
+
+const APPLIANCE_SCHEMA = {
+  type: 'object',
+  properties: {
+    document_kind: {
+      type: 'string',
+      enum: ['warranty', 'manual', 'receipt', 'invoice', 'service_contract', 'inspection', 'other'],
+    },
+    product_name: { type: 'string' },
+    suggested_category: { type: 'string' },
+    make: { type: 'string' },
+    model: { type: 'string' },
+    serial_number: { type: 'string' },
+    purchased_on: { type: 'string' },
+    installed_on: { type: 'string' },
+    purchase_price: { type: 'string' },
+    purchased_from: { type: 'string' },
+    warranty_provider: { type: 'string' },
+    warranty_type: { type: 'string' },
+    warranty_starts_on: { type: 'string' },
+    warranty_expires_on: { type: 'string' },
+    warranty_length_months: { type: 'string' },
+    coverage_summary: { type: 'string' },
+    exclusions_summary: { type: 'string' },
+    claim_contact: { type: 'string' },
+    fields: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          field: { type: 'string' },
+          value: { type: 'string' },
+          source_page: { type: 'number' },
+          evidence: { type: 'string' },
+          confidence: { type: 'number' },
+        },
+        required: ['field', 'value', 'source_page', 'evidence', 'confidence'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['document_kind', 'product_name', 'suggested_category', 'make', 'model', 'serial_number',
+    'purchased_on', 'installed_on', 'purchase_price', 'purchased_from', 'warranty_provider',
+    'warranty_type', 'warranty_starts_on', 'warranty_expires_on', 'warranty_length_months',
+    'coverage_summary', 'exclusions_summary', 'claim_contact', 'fields'],
+  additionalProperties: false,
+};
+
+const APPLIANCE_RULES = `
+Ground rules, in priority order:
+
+1. suggested_category is one of these codes, whichever fits: ${HOME_CATEGORY_CODES}.
+   Use "other" rather than forcing a poor fit.
+2. A warranty length and a warranty end date are different things. Record whichever
+   the document prints; only fill both if both appear. Do not add a length to a
+   purchase date to invent an end date — the clock often starts at installation.
+3. Do not infer coverage. Summarize what the document says is covered and what it
+   says is excluded, in a sentence each, and leave them empty if it does not say.
+4. warranty_type is one of: manufacturer, extended, home_warranty, installer.
+5. Amounts are digits only. Dates are YYYY-MM-DD. Months are whole numbers.
+6. Every entry in fields carries its page and a short verbatim excerpt.
+`.trim();
+
 
 const GENERIC_FIELDS = [
   'lender', 'interest_rate', 'monthly_payment', 'escrow_balance', 'carrier',
@@ -1787,6 +1942,11 @@ Deno.serve(async (req: Request) => {
       .update({ processing_state: 'failed', failure_reason: message })
       .eq('document_id', document.id)
       .in('processing_state', ['uploaded', 'queued', 'processing']);
+    await admin
+      .from('mortgage_statements')
+      .update({ processing_state: 'failed', failure_reason: message })
+      .eq('document_id', document.id)
+      .in('processing_state', ['uploaded', 'queued', 'processing']);
     console.error(message);
     return json({ error: message, document_id: document.id }, status);
   };
@@ -2301,6 +2461,168 @@ Deno.serve(async (req: Request) => {
         reprocessed: Boolean(existingStatement),
         counts,
         transactions_truncated: transactionData.truncated === true,
+      }, 200);
+    }
+
+    // Home paperwork: the mortgage statement and anything about a system in the
+    // house. Both are single-pass — a page of figures and a page of terms.
+    const homeType = classification.home_document_type;
+    if (homeType === 'mortgage_statement' || classification.legacy_type === 'mortgage_statement') {
+      const digest = await crypto.subtle.digest('SHA-256', bytes);
+      const contentHash = Array.from(new Uint8Array(digest))
+        .map((b) => b.toString(16).padStart(2, '0')).join('');
+
+      const { data: prior } = await admin
+        .from('mortgage_statements').select('id')
+        .eq('household_id', document.household_id).eq('content_hash', contentHash).maybeSingle();
+
+      let statementId: string;
+      if (prior) {
+        statementId = prior.id;
+        await admin.from('mortgage_statements')
+          .update({ processing_state: 'processing', document_id: document.id })
+          .eq('id', statementId);
+      } else {
+        const { data: inserted, error: insertError } = await admin
+          .from('mortgage_statements')
+          .insert([{
+            household_id: document.household_id, document_id: document.id,
+            processing_state: 'processing', review_status: 'pending_review',
+            content_hash: contentHash, extractor_version: EXTRACTOR_VERSION, model: anthropicModel,
+          }])
+          .select('id').single();
+        if (insertError || !inserted) {
+          return await failDocument(`Could not record the statement: ${insertError?.message ?? 'no row'}`, 500);
+        }
+        statementId = inserted.id;
+      }
+
+      const mortgage = await callClaude(
+        content,
+        `Read this mortgage statement. File name: ${document.name}\n\n${MORTGAGE_RULES}\n\n` +
+        `Emit one entry in fields per value genuinely printed, using these codes:\n` +
+        `${MORTGAGE_FIELD_CODES}\n\nOmit a code entirely rather than guessing at it.`,
+        MORTGAGE_SCHEMA, 'high', 8000,
+      );
+
+      // deno-lint-ignore no-explicit-any
+      const header: Record<string, any> = {};
+      // deno-lint-ignore no-explicit-any
+      const fieldRows: any[] = [];
+      const MORTGAGE_DATES = new Set(['statement_date', 'payment_due_date', 'maturity_date']);
+      const MORTGAGE_TEXT = new Set(['servicer', 'property_address', 'borrower', 'rate_type', 'loan_number_last4']);
+
+      for (const field of mortgage.fields ?? []) {
+        const code = text(field.field_code);
+        const rawValue = text(field.value);
+        if (!code || !rawValue) continue;
+
+        const isLastFour = code === 'loan_number_last4';
+        const value = isLastFour ? lastFourOnly(rawValue) : rawValue;
+        if (!value) continue;
+
+        const isDate = MORTGAGE_DATES.has(code);
+        const isText = MORTGAGE_TEXT.has(code);
+
+        fieldRows.push({
+          statement_id: statementId, household_id: document.household_id,
+          field_code: code,
+          value_text: value,
+          value_number: !isDate && !isText ? num(value) : null,
+          value_date: isDate ? date(value) : null,
+          raw_value: isLastFour ? value : scrubCardNumbers(text(field.raw_value)),
+          source_page: num(field.source_page),
+          evidence: scrubCardNumbers(text(field.evidence)),
+          confidence: clamp01(field.confidence),
+          value_type: VALUE_TYPES.includes(field.value_type) ? field.value_type : 'explicit',
+          is_sensitive: isLastFour,
+        });
+        header[code] = isDate ? date(value) : isText ? value : num(value);
+      }
+
+      if (fieldRows.length > 0) {
+        const { error } = await admin.from('mortgage_statement_fields')
+          .upsert(fieldRows, { onConflict: 'statement_id,field_code' });
+        if (error) console.error('Failed to write mortgage fields:', error.message);
+      }
+
+      await admin.from('mortgage_statements').update({
+        ...header,
+        unresolved_items: mortgage.unresolved_items ?? [],
+        processing_state: 'needs_review',
+      }).eq('id', statementId);
+
+      if (!document.category || document.category === 'general') {
+        await admin.from('documents').update({ category: 'home' }).eq('id', document.id);
+      }
+      await admin.from('documents').update({ status: 'processed' }).eq('id', document.id);
+
+      return json({
+        document_id: document.id, mode: 'mortgage', statement_id: statementId,
+        reprocessed: Boolean(prior), fields: fieldRows.length,
+      }, 200);
+    }
+
+    if (['appliance_warranty', 'appliance_manual', 'appliance_receipt', 'service_contract']
+      .includes(homeType)) {
+      const digest = await crypto.subtle.digest('SHA-256', bytes);
+      const contentHash = Array.from(new Uint8Array(digest))
+        .map((b) => b.toString(16).padStart(2, '0')).join('');
+
+      const appliance = await callClaude(
+        content,
+        `Read this document about a household system or appliance. File name: ${document.name}\n\n` +
+        `${APPLIANCE_RULES}\n\nIdentify what the equipment is, who made it, and what any warranty ` +
+        `covers and until when. Leave a field empty rather than guessing at it.`,
+        APPLIANCE_SCHEMA, 'high', 8000,
+      );
+
+      const row = {
+        household_id: document.household_id,
+        document_id: document.id,
+        content_hash: contentHash,
+        document_kind: ['warranty', 'manual', 'receipt', 'invoice', 'service_contract', 'inspection', 'other']
+          .includes(appliance.document_kind) ? appliance.document_kind : 'other',
+        product_name: text(appliance.product_name),
+        suggested_category: text(appliance.suggested_category),
+        make: text(appliance.make),
+        model: text(appliance.model),
+        serial_number: text(appliance.serial_number),
+        purchased_on: date(appliance.purchased_on),
+        installed_on: date(appliance.installed_on),
+        purchase_price: num(appliance.purchase_price),
+        purchased_from: text(appliance.purchased_from),
+        warranty_provider: text(appliance.warranty_provider),
+        warranty_type: text(appliance.warranty_type),
+        warranty_starts_on: date(appliance.warranty_starts_on),
+        warranty_expires_on: date(appliance.warranty_expires_on),
+        warranty_length_months: num(appliance.warranty_length_months),
+        coverage_summary: text(appliance.coverage_summary),
+        exclusions_summary: text(appliance.exclusions_summary),
+        claim_contact: text(appliance.claim_contact),
+        fields: appliance.fields ?? [],
+        processing_state: 'needs_review',
+        review_status: 'pending_review',
+        extractor_version: EXTRACTOR_VERSION,
+        extraction_model: anthropicModel,
+      };
+
+      const { data: saved, error: saveError } = await admin
+        .from('appliance_extractions')
+        .upsert(row, { onConflict: 'household_id,content_hash' })
+        .select('id').single();
+      if (saveError) {
+        return await failDocument(`Could not record the warranty: ${saveError.message}`, 500);
+      }
+
+      if (!document.category || document.category === 'general') {
+        await admin.from('documents').update({ category: 'home' }).eq('id', document.id);
+      }
+      await admin.from('documents').update({ status: 'processed' }).eq('id', document.id);
+
+      return json({
+        document_id: document.id, mode: 'appliance', extraction_id: saved?.id,
+        product: row.product_name, category: row.suggested_category,
       }, 200);
     }
 

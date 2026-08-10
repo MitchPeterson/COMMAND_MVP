@@ -2492,6 +2492,220 @@ export async function saveMortgage(householdId: string, input: MortgageInput): P
   return data as MortgageAccount;
 }
 
+
+export interface MortgageStatement {
+  id: string;
+  household_id: string;
+  document_id: string;
+  mortgage_account_id: string | null;
+  servicer: string | null;
+  loan_number_last4: string | null;
+  property_address: string | null;
+  borrower: string | null;
+  statement_date: string | null;
+  payment_due_date: string | null;
+  principal_balance: number | null;
+  original_amount: number | null;
+  interest_rate: number | null;
+  rate_type: string | null;
+  maturity_date: string | null;
+  monthly_payment: number | null;
+  principal_portion: number | null;
+  interest_portion: number | null;
+  escrow_portion: number | null;
+  escrow_balance: number | null;
+  pmi_amount: number | null;
+  past_due_amount: number | null;
+  interest_paid_ytd: number | null;
+  principal_paid_ytd: number | null;
+  processing_state: string;
+  review_status: 'pending_review' | 'confirmed' | 'partially_confirmed' | 'discarded';
+  created_at: string;
+}
+
+export interface ApplianceExtraction {
+  id: string;
+  household_id: string;
+  document_id: string;
+  home_system_id: string | null;
+  document_kind: string;
+  product_name: string | null;
+  suggested_category: string | null;
+  make: string | null;
+  model: string | null;
+  serial_number: string | null;
+  purchased_on: string | null;
+  installed_on: string | null;
+  purchase_price: number | null;
+  purchased_from: string | null;
+  warranty_provider: string | null;
+  warranty_type: string | null;
+  warranty_starts_on: string | null;
+  warranty_expires_on: string | null;
+  warranty_length_months: number | null;
+  coverage_summary: string | null;
+  exclusions_summary: string | null;
+  claim_contact: string | null;
+  fields: Array<{ field: string; value: string; source_page?: number; evidence?: string; confidence?: number }>;
+  review_status: 'pending_review' | 'confirmed' | 'partially_confirmed' | 'discarded';
+  created_at: string;
+}
+
+export async function getMortgageStatements(householdId: string): Promise<MortgageStatement[]> {
+  const { data, error } = await supabase
+    .from('mortgage_statements').select('*').eq('household_id', householdId)
+    .neq('processing_state', 'deleted')
+    .order('statement_date', { ascending: false, nullsFirst: false });
+  if (error) {
+    console.error('Error fetching mortgage statements:', error);
+    return [];
+  }
+  return (data ?? []) as MortgageStatement[];
+}
+
+export async function getApplianceExtractions(householdId: string): Promise<ApplianceExtraction[]> {
+  const { data, error } = await supabase
+    .from('appliance_extractions').select('*').eq('household_id', householdId)
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error('Error fetching appliance extractions:', error);
+    return [];
+  }
+  return (data ?? []) as ApplianceExtraction[];
+}
+
+/**
+ * Promotes a read statement onto the mortgage record.
+ *
+ * An older statement never overwrites a newer one's balance — a mortgage
+ * balance only goes one direction, and a statement from March filed in August
+ * would otherwise undo eight payments.
+ */
+export async function confirmMortgageStatement(statement: MortgageStatement): Promise<MortgageAccount> {
+  const existing = await getMortgageAccount(householdIdOf(statement));
+  const isNewer =
+    !existing?.balance_as_of || !statement.statement_date || statement.statement_date >= existing.balance_as_of;
+
+  const values: MortgageInput = {
+    servicer: statement.servicer,
+    loan_number_last4: statement.loan_number_last4,
+    property_address: statement.property_address,
+    original_amount: statement.original_amount,
+    interest_rate: statement.interest_rate,
+    rate_type: statement.rate_type,
+    maturity_date: statement.maturity_date,
+    monthly_payment: statement.monthly_payment,
+    escrow_payment: statement.escrow_portion,
+    escrow_balance: statement.escrow_balance,
+    pmi_amount: statement.pmi_amount,
+    payment_due_date: statement.payment_due_date,
+  };
+  if (isNewer) {
+    values.principal_balance = statement.principal_balance;
+    values.balance_as_of = statement.statement_date;
+  }
+
+  const account = await saveMortgage(statement.household_id, values);
+
+  await supabase.from('mortgage_accounts')
+    .update({ entry_source: 'extracted', latest_statement_id: statement.id,
+      source_document_id: statement.document_id, last_confirmed_at: new Date().toISOString() })
+    .eq('id', account.id);
+
+  const { error } = await supabase.from('mortgage_statements')
+    .update({ review_status: 'confirmed', processing_state: 'confirmed', mortgage_account_id: account.id })
+    .eq('id', statement.id);
+  if (error) throw new Error(`Could not link this statement: ${error.message}`);
+
+  return account;
+}
+
+function householdIdOf(row: { household_id: string }): string {
+  return row.household_id;
+}
+
+export async function discardMortgageStatement(statementId: string): Promise<boolean> {
+  const { error } = await supabase.from('mortgage_statements')
+    .update({ review_status: 'discarded', processing_state: 'deleted' }).eq('id', statementId);
+  if (error) throw new Error(`Could not discard that: ${error.message}`);
+  return true;
+}
+
+/**
+ * Turns a read warranty into a tracked system, or files it against one that
+ * already exists. Nothing about the house changes until this is called.
+ */
+export async function confirmApplianceExtraction(
+  extraction: ApplianceExtraction,
+  targetSystemId: string | null,
+): Promise<string> {
+  let systemId = targetSystemId;
+
+  if (systemId) {
+    // Filling gaps on an existing system, never overwriting what is already known.
+    const { data: current } = await supabase
+      .from('home_systems').select('*').eq('id', systemId).single();
+    const patch: Record<string, unknown> = {};
+    const fill = (key: string, value: unknown) => {
+      if (value != null && value !== '' && (current as Record<string, unknown> | null)?.[key] == null) {
+        patch[key] = value;
+      }
+    };
+    fill('make', extraction.make);
+    fill('model', extraction.model);
+    fill('serial_number', extraction.serial_number);
+    fill('installed_on', extraction.installed_on ?? extraction.purchased_on);
+    fill('purchase_price', extraction.purchase_price);
+    fill('purchased_from', extraction.purchased_from);
+    fill('warranty_provider', extraction.warranty_provider);
+    fill('warranty_type', extraction.warranty_type);
+    fill('warranty_expires_on', extraction.warranty_expires_on);
+    fill('warranty_notes', extraction.coverage_summary);
+    if (Object.keys(patch).length > 0) {
+      const { error } = await supabase.from('home_systems').update(patch).eq('id', systemId);
+      if (error) throw new Error(`Could not update that system: ${error.message}`);
+    }
+  } else {
+    const created = await addHomeSystem(extraction.household_id, {
+      name: extraction.product_name ?? 'Untitled system',
+      category: extraction.suggested_category ?? 'other',
+      make: extraction.make,
+      model: extraction.model,
+      serial_number: extraction.serial_number,
+      installed_on: extraction.installed_on ?? extraction.purchased_on,
+      purchase_price: extraction.purchase_price,
+      purchased_from: extraction.purchased_from,
+      warranty_provider: extraction.warranty_provider,
+      warranty_type: extraction.warranty_type as HomeSystem['warranty_type'],
+      warranty_expires_on: extraction.warranty_expires_on,
+      warranty_notes: extraction.coverage_summary,
+    });
+    systemId = created.id;
+    await supabase.from('home_systems')
+      .update({ entry_source: 'extracted', source_document_id: extraction.document_id })
+      .eq('id', systemId);
+  }
+
+  await attachDocumentToSystem(
+    extraction.household_id, systemId, extraction.document_id,
+    (extraction.document_kind as HomeSystemDocument['doc_role']) ?? 'warranty',
+  );
+
+  const { error } = await supabase.from('appliance_extractions')
+    .update({ review_status: 'confirmed', processing_state: 'confirmed', home_system_id: systemId })
+    .eq('id', extraction.id);
+  if (error) throw new Error(`Could not link this document: ${error.message}`);
+
+  return systemId;
+}
+
+export async function discardApplianceExtraction(extractionId: string): Promise<boolean> {
+  const { error } = await supabase.from('appliance_extractions')
+    .update({ review_status: 'discarded', processing_state: 'deleted' }).eq('id', extractionId);
+  if (error) throw new Error(`Could not discard that: ${error.message}`);
+  return true;
+}
+
 export async function getAssets(householdId: string): Promise<Asset[]> {
   const { data, error } = await supabase
     .from('assets')

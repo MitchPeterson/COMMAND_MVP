@@ -25,6 +25,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.22.0',
+    date: '2026-08-10',
+    title: 'Home documents that actually land somewhere',
+    items: [
+      'Mortgage statements are now read properly — servicer, balance, rate, payment, escrow, maturity — and confirming them fills in your equity, rate and payment on the Home page.',
+      'Warranty cards, manuals and receipts are read for what the equipment is and what the warranty covers, and can be tracked as a new system or filed against one you already have.',
+      'Filing a document against an existing system fills only the gaps — nothing you recorded yourself is overwritten.',
+      'An older statement never overwrites a newer balance.',
+    ],
+  },
+  {
     version: '0.21.0',
     date: '2026-08-10',
     title: 'Cheaper to run, clearer when it can\'t',

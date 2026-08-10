@@ -4,6 +4,7 @@ import { UploadDropzone } from '../components/UploadDropzone';
 import { HomeHealth } from '../components/HomeHealth';
 import { HomeSystemsPanel } from '../components/HomeSystemsPanel';
 import { MortgagePanel } from '../components/MortgagePanel';
+import { HomeDocumentReview } from '../components/HomeDocumentReview';
 import { uploadDocumentAsset, invokeDocumentExtraction } from '../lib/supabase';
 import type { HomeSystemRow } from '../lib/homeSystems';
 import { Wrench } from 'lucide-react';
@@ -20,6 +21,13 @@ export function HomeView() {
         systems={systems}
         profile={data?.profile ?? null}
         mortgagePrincipal={mortgage?.principal_balance ?? null}
+      />
+
+      <HomeDocumentReview
+        mortgageStatements={data?.mortgageStatements ?? []}
+        applianceExtractions={data?.applianceExtractions ?? []}
+        systems={data?.homeSystems ?? []}
+        onChanged={refresh}
       />
 
       {data?.household?.id && (

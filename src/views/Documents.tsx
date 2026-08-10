@@ -161,17 +161,31 @@ export function DocumentsView() {
                     <ExternalLink className="h-4 w-4" /> View file
                   </button>
 
-                  {doc.status !== 'processed' && (
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => retryExtraction(doc.id)}
-                      className="inline-flex items-center gap-2 rounded-xl border border-cmd-gold/40 bg-cmd-gold/10 px-4 py-2 text-sm font-medium text-cmd-gold transition hover:bg-cmd-gold/20 disabled:opacity-40"
-                    >
-                      <RefreshCw className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`} />
-                      {busy ? 'Extracting…' : 'Run extraction'}
-                    </button>
-                  )}
+                  {/* Always available, including on a document already read.
+                      Extraction is idempotent — content hashes and upserts mean a
+                      second run updates the same rows rather than duplicating
+                      them — and re-reading is the only way to pick up an
+                      improvement to how a document type is handled. Hiding this
+                      once a document was 'processed' left the earlier readings
+                      stranded on whatever the pipeline did at the time. */}
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => retryExtraction(doc.id)}
+                    className="inline-flex items-center gap-2 rounded-xl border border-cmd-gold/40 bg-cmd-gold/10 px-4 py-2 text-sm font-medium text-cmd-gold transition hover:bg-cmd-gold/20 disabled:opacity-40"
+                    title={
+                      doc.status === 'processed'
+                        ? 'Reads the document again and updates what it found. It will not create a duplicate.'
+                        : 'Reads the document and files what it finds.'
+                    }
+                  >
+                    <RefreshCw className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`} />
+                    {busy
+                      ? 'Extracting…'
+                      : doc.status === 'processed'
+                        ? 'Read it again'
+                        : 'Run extraction'}
+                  </button>
 
                   <button
                     type="button"

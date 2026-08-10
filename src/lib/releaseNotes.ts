@@ -25,6 +25,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.22.1',
+    date: '2026-08-10',
+    title: 'Read any document again',
+    items: [
+      'Any document in the vault can be read again, including ones already extracted. A second run updates what it found rather than creating a duplicate, so improvements to how a document type is handled can be applied to files you uploaded earlier.',
+    ],
+  },
+  {
     version: '0.22.0',
     date: '2026-08-10',
     title: 'Home documents that actually land somewhere',

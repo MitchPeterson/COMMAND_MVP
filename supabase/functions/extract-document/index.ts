@@ -69,7 +69,7 @@ const VALUE_TYPES = ['explicit', 'calculated', 'inferred', 'unknown'];
 
 // Stamped on every extraction row. Bump it when a prompt or schema changes in a
 // way that would make an old reading and a new one incomparable.
-const EXTRACTOR_VERSION = 'extract-2026.08.09';
+const EXTRACTOR_VERSION = 'extract-2026.08.10';
 
 // Canonical coverage vocabulary. Deliberately NOT a schema enum — ~60 values
 // blew the compiled-grammar budget. The model writes a loose code, we canonicalize
@@ -328,6 +328,10 @@ const HOME_DOCUMENT_TYPES = [
   'service_contract', 'home_inspection', 'contractor_invoice', 'none',
 ];
 
+const TAX_DOCUMENT_TYPES = [
+  'tax_return', 'w2', '1099', '1098', 'k1', '1095', 'other_tax_form', 'none',
+];
+
 const LEGAL_DOCUMENT_STATUSES = [
   'draft', 'executed', 'amended', 'revoked', 'expired', 'recorded', 'certified_copy', 'unknown',
 ];
@@ -361,12 +365,16 @@ const CLASSIFY_SCHEMA = {
     // Home paperwork. A mortgage statement was already recognized as a legacy
     // financial type and read as loose strings; a warranty had no home at all.
     home_document_type: { type: 'string', enum: HOME_DOCUMENT_TYPES },
+
+    // Tax paperwork. A filed return is the highest-value document a household
+    // can hand over: it is what makes planning during the year possible at all.
+    tax_document_type: { type: 'string', enum: TAX_DOCUMENT_TYPES },
   },
   required: [
     'is_insurance', 'document_class', 'insurance_type', 'legacy_type', 'confidence',
     'legal_recognition', 'legal_type', 'legal_subtype', 'legal_confidence', 'legal_reason',
     'document_title', 'document_status', 'page_count', 'document_language',
-    'home_document_type',
+    'home_document_type', 'tax_document_type',
   ],
   additionalProperties: false,
 };
@@ -396,6 +404,11 @@ Legal classification rules:
    judgement about whether the document is valid or effective.
 8. document_title is the document's own title, verbatim. Empty string if untitled.
 9. page_count is the number of pages provided. 0 if you cannot tell.
+10. tax_document_type is "tax_return" only for a filed or prepared return —
+   a Form 1040 with its schedules, or a preparer's copy of one. An individual
+   information form is "w2", "1099", "1098", "k1" or "1095". A tax organizer, a
+   notice from a tax authority, or a worksheet is "other_tax_form". Anything not
+   about taxes at all is "none".
 `.trim();
 
 // ─────────────────────────────────────────────────────────────
@@ -847,6 +860,85 @@ Ground rules, in priority order:
 5. Amounts are digits only: "1842.19". Rates are plain numbers: "6.25". Dates are
    YYYY-MM-DD.
 6. Quote evidence verbatim and keep it to the line the value came from.
+`.trim();
+
+// A filed return. One pass: it is a page of figures with well-known line
+// numbers, and the schedules that matter break out into the same flat list.
+const TAX_RETURN_FIELD_CODES = `
+  tax_year, filing_status, adjusted_gross_income, taxable_income, total_tax,
+  total_payments, refund_amount, amount_owed, took_standard_deduction,
+  standard_deduction_amount, itemized_total, itemized_medical, itemized_salt,
+  itemized_mortgage_interest, itemized_charitable, federal_withheld,
+  estimated_payments, child_tax_credit, dependent_care_credit, education_credits,
+  capital_loss_carryforward, charitable_carryforward, wages, interest_income,
+  dividend_income, capital_gains, business_income, rental_income,
+  retirement_income, state, state_tax, preparer
+`.trim();
+
+const TAX_RETURN_SCHEMA = {
+  type: 'object',
+  properties: {
+    tax_year: { type: 'string' },
+    fields: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          field_code: { type: 'string' },
+          value: { type: 'string' },
+          raw_value: { type: 'string' },
+          // The form and line it came from — "1040 line 11", "Schedule A line 17".
+          // A figure that drives a planning recommendation should be traceable.
+          form_line: { type: 'string' },
+          value_type: { type: 'string', enum: VALUE_TYPES },
+          source_page: { type: 'number' },
+          evidence: { type: 'string' },
+          confidence: { type: 'number' },
+        },
+        required: [
+          'field_code', 'value', 'raw_value', 'form_line', 'value_type',
+          'source_page', 'evidence', 'confidence',
+        ],
+        additionalProperties: false,
+      },
+    },
+    unresolved_items: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: { item: { type: 'string' }, why_unresolved: { type: 'string' } },
+        required: ['item', 'why_unresolved'],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ['tax_year', 'fields', 'unresolved_items'],
+  additionalProperties: false,
+};
+
+const TAX_RETURN_RULES = `
+Ground rules, in priority order:
+
+1. Never output a Social Security number, a taxpayer identification number, or a
+   bank account number — not as a value and not inside evidence. Truncate the
+   excerpt rather than quoting a line that contains one.
+2. tax_year is the year the return is *for*, printed at the top of the form. It
+   is not the year it was filed and not the year on the preparer's stamp.
+3. total_tax is the total tax for the year before payments — Form 1040 line 24.
+   It is not the balance due, not the refund, and not the withholding. These are
+   four different numbers and the planning depends on keeping them apart.
+4. took_standard_deduction is "true" or "false". Decide it from which figure the
+   return actually used, not from whether a Schedule A is present in the file.
+5. Report Schedule A components only when Schedule A is present and used. Do not
+   reconstruct them from a 1098 or from anything else in the bundle.
+6. Carryforwards are the figures carried *out* of this year into the next —
+   from the Capital Loss Carryover Worksheet, or a charitable carryover
+   statement. Omit them entirely if the return does not print them.
+7. Do not compute anything the return does not show. A calculated figure that
+   looks right is worse than a missing one, because it will be trusted.
+8. Amounts are digits only: "18420". A negative is "-3000". Dates are YYYY-MM-DD.
+9. form_line names where the value sits — "1040 line 11", "Schedule A line 7".
+   Empty string only when the figure genuinely carries no line reference.
 `.trim();
 
 const APPLIANCE_SCHEMA = {
@@ -2467,6 +2559,111 @@ Deno.serve(async (req: Request) => {
       }, 200);
     }
 
+    // A filed return. It is not one of the raw/canonical pairs the other paths
+    // use: a filed return is already authoritative, so it lands as one row per
+    // year that the household can correct, rather than as a reading awaiting
+    // confirmation.
+    if (classification.tax_document_type === 'tax_return') {
+      const digest = await crypto.subtle.digest('SHA-256', bytes);
+      const contentHash = Array.from(new Uint8Array(digest))
+        .map((b) => b.toString(16).padStart(2, '0')).join('');
+
+      const parsed = await callClaude(
+        content,
+        `Read this filed tax return. File name: ${document.name}\n\n${TAX_RETURN_RULES}\n\n` +
+        `Emit one entry in fields per value genuinely printed, using these codes:\n` +
+        `${TAX_RETURN_FIELD_CODES}\n\nOmit a code entirely rather than guessing at it.`,
+        TAX_RETURN_SCHEMA, 'high', 8000,
+      );
+
+      const taxYear = num(parsed.tax_year)
+        ?? num((parsed.fields ?? []).find((f: { field_code?: string }) => f.field_code === 'tax_year')?.value);
+      if (!taxYear || taxYear < 1990 || taxYear > new Date().getFullYear() + 1) {
+        // Without a year there is nothing to file the figures under, and
+        // guessing one would silently overwrite a different year's return.
+        return await failDocument(
+          'Could not find the tax year on this return. Enter the figures by hand instead.', 422,
+        );
+      }
+
+      const TAX_TEXT = new Set(['filing_status', 'state', 'preparer']);
+      // deno-lint-ignore no-explicit-any
+      const header: Record<string, any> = {};
+      // deno-lint-ignore no-explicit-any
+      const fieldRows: any[] = [];
+
+      for (const field of parsed.fields ?? []) {
+        const code = text(field.field_code);
+        const value = text(field.value);
+        if (!code || !value || code === 'tax_year') continue;
+
+        if (code === 'took_standard_deduction') {
+          header[code] = /^(true|yes|standard)$/i.test(value);
+        } else if (TAX_TEXT.has(code)) {
+          header[code] = value;
+        } else {
+          const parsedNumber = num(value);
+          if (parsedNumber === null) continue;
+          header[code] = parsedNumber;
+        }
+
+        fieldRows.push({
+          household_id: document.household_id,
+          field_code: code,
+          form_line: text(field.form_line),
+          value_number: TAX_TEXT.has(code) ? null : num(value),
+          value_text: value,
+          source_page: num(field.source_page),
+          evidence: scrubCardNumbers(text(field.evidence)),
+          confidence: clamp01(field.confidence),
+          value_type: VALUE_TYPES.includes(field.value_type) ? field.value_type : 'explicit',
+        });
+      }
+
+      // One row per year. Re-reading the same return updates it in place.
+      const { data: saved, error: saveError } = await admin
+        .from('tax_returns')
+        .upsert({
+          household_id: document.household_id,
+          document_id: document.id,
+          tax_year: taxYear,
+          ...header,
+          entry_source: 'extracted',
+          review_status: 'confirmed',
+          content_hash: contentHash,
+          extractor_version: EXTRACTOR_VERSION,
+          extraction_model: anthropicModel,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'household_id,tax_year' })
+        .select('id').single();
+
+      // Checked, and loudly. A return whose header failed to save leaves the
+      // planning section drawing empty boxes with no sign anything went wrong.
+      if (saveError || !saved) {
+        return await failDocument(
+          `Read the return but could not save it: ${saveError?.message ?? 'no row returned'}`, 500,
+        );
+      }
+
+      if (fieldRows.length > 0) {
+        const { error: fieldError } = await admin
+          .from('tax_return_fields')
+          .upsert(fieldRows.map((row) => ({ ...row, return_id: saved.id })),
+            { onConflict: 'return_id,field_code' });
+        if (fieldError) console.error('Failed to write return fields:', fieldError.message);
+      }
+
+      if (!document.category || document.category === 'general') {
+        await admin.from('documents').update({ category: 'tax' }).eq('id', document.id);
+      }
+      await admin.from('documents').update({ status: 'processed' }).eq('id', document.id);
+
+      return json({
+        document_id: document.id, mode: 'tax_return', return_id: saved.id,
+        tax_year: taxYear, fields: fieldRows.length,
+      }, 200);
+    }
+
     // Home paperwork: the mortgage statement and anything about a system in the
     // house. Both are single-pass — a page of figures and a page of terms.
     const homeType = classification.home_document_type;
@@ -2636,6 +2833,48 @@ Deno.serve(async (req: Request) => {
         document_id: document.id, mode: 'appliance', extraction_id: saved?.id,
         product: row.product_name, category: row.suggested_category,
       }, 200);
+    }
+
+    // An information form — a W-2, a 1099, a 1098. These do not get their own
+    // extraction path: what the section needs from them is that they *arrived*,
+    // so the year's checklist can stop asking. The figures still go through the
+    // generic pass below, so the fall-through is deliberate.
+    const TAX_FORM_EXPECTATIONS: Record<string, string> = {
+      w2: 'w2', '1099': '1099_int', '1098': '1098', k1: 'k1', '1095': '1095',
+    };
+    const taxFormType = classification.tax_document_type;
+    if (taxFormType && TAX_FORM_EXPECTATIONS[taxFormType]) {
+      // Which tax year a form belongs to is printed on it, but the classifier
+      // does not read figures. The filing year is the safe assumption: forms
+      // arrive in January for the year that just closed.
+      const now = new Date();
+      const formYear = now.getMonth() < 6 ? now.getFullYear() - 1 : now.getFullYear();
+
+      const { data: priorForm } = await admin
+        .from('tax_documents').select('id')
+        .eq('household_id', document.household_id)
+        .eq('document_id', document.id).maybeSingle();
+
+      if (!priorForm) {
+        const { error: formError } = await admin.from('tax_documents').insert([{
+          household_id: document.household_id,
+          document_id: document.id,
+          name: document.name,
+          doc_type: taxFormType,
+          form_type: taxFormType,
+          tax_year: formYear,
+          status: 'received',
+          received_on: now.toISOString().slice(0, 10),
+          satisfies_expectation: TAX_FORM_EXPECTATIONS[taxFormType],
+        }]);
+        // Not fatal: the figures are still worth having even if the checklist
+        // entry did not land. It is logged rather than swallowed.
+        if (formError) console.error('Failed to record the tax form:', formError.message);
+      }
+
+      if (!document.category || document.category === 'general') {
+        await admin.from('documents').update({ category: 'tax' }).eq('id', document.id);
+      }
     }
 
     // Non-insurance: the original lightweight path.

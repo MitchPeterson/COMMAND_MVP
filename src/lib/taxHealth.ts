@@ -6,7 +6,8 @@
 // a narrow claim, and the grade says only that much.
 
 import type {
-  FamilyMember, FinanceAccount, HouseholdProfile, LegalDocument, MortgageStatement, TaxDocument,
+  DeductionLogEntry, FamilyMember, FinanceAccount, HouseholdProfile, LegalDocument,
+  MortgageStatement, TaxDocument, TaxReturn,
 } from './supabase';
 import { expectedForms, taxDeadlines } from './taxYear';
 
@@ -41,6 +42,8 @@ export function computeTaxHealth(
   mortgageStatements: MortgageStatement[],
   financeAccounts: FinanceAccount[],
   legalDocuments: LegalDocument[],
+  taxReturns: TaxReturn[] = [],
+  deductions: DeductionLogEntry[] = [],
   today = new Date(),
 ): TaxHealthResult {
   const findings: TaxFinding[] = [];
@@ -100,6 +103,53 @@ export function computeTaxHealth(
       detail: 'Mortgage interest and the property tax paid through escrow both come from one.',
     });
   }
+  // ── The prior-year return, which is what makes planning possible ──────────
+  // Without it there is no safe-harbor number, no way to know whether itemizing
+  // is even in play, and no visibility of anything carried forward. It is the
+  // single highest-value document this section can hold.
+  const priorYear = today.getFullYear() - 1;
+  const baseline = taxReturns.filter((r) => r.tax_year >= priorYear - 1)
+    .sort((a, b) => b.tax_year - a.tax_year)[0] ?? null;
+
+  if (!baseline) {
+    findings.push({
+      severity: 'attention',
+      title: 'No prior-year return on file',
+      detail:
+        'A filed return fixes the safe-harbor payment target, says whether itemizing is in play, and ' +
+        'carries forward losses and giving that otherwise get lost between preparers. Without one this ' +
+        'section can only track paperwork.',
+    });
+    dataFindings.push({
+      severity: 'info',
+      title: 'No return to plan against',
+      detail: 'Upload last year’s 1040, or enter the headline figures from it.',
+    });
+  } else if (baseline.tax_year < priorYear) {
+    findings.push({
+      severity: 'info',
+      title: `The newest return on file is ${baseline.tax_year}`,
+      detail:
+        'Planning runs off the most recent year. Once last year is filed, adding it keeps the safe-harbor ' +
+        'number and the carryforwards current.',
+    });
+  }
+
+  // Anything logged but unsubstantiated, while it is still easy to fix.
+  const thisYear = today.getFullYear();
+  const unsubstantiated = deductions.filter(
+    (d) => d.tax_year === thisYear && d.needs_receipt && !d.has_receipt,
+  );
+  if (unsubstantiated.length > 0) {
+    findings.push({
+      severity: 'attention',
+      title: `${unsubstantiated.length} logged item${unsubstantiated.length === 1 ? '' : 's'} without an acknowledgment`,
+      detail:
+        'A charitable gift over $250 needs a written acknowledgment from the charity. They are far easier ' +
+        'to get before the year closes.',
+    });
+  }
+
   dataFindings.push({
     severity: 'info',
     title: 'Command is not a tax preparer',
@@ -108,7 +158,7 @@ export function computeTaxHealth(
       'Whether something is deductible, and what is owed, is not a question it answers.',
   });
 
-  if (checklist.expected.length === 0) {
+  if (checklist.expected.length === 0 && !baseline) {
     return {
       score: null, grade: '—', status: 'unknown', findings, dataFindings,
       confidence: 'limited', confidenceReason: 'Not enough on file to know what to expect.',

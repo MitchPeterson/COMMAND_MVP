@@ -134,9 +134,11 @@ export function DashboardView({ onNavigate }: DashboardProps) {
     () => computeTaxHealth(
       data?.taxDocuments ?? [], data?.profile, data?.familyMembers ?? [],
       data?.mortgageStatements ?? [], data?.financeAccounts ?? [], data?.legalDocuments ?? [],
+      data?.taxReturns ?? [], data?.deductionLog ?? [],
     ),
     [data?.taxDocuments, data?.profile, data?.familyMembers,
-      data?.mortgageStatements, data?.financeAccounts, data?.legalDocuments],
+      data?.mortgageStatements, data?.financeAccounts, data?.legalDocuments,
+      data?.taxReturns, data?.deductionLog],
   );
 
   // Any section with a live score overrides its stored row. The stored rows were

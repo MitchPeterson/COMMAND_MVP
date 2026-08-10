@@ -3172,3 +3172,210 @@ export async function completeAction(actionId: string): Promise<boolean> {
 
   return !error;
 }
+
+// ─────────────────────────────────────────────────────────────
+// Tax planning
+// ─────────────────────────────────────────────────────────────
+
+export interface TaxReturn {
+  id: string;
+  household_id: string;
+  document_id: string | null;
+  tax_year: number;
+  filing_status: string | null;
+  adjusted_gross_income: number | null;
+  taxable_income: number | null;
+  total_tax: number | null;
+  total_payments: number | null;
+  refund_amount: number | null;
+  amount_owed: number | null;
+  took_standard_deduction: boolean | null;
+  standard_deduction_amount: number | null;
+  itemized_total: number | null;
+  itemized_medical: number | null;
+  itemized_salt: number | null;
+  itemized_mortgage_interest: number | null;
+  itemized_charitable: number | null;
+  federal_withheld: number | null;
+  estimated_payments: number | null;
+  child_tax_credit: number | null;
+  dependent_care_credit: number | null;
+  education_credits: number | null;
+  capital_loss_carryforward: number | null;
+  charitable_carryforward: number | null;
+  wages: number | null;
+  interest_income: number | null;
+  dividend_income: number | null;
+  capital_gains: number | null;
+  business_income: number | null;
+  rental_income: number | null;
+  retirement_income: number | null;
+  state: string | null;
+  state_tax: number | null;
+  preparer: string | null;
+  entry_source: string;
+  review_status: 'pending_review' | 'confirmed' | 'discarded';
+  notes: string | null;
+}
+
+export interface DeductionLogEntry {
+  id: string;
+  household_id: string;
+  tax_year: number;
+  spent_on: string;
+  category: string;
+  amount: number;
+  description: string;
+  payee: string | null;
+  payment_method: string | null;
+  receipt_document_id: string | null;
+  has_receipt: boolean;
+  needs_receipt: boolean;
+  source: 'manual' | 'card_transaction' | 'extracted';
+  source_transaction_id: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export async function getTaxReturns(householdId: string): Promise<TaxReturn[]> {
+  const { data, error } = await supabase
+    .from('tax_returns').select('*').eq('household_id', householdId)
+    .neq('review_status', 'discarded').order('tax_year', { ascending: false });
+  if (error) {
+    console.error('Error fetching tax returns:', error);
+    return [];
+  }
+  return (data ?? []) as TaxReturn[];
+}
+
+export async function getDeductionLog(householdId: string): Promise<DeductionLogEntry[]> {
+  const { data, error } = await supabase
+    .from('deduction_log').select('*').eq('household_id', householdId)
+    .order('spent_on', { ascending: false });
+  if (error) {
+    console.error('Error fetching the deduction log:', error);
+    return [];
+  }
+  return (data ?? []) as DeductionLogEntry[];
+}
+
+export type TaxReturnInput = FromForm<Omit<TaxReturn, 'id' | 'household_id'>>;
+
+/** One return per year; saving the same year again updates it rather than duplicating. */
+export async function saveTaxReturn(householdId: string, input: TaxReturnInput): Promise<TaxReturn> {
+  const patch: Record<string, unknown> = { household_id: householdId, updated_at: new Date().toISOString() };
+  const numeric = new Set([
+    'adjusted_gross_income', 'taxable_income', 'total_tax', 'total_payments', 'refund_amount',
+    'amount_owed', 'standard_deduction_amount', 'itemized_total', 'itemized_medical', 'itemized_salt',
+    'itemized_mortgage_interest', 'itemized_charitable', 'federal_withheld', 'estimated_payments',
+    'child_tax_credit', 'dependent_care_credit', 'education_credits', 'capital_loss_carryforward',
+    'charitable_carryforward', 'wages', 'interest_income', 'dividend_income', 'capital_gains',
+    'business_income', 'rental_income', 'retirement_income', 'state_tax',
+  ]);
+
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined) continue;
+    if (key === 'tax_year') patch[key] = Number(value);
+    else if (key === 'took_standard_deduction') patch[key] = value === null ? null : Boolean(value);
+    else if (numeric.has(key)) {
+      const parsed = value === '' || value === null ? null : Number(String(value).replace(/[^0-9.\-]/g, ''));
+      patch[key] = parsed !== null && Number.isFinite(parsed) ? parsed : null;
+    } else patch[key] = (String(value ?? '').trim() || null);
+  }
+
+  const { data, error } = await supabase
+    .from('tax_returns').upsert(patch, { onConflict: 'household_id,tax_year' }).select('*').single();
+  if (error || !data) {
+    console.error('Failed to save the return:', error);
+    throw new Error(`Could not save that: ${error?.message ?? 'no row returned'}`);
+  }
+  return data as TaxReturn;
+}
+
+export type DeductionInput = FromForm<Omit<DeductionLogEntry, 'id' | 'household_id' | 'created_at'>>;
+
+export async function addDeduction(householdId: string, input: DeductionInput): Promise<DeductionLogEntry> {
+  const amount = Number(String(input.amount ?? '').replace(/[^0-9.\-]/g, ''));
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error('Give it an amount.');
+  if (!input.description) throw new Error('Say what it was for.');
+
+  const { data, error } = await supabase.from('deduction_log').insert([{
+    household_id: householdId,
+    tax_year: Number(input.tax_year) || new Date().getFullYear(),
+    spent_on: input.spent_on || new Date().toISOString().slice(0, 10),
+    category: input.category ?? 'other',
+    amount,
+    description: String(input.description).trim(),
+    payee: (String(input.payee ?? '').trim() || null),
+    has_receipt: Boolean(input.has_receipt),
+    needs_receipt: Boolean(input.needs_receipt),
+    source: 'manual',
+    notes: (String(input.notes ?? '').trim() || null),
+  }]).select('*').single();
+
+  if (error || !data) {
+    console.error('Failed to log the deduction:', error);
+    throw new Error(`Could not log that: ${error?.message ?? 'no row returned'}`);
+  }
+  return data as DeductionLogEntry;
+}
+
+export async function updateDeduction(id: string, input: Partial<DeductionInput>): Promise<boolean> {
+  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (input.has_receipt !== undefined) patch.has_receipt = Boolean(input.has_receipt);
+  if (input.receipt_document_id !== undefined) patch.receipt_document_id = input.receipt_document_id || null;
+  if (input.notes !== undefined) patch.notes = String(input.notes ?? '').trim() || null;
+  const { error } = await supabase.from('deduction_log').update(patch).eq('id', id);
+  if (error) throw new Error(`Could not save that: ${error.message}`);
+  return true;
+}
+
+export async function deleteDeduction(id: string): Promise<boolean> {
+  const { error } = await supabase.from('deduction_log').delete().eq('id', id);
+  if (error) throw new Error(`Could not remove that: ${error.message}`);
+  return true;
+}
+
+/**
+ * Pulls card transactions already categorized as charitable into the log.
+ * Deduplicated on the transaction id by a unique index, so importing twice
+ * cannot double-count — the second attempt simply matches nothing new.
+ */
+export async function importCharitableFromCards(
+  householdId: string,
+  taxYear: number,
+  transactions: CreditTransaction[],
+): Promise<number> {
+  const candidates = transactions.filter(
+    (t) => t.direction === 'charge'
+      && (t.category ?? '').toLowerCase().includes('charit')
+      && (t.transaction_date ?? '').startsWith(String(taxYear)),
+  );
+  if (candidates.length === 0) return 0;
+
+  const { data: existing } = await supabase
+    .from('deduction_log').select('source_transaction_id')
+    .eq('household_id', householdId).not('source_transaction_id', 'is', null);
+  const already = new Set((existing ?? []).map((row) => row.source_transaction_id));
+
+  const rows = candidates
+    .filter((t) => !already.has(t.id))
+    .map((t) => ({
+      household_id: householdId,
+      tax_year: taxYear,
+      spent_on: t.transaction_date,
+      category: 'charitable',
+      amount: t.amount ?? 0,
+      description: t.merchant_description,
+      payee: t.merchant_description,
+      has_receipt: false,
+      needs_receipt: (t.amount ?? 0) >= 250,
+      source: 'card_transaction' as const,
+      source_transaction_id: t.id,
+    }));
+  if (rows.length === 0) return 0;
+
+  const { error } = await supabase.from('deduction_log').insert(rows);
+  if (error) throw new Error(`Could not import those: ${error.message}`);
+  return rows.length;
+}

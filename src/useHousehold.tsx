@@ -32,6 +32,8 @@ import {
   getMortgageAccount,
   getMortgageStatements,
   getApplianceExtractions,
+  getTaxReturns,
+  getDeductionLog,
   type Household,
   type InsurancePolicy,
   type LegalDocument,
@@ -61,6 +63,8 @@ import {
   type MortgageAccount,
   type MortgageStatement,
   type ApplianceExtraction,
+  type TaxReturn,
+  type DeductionLogEntry,
 } from './lib/supabase';
 
 export interface HouseholdData {
@@ -93,6 +97,8 @@ export interface HouseholdData {
   mortgage: MortgageAccount | null;
   mortgageStatements: MortgageStatement[];
   applianceExtractions: ApplianceExtraction[];
+  taxReturns: TaxReturn[];
+  deductionLog: DeductionLogEntry[];
 }
 
 export interface UseHouseholdReturn {
@@ -133,6 +139,8 @@ const EMPTY_DATA: HouseholdData = {
   mortgage: null,
   mortgageStatements: [],
   applianceExtractions: [],
+  taxReturns: [],
+  deductionLog: [],
 };
 
 /**
@@ -199,6 +207,8 @@ function useHouseholdState(): UseHouseholdReturn {
         mortgage,
         mortgageStatements,
         applianceExtractions,
+        taxReturns,
+        deductionLog,
       ] = await Promise.all([
         supabase
           .from('household_profile')
@@ -233,6 +243,8 @@ function useHouseholdState(): UseHouseholdReturn {
         getMortgageAccount(hid),
         getMortgageStatements(hid),
         getApplianceExtractions(hid),
+        getTaxReturns(hid),
+        getDeductionLog(hid),
       ]);
 
       setData({
@@ -265,6 +277,8 @@ function useHouseholdState(): UseHouseholdReturn {
         mortgage,
         mortgageStatements,
         applianceExtractions,
+        taxReturns,
+        deductionLog,
       });
     } catch (err) {
       console.error('Failed to load household data:', err);

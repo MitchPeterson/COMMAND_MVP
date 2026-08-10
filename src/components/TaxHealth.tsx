@@ -1,6 +1,7 @@
 import React from 'react';
 import type {
-  FamilyMember, FinanceAccount, HouseholdProfile, LegalDocument, MortgageStatement, TaxDocument,
+  DeductionLogEntry, FamilyMember, FinanceAccount, HouseholdProfile, LegalDocument,
+  MortgageStatement, TaxDocument, TaxReturn,
 } from '../lib/supabase';
 import { computeTaxHealth, type TaxFindingSeverity } from '../lib/taxHealth';
 import { gradeTone } from '../lib/coverageHealth';
@@ -13,6 +14,8 @@ interface Props {
   mortgageStatements: MortgageStatement[];
   financeAccounts: FinanceAccount[];
   legalDocuments: LegalDocument[];
+  taxReturns: TaxReturn[];
+  deductions: DeductionLogEntry[];
 }
 
 export function TaxHealth(props: Props) {
@@ -22,6 +25,7 @@ export function TaxHealth(props: Props) {
   } = computeTaxHealth(
     props.taxDocuments, props.profile, props.members,
     props.mortgageStatements, props.financeAccounts, props.legalDocuments,
+    props.taxReturns, props.deductions,
   );
 
   const criticals = findings.filter((f) => f.severity === 'critical');

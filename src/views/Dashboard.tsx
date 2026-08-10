@@ -7,6 +7,7 @@ import { computeCoverageHealth } from '../lib/coverageHealth';
 import { computeLegalHealth } from '../lib/legalHealth';
 import { computeCreditHealth } from '../lib/creditHealth';
 import { computeHomeHealth } from '../lib/homeHealth';
+import { computeFamilyHealth } from '../lib/familyHealth';
 import { buildPriorityActions, type RankedAction, type RankedSeverity } from '../lib/priorityActions';
 import {
   Shield,
@@ -120,6 +121,14 @@ export function DashboardView({ onNavigate }: DashboardProps) {
     [data?.homeSystems, data?.profile, data?.mortgage],
   );
 
+  const family = useMemo(
+    () => computeFamilyHealth(
+      data?.familyMembers ?? [], data?.profile, data?.insurancePolicies ?? [],
+      data?.mortgage ?? null, data?.legalDocuments ?? [],
+    ),
+    [data?.familyMembers, data?.profile, data?.insurancePolicies, data?.mortgage, data?.legalDocuments],
+  );
+
   // Any section with a live score overrides its stored row. The stored rows were
   // written once at onboarding and never recalculated, so without this an upload
   // changes the section page and leaves the dashboard telling the old story.
@@ -165,8 +174,17 @@ export function DashboardView({ onNavigate }: DashboardProps) {
             : home.findings[0].title,
       };
     }
+    if (family.score !== null) {
+      live.family = {
+        score: family.score,
+        status: family.status,
+        summary: family.findings.length === 0
+          ? 'Nothing outstanding against what is on file.'
+          : family.findings[0].title,
+      };
+    }
     return live;
-  }, [coverage, legal, credit, home]);
+  }, [coverage, legal, credit, home, family]);
 
   const sectionScores = useMemo(() => {
     const rows = (data?.sectionScores ?? []).map((section) => {

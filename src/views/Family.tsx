@@ -1,6 +1,10 @@
 import React from 'react';
 import { useHousehold } from '../useHousehold';
-import { Users, Gift, Calendar, Heart } from 'lucide-react';
+import { FamilyHealth } from '../components/FamilyHealth';
+import { FamilyTimeline } from '../components/FamilyTimeline';
+import { ProtectionGap } from '../components/ProtectionGap';
+import { ageOf } from '../lib/familyTimeline';
+import { Users, Gift, Heart } from 'lucide-react';
 
 export function FamilyView() {
   const { data } = useHousehold();
@@ -16,17 +20,23 @@ export function FamilyView() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-8 shadow-sm shadow-black/10">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Family hub</p>
-            <h1 className="mt-3 text-3xl font-semibold text-cmd-offwhite">Family</h1>
-          </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-cmd-border bg-cmd-black/50 px-4 py-2 text-sm text-cmd-muted">
-            <Users className="h-4 w-4" /> {members.length} member{members.length === 1 ? '' : 's'}
-          </div>
-        </div>
-      </section>
+      {/* The grade leads, as on every section. */}
+      <FamilyHealth
+        members={members}
+        profile={data?.profile ?? null}
+        policies={data?.insurancePolicies ?? []}
+        mortgage={data?.mortgage ?? null}
+        legalDocuments={data?.legalDocuments ?? []}
+      />
+
+      <ProtectionGap
+        members={members}
+        profile={data?.profile ?? null}
+        policies={data?.insurancePolicies ?? []}
+        mortgage={data?.mortgage ?? null}
+      />
+
+      <FamilyTimeline members={members} profile={data?.profile ?? null} />
 
       <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
         <div className="mb-6 flex items-center justify-between gap-4">
@@ -53,7 +63,11 @@ export function FamilyView() {
                     <h3 className="mt-2 text-xl font-semibold text-cmd-offwhite">{member.name}</h3>
                   </div>
                 </div>
-                <p className="mt-4 text-sm text-cmd-muted">Born {member.birth_date ?? 'unknown'}</p>
+                <p className="mt-4 text-sm text-cmd-muted">
+                  {member.birth_date
+                    ? `Born ${member.birth_date}${ageOf(member.birth_date) != null ? ` · ${Math.floor(ageOf(member.birth_date)!)} years old` : ''}`
+                    : 'Birth date not recorded — add it on your profile and this person joins the timeline'}
+                </p>
               </div>
             ))}
           </div>

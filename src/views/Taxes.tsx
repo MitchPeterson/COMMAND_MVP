@@ -1,5 +1,7 @@
 import React from 'react';
 import { useHousehold } from '../useHousehold';
+import { TaxHealth } from '../components/TaxHealth';
+import { TaxYearPanel } from '../components/TaxYearPanel';
 import { UploadDropzone } from '../components/UploadDropzone';
 import { uploadDocumentAsset, invokeDocumentExtraction } from '../lib/supabase';
 import { FileText, Shield, Calendar, CheckCircle } from 'lucide-react';
@@ -11,17 +13,29 @@ export function TaxesView() {
 
   return (
     <div className="space-y-6">
-      <section className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-8 shadow-sm shadow-black/10">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Tax center</p>
-            <h1 className="mt-3 text-3xl font-semibold text-cmd-offwhite">Taxes</h1>
-          </div>
-          <div className="inline-flex items-center gap-2 rounded-full border border-cmd-border bg-cmd-black/50 px-4 py-2 text-sm text-cmd-muted">
-            <Shield className="h-4 w-4" /> {documents.length} document{documents.length === 1 ? '' : 's'}
-          </div>
-        </div>
-      </section>
+      <TaxHealth
+        taxDocuments={data?.taxDocuments ?? []}
+        profile={data?.profile ?? null}
+        members={data?.familyMembers ?? []}
+        mortgageStatements={data?.mortgageStatements ?? []}
+        financeAccounts={data?.financeAccounts ?? []}
+        legalDocuments={data?.legalDocuments ?? []}
+      />
+
+      {data?.household?.id && (
+        <TaxYearPanel
+          householdId={data.household.id}
+          taxYear={new Date().getMonth() < 3 ? new Date().getFullYear() - 1 : new Date().getFullYear()}
+          taxDocuments={data?.taxDocuments ?? []}
+          profile={data?.profile ?? null}
+          members={data?.familyMembers ?? []}
+          mortgageStatements={data?.mortgageStatements ?? []}
+          financeAccounts={data?.financeAccounts ?? []}
+          legalDocuments={data?.legalDocuments ?? []}
+          transactions={data?.creditTransactions ?? []}
+          onChanged={refresh}
+        />
+      )}
 
       <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
         <div className="mb-6 flex items-center justify-between gap-4">
@@ -61,17 +75,6 @@ export function TaxesView() {
       </section>
 
       <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
-        <UploadDropzone
-          contextLabel="Tax document upload"
-          buttonLabel="Upload tax document"
-          className="mb-6"
-          onUpload={async (file) => {
-            if (!data?.household?.id) return;
-            const document = await uploadDocumentAsset(data.household.id, file, 'tax');
-            await invokeDocumentExtraction(document.id);
-            await refresh();
-          }}
-        />
         <div className="mb-6 flex items-center justify-between gap-4">
           <div>
             <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Tax documents</p>
@@ -104,6 +107,19 @@ export function TaxesView() {
             ))}
           </div>
         )}
+      </section>
+      {/* Demoted: still one click away, no longer the headline. */}
+      <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
+        <UploadDropzone
+          contextLabel="Add a tax document"
+          buttonLabel="Upload a W-2, 1099, 1098 or other tax form"
+          onUpload={async (file) => {
+            if (!data?.household?.id) return;
+            const document = await uploadDocumentAsset(data.household.id, file, 'tax');
+            await invokeDocumentExtraction(document.id);
+            await refresh();
+          }}
+        />
       </section>
     </div>
   );

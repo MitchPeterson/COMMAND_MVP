@@ -25,6 +25,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.24.0',
+    date: '2026-08-10',
+    title: 'Taxes, as a checklist and a calendar',
+    items: [
+      'The Taxes section now works out which forms you should expect — a 1098 because you have a mortgage, a K-1 because you have a business, childcare records because you have children under 13 — and tracks which have arrived.',
+      'Figures already sitting in your own documents are surfaced where a preparer will ask for them: mortgage interest and escrowed property tax from your statement, charitable giving from card transactions, and how many children were under 17 at year end.',
+      'A calendar of the dates that carry money, including the one people miss — April 15 is also the last day to fund an IRA or HSA for the previous year.',
+      'Command is not a tax preparer and says so. It tracks what arrived and what the dates are; whether something is deductible is not a question it answers.',
+    ],
+  },
+  {
     version: '0.23.0',
     date: '2026-08-10',
     title: 'Family, on a calendar',

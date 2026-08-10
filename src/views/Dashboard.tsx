@@ -8,6 +8,7 @@ import { computeLegalHealth } from '../lib/legalHealth';
 import { computeCreditHealth } from '../lib/creditHealth';
 import { computeHomeHealth } from '../lib/homeHealth';
 import { computeFamilyHealth } from '../lib/familyHealth';
+import { computeTaxHealth } from '../lib/taxHealth';
 import { buildPriorityActions, type RankedAction, type RankedSeverity } from '../lib/priorityActions';
 import {
   Shield,
@@ -129,6 +130,15 @@ export function DashboardView({ onNavigate }: DashboardProps) {
     [data?.familyMembers, data?.profile, data?.insurancePolicies, data?.mortgage, data?.legalDocuments],
   );
 
+  const taxes = useMemo(
+    () => computeTaxHealth(
+      data?.taxDocuments ?? [], data?.profile, data?.familyMembers ?? [],
+      data?.mortgageStatements ?? [], data?.financeAccounts ?? [], data?.legalDocuments ?? [],
+    ),
+    [data?.taxDocuments, data?.profile, data?.familyMembers,
+      data?.mortgageStatements, data?.financeAccounts, data?.legalDocuments],
+  );
+
   // Any section with a live score overrides its stored row. The stored rows were
   // written once at onboarding and never recalculated, so without this an upload
   // changes the section page and leaves the dashboard telling the old story.
@@ -183,8 +193,17 @@ export function DashboardView({ onNavigate }: DashboardProps) {
           : family.findings[0].title,
       };
     }
+    if (taxes.score !== null) {
+      live.taxes = {
+        score: taxes.score,
+        status: taxes.status,
+        summary: taxes.findings.length === 0
+          ? 'Nothing outstanding and no deadline close.'
+          : taxes.findings[0].title,
+      };
+    }
     return live;
-  }, [coverage, legal, credit, home, family]);
+  }, [coverage, legal, credit, home, family, taxes]);
 
   const sectionScores = useMemo(() => {
     const rows = (data?.sectionScores ?? []).map((section) => {

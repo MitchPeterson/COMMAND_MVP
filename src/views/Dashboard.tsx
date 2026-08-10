@@ -22,6 +22,8 @@ import {
   Clock,
   AlertTriangle,
   ArrowRight,
+  HeartPulse,
+  Compass,
 } from 'lucide-react';
 
 const severityOrder = ['critical', 'high', 'medium', 'low'] as const;
@@ -31,6 +33,26 @@ const severityLabels = {
   medium: { label: 'Review', accent: 'bg-slate-500/10 text-slate-300 border-slate-500/20' },
   low: { label: 'Low', accent: 'bg-slate-700/10 text-slate-300 border-slate-700/20' },
 };
+
+// section_scores rows were written at onboarding under keys that never quite
+// matched the views: "tax" against a Taxes page, "healthcare" against Health.
+// The mismatch was invisible for a while because it only degraded — the label
+// fell back to the raw key, the icon fell back to a generic document, and the
+// live scorer keyed on "taxes" silently failed to override the stored row, so
+// the dashboard reported a section as untouched while its own page graded it.
+// Normalize on read; the stored rows are left alone.
+const SECTION_ALIASES: Record<string, string> = {
+  tax: 'taxes',
+  healthcare: 'health',
+  insurances: 'insurance',
+  finance: 'finances',
+  legal_documents: 'legal',
+};
+
+function canonicalSection(section: string): string {
+  const key = (section ?? '').trim().toLowerCase();
+  return SECTION_ALIASES[key] ?? key;
+}
 
 const sectionLabels: Record<string, string> = {
   insurance: 'Insurance',
@@ -44,6 +66,12 @@ const sectionLabels: Record<string, string> = {
   health: 'Health',
 };
 
+// Sections that have a page to land on. The rest still show a score — they just
+// are not pretending to be a link that goes nowhere.
+const ROUTABLE_SECTIONS = new Set([
+  'insurance', 'legal', 'credit', 'home', 'finances', 'taxes', 'family',
+]);
+
 const sectionIcons: Record<string, React.ElementType> = {
   insurance: Shield,
   legal: FileText,
@@ -52,6 +80,8 @@ const sectionIcons: Record<string, React.ElementType> = {
   taxes: Receipt,
   family: Users,
   credit: CreditCard,
+  health: HeartPulse,
+  advisory: Compass,
 };
 
 function formatDateLabel(dateString?: string | null) {
@@ -209,15 +239,30 @@ export function DashboardView({ onNavigate }: DashboardProps) {
 
   const sectionScores = useMemo(() => {
     const rows = (data?.sectionScores ?? []).map((section) => {
-      const live = liveScores[section.section];
+      const key = canonicalSection(section.section);
+      const live = liveScores[key];
       return live
-        ? { ...section, score: live.score, status: live.status as typeof section.status, summary: live.summary }
-        : section;
+        ? { ...section, section: key, score: live.score, status: live.status as typeof section.status, summary: live.summary }
+        : { ...section, section: key };
     });
+
+    // Two rows can normalize onto the same section — an old "tax" row alongside
+    // a newer "taxes" one. Showing both would put the same section on the page
+    // twice with different scores, so the live-scored row wins, then the one
+    // that actually has something in it.
+    const byKey = new Map<string, typeof rows[number]>();
+    for (const row of rows) {
+      const existing = byKey.get(row.section);
+      if (!existing) { byKey.set(row.section, row); continue; }
+      const rowIsLive = Boolean(liveScores[row.section]);
+      const keep = rowIsLive || row.score > existing.score ? row : existing;
+      byKey.set(row.section, keep);
+    }
+    const deduped = [...byKey.values()];
     // A zero means nothing has been put into that section, not that it is
     // failing. Ranking those first put the sections with the least information
     // at the top of the page, which is the opposite of useful.
-    return rows.sort((a, b) => {
+    return deduped.sort((a, b) => {
       const aStarted = a.score > 0;
       const bStarted = b.score > 0;
       if (aStarted !== bStarted) return aStarted ? -1 : 1;
@@ -522,16 +567,17 @@ export function DashboardView({ onNavigate }: DashboardProps) {
               <div className="space-y-3">
                 {sectionScores.map((section) => {
                   const Icon = sectionIcons[section.section] ?? FileText;
+                  const routable = Boolean(onNavigate) && ROUTABLE_SECTIONS.has(section.section);
                   const isCritical = section.status === 'action_needed';
                   const isWarning = section.status === 'review';
                   return (
                     <div
                       key={section.id}
-                      role={onNavigate ? 'button' : undefined}
-                      tabIndex={onNavigate ? 0 : undefined}
-                      onClick={() => onNavigate?.(section.section)}
-                      onKeyDown={(e) => { if (onNavigate && (e.key === 'Enter' || e.key === ' ')) onNavigate(section.section); }}
-                      className={`flex flex-col gap-3 rounded-3xl border ${isCritical ? 'border-red-500/20' : 'border-cmd-border'} bg-cmd-black/40 p-4 xl:flex-row xl:items-center xl:justify-between ${onNavigate ? 'cursor-pointer transition hover:border-cmd-gold/40' : ''}`}
+                      role={routable ? 'button' : undefined}
+                      tabIndex={routable ? 0 : undefined}
+                      onClick={() => { if (routable) onNavigate?.(section.section); }}
+                      onKeyDown={(e) => { if (routable && (e.key === 'Enter' || e.key === ' ')) onNavigate?.(section.section); }}
+                      className={`flex flex-col gap-3 rounded-3xl border ${isCritical ? 'border-red-500/20' : 'border-cmd-border'} bg-cmd-black/40 p-4 xl:flex-row xl:items-center xl:justify-between ${routable ? 'cursor-pointer transition hover:border-cmd-gold/40' : ''}`}
                     >
                       <div className="flex items-center gap-3">
                         <div className="rounded-2xl bg-white/5 p-3 text-cmd-gold">

@@ -25,6 +25,18 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.25.0',
+    date: '2026-08-10',
+    title: 'Tax planning against last year\'s return',
+    items: [
+      'Upload a filed 1040 and Command reads AGI, total tax, the deduction path, credits and carryforwards into a baseline — with the form and line each figure came from',
+      'Planning items derived from your own figures: the safe-harbor payment target, bunching when itemizing is within reach, carryforwards that get lost between preparers, and a child aging out of the child tax credit',
+      'A deduction log that records what was spent as it happens, flags a charitable gift over $250 that has no acknowledgment yet, and can pull charitable card transactions across without double-counting',
+      'W-2s, 1099s and 1098s now tick their own box on the year\'s checklist when uploaded',
+      'The tax grade counts a missing prior-year return and unsubstantiated entries',
+    ],
+  },
+  {
     version: '0.24.0',
     date: '2026-08-10',
     title: 'Taxes, as a checklist and a calendar',

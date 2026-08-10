@@ -250,6 +250,7 @@ Dual-income homeowners, $100k–$500k HHI, meaningful asset complexity.
 
 | Date | Change |
 |------|--------|
+| Aug 10, 2026 | Tax planning: prior-year return as a baseline, deduction log, 1040 extraction |
 | Aug 8, 2026 | Version history via DB trigger; what's-new prompt |
 | Aug 8, 2026 | Editable policies; fixed phantom exposures and false duplicate detection |
 | Aug 8, 2026 | Coverage health grades adequacy against household facts, not documentation completeness |

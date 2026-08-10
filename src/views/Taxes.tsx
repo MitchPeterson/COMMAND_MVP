@@ -2,14 +2,19 @@ import React from 'react';
 import { useHousehold } from '../useHousehold';
 import { TaxHealth } from '../components/TaxHealth';
 import { TaxYearPanel } from '../components/TaxYearPanel';
+import { TaxBaseline } from '../components/TaxBaseline';
+import { DeductionLog } from '../components/DeductionLog';
 import { UploadDropzone } from '../components/UploadDropzone';
 import { uploadDocumentAsset, invokeDocumentExtraction } from '../lib/supabase';
-import { FileText, Shield, Calendar, CheckCircle } from 'lucide-react';
+import { FileText } from 'lucide-react';
 
 export function TaxesView() {
   const { data, refresh } = useHousehold();
   const documents = data?.taxDocuments ?? [];
   const recommendations = data?.taxRecommendations ?? [];
+  // Before April, the year people are still acting on is the current one; the
+  // return being filed is last year's. Planning always runs on the current year.
+  const planningYear = new Date().getFullYear();
 
   return (
     <div className="space-y-6">
@@ -20,7 +25,31 @@ export function TaxesView() {
         mortgageStatements={data?.mortgageStatements ?? []}
         financeAccounts={data?.financeAccounts ?? []}
         legalDocuments={data?.legalDocuments ?? []}
+        taxReturns={data?.taxReturns ?? []}
+        deductions={data?.deductionLog ?? []}
       />
+
+      {data?.household?.id && (
+        <TaxBaseline
+          householdId={data.household.id}
+          taxYear={planningYear}
+          returns={data?.taxReturns ?? []}
+          deductions={data?.deductionLog ?? []}
+          members={data?.familyMembers ?? []}
+          profile={data?.profile ?? null}
+          onChanged={refresh}
+        />
+      )}
+
+      {data?.household?.id && (
+        <DeductionLog
+          householdId={data.household.id}
+          taxYear={planningYear}
+          entries={data?.deductionLog ?? []}
+          transactions={data?.creditTransactions ?? []}
+          onChanged={refresh}
+        />
+      )}
 
       {data?.household?.id && (
         <TaxYearPanel

@@ -1335,7 +1335,7 @@ async function persistLegalExtraction(
   headerPatch.processing_state = 'needs_review';
   const { error: headerError } = await admin
     .from('legal_document_extractions').update(headerPatch).eq('id', extractionId);
-  if (headerError) console.error('Failed to update legal extraction header:', headerError.message);
+  if (headerError) throw new Error(`Could not save the document summary: ${headerError.message}`);
 
   return {
     fields: fieldRows.length,
@@ -1539,7 +1539,10 @@ async function persistCreditStatement(
       processing_state: 'needs_review',
     })
     .eq('id', statementId);
-  if (headerError) console.error('Failed to update the statement header:', headerError.message);
+  // Raised rather than logged: a header that did not save leaves a statement
+  // whose figures are all null, which reads to the user as "extraction found
+  // nothing" rather than as a failure.
+  if (headerError) throw new Error(`Could not save the statement summary: ${headerError.message}`);
 
   return {
     fields: fieldRows.length,
@@ -2546,11 +2549,20 @@ Deno.serve(async (req: Request) => {
         if (error) console.error('Failed to write mortgage fields:', error.message);
       }
 
-      await admin.from('mortgage_statements').update({
-        ...header,
-        unresolved_items: mortgage.unresolved_items ?? [],
-        processing_state: 'needs_review',
-      }).eq('id', statementId);
+      // The error is checked. An earlier version of this wrote a column the
+      // table does not have, PostgREST rejected the whole update, and because
+      // nothing looked at the error the record came back with every promoted
+      // value null and no sign that anything had gone wrong. A persistence
+      // failure here makes the statement useless, so it fails loudly.
+      const { error: headerError } = await admin
+        .from('mortgage_statements')
+        .update({ ...header, processing_state: 'needs_review' })
+        .eq('id', statementId);
+      if (headerError) {
+        return await failDocument(
+          `Read the statement but could not save it: ${headerError.message}`, 500,
+        );
+      }
 
       if (!document.category || document.category === 'general') {
         await admin.from('documents').update({ category: 'home' }).eq('id', document.id);
@@ -2612,7 +2624,7 @@ Deno.serve(async (req: Request) => {
         .upsert(row, { onConflict: 'household_id,content_hash' })
         .select('id').single();
       if (saveError) {
-        return await failDocument(`Could not record the warranty: ${saveError.message}`, 500);
+        return await failDocument(`Read the document but could not save it: ${saveError.message}`, 500);
       }
 
       if (!document.category || document.category === 'general') {

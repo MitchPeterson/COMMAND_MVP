@@ -10,7 +10,6 @@ import {
 } from '../lib/supabase';
 import {
   LEGAL_CATEGORIES,
-  LEGAL_DOCUMENT_STATUSES,
   legalCategoryLabel,
   legalType,
   legalTypeLabel,
@@ -21,11 +20,8 @@ import { DocumentLinkBadge } from '../components/DocumentLinkBadge';
 import { UnfiledDocuments } from '../components/UnfiledDocuments';
 import { LegalDocumentDetail } from '../components/LegalDocumentDetail';
 import { LegalHealth } from '../components/LegalHealth';
+import { ExecutionStatus, summarizeExecution } from '../components/ExecutionStatus';
 import { AlertTriangle, ChevronDown, ChevronRight, FileText, Gavel, Info, ShieldCheck } from 'lucide-react';
-
-function statusLabel(code: string | null | undefined): string {
-  return LEGAL_DOCUMENT_STATUSES.find((s) => s.code === code)?.label ?? 'Not stated in the document';
-}
 
 /** Confidence as a plain phrase. A bare 0.82 tells a user nothing useful. */
 function confidencePhrase(value: number | null): string {
@@ -256,10 +252,20 @@ export function LegalView({ focusId = null }: LegalViewProps) {
                         <h3 className="mt-2 truncate text-xl font-semibold text-cmd-offwhite">
                           {extraction.document_title || source?.name || 'Untitled document'}
                         </h3>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <ExecutionStatus
+                            documentStatus={extraction.document_status}
+                            observations={extraction.execution_observations}
+                          />
+                        </div>
                         <p className="mt-2 text-sm text-cmd-muted">
-                          {statusLabel(extraction.document_status)}
-                          {extraction.page_count ? ` · ${extraction.page_count} page${extraction.page_count === 1 ? '' : 's'}` : ''}
-                          {extraction.document_subtype ? ` · ${extraction.document_subtype}` : ''}
+                          {summarizeExecution(extraction.document_status, extraction.execution_observations ?? []).detail}
+                        </p>
+                        <p className="mt-1 text-sm text-cmd-muted">
+                          {[
+                            extraction.page_count ? `${extraction.page_count} page${extraction.page_count === 1 ? '' : 's'}` : null,
+                            extraction.document_subtype || null,
+                          ].filter(Boolean).join(' · ')}
                         </p>
                       </div>
                       <span
@@ -359,7 +365,8 @@ export function LegalView({ focusId = null }: LegalViewProps) {
                   <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">{doc.type}</p>
                   <h3 className="mt-2 text-xl font-semibold text-cmd-offwhite">{doc.name}</h3>
                   <p className="mt-2 text-sm text-cmd-muted">Attorney: {doc.attorney ?? 'Not set'}</p>
-                  <div className="mt-3">
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <ExecutionStatus documentStatus={doc.document_status} />
                     <DocumentLinkBadge
                       sourceDocumentId={doc.source_document_id}
                       documents={storedDocuments}

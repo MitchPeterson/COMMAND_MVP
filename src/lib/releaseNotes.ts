@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.25.7',
+    date: '2026-08-11',
+    title: 'Signed, or a draft, said plainly',
+    items: [
+      'Legal documents now lead with whether the copy on file is signed, marked draft, recorded or silent on the question — the most consequential fact about a will, previously grey text next to the page count',
+      'Command reports what the document says and what it could see, never whether it is valid — an unsigned copy in the vault does not mean no signed original exists',
+    ],
+  },
+  {
     version: '0.25.6',
     date: '2026-08-11',
     title: 'One document, one entry',

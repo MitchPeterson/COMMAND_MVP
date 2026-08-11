@@ -4,6 +4,7 @@
 // Add to .env: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
 
 import { createClient } from '@supabase/supabase-js';
+import { currentReadings } from './readings';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
@@ -491,6 +492,8 @@ export interface LegalDocumentExtraction {
   review_status: 'pending_review' | 'confirmed' | 'partially_confirmed' | 'discarded';
   failure_reason: string | null;
   extraction_version: number;
+  /** The reading this one replaced. Written by the extractor, never by the UI. */
+  supersedes_extraction_id?: string | null;
   content_hash: string | null;
   extractor_version: string | null;
   model: string | null;
@@ -971,6 +974,29 @@ export async function getLegalExtractions(householdId: string): Promise<LegalDoc
 
   if (error) {
     console.error('Error fetching legal extractions:', error);
+    return [];
+  }
+  // Filtered here rather than in each view: the section listed a re-read
+  // document twice and legalHealth graded it twice, and the next consumer would
+  // have made the same mistake. Use getLegalReadingHistory for the older ones.
+  return currentReadings((data ?? []) as LegalDocumentExtraction[]);
+}
+
+/** Every reading, including replaced ones, for a document's history view. */
+export async function getLegalReadingHistory(
+  householdId: string,
+  documentId: string,
+): Promise<LegalDocumentExtraction[]> {
+  const { data, error } = await supabase
+    .from('legal_document_extractions')
+    .select('*')
+    .eq('household_id', householdId)
+    .eq('document_id', documentId)
+    .neq('processing_state', 'deleted')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching reading history:', error);
     return [];
   }
   return (data ?? []) as LegalDocumentExtraction[];
@@ -1818,7 +1844,11 @@ export async function getInsurancePolicyExtractions(householdId: string): Promis
     console.error('Error fetching insurance policy extractions:', error);
     return [];
   }
-  return (data ?? []) as unknown as InsurancePolicyExtraction[];
+  // Same problem as the legal path, from a different cause: persistInsurance
+  // inserts unconditionally, so re-reading a declarations page produces a second
+  // extraction carrying its own full set of coverages. Confirming both would put
+  // the policy on file twice.
+  return currentReadings((data ?? []) as unknown as InsurancePolicyExtraction[]);
 }
 
 /**

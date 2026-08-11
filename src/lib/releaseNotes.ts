@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.26.0',
+    date: '2026-08-11',
+    title: 'Tell Command when it reads a document wrong',
+    items: [
+      'A "Wrong type?" control in the Document Vault re-reads a document down the path you pick — re-running extraction alone just repeats the same misclassification',
+      'The classifier now knows how a credit card statement differs from a bank statement: a credit limit, a minimum payment and an APR table settle it, not the letterhead',
+    ],
+  },
+  {
     version: '0.25.7',
     date: '2026-08-11',
     title: 'Signed, or a draft, said plainly',

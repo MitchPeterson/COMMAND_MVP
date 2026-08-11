@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
 import { useHousehold } from '../useHousehold';
-import { getDocumentUrl, invokeDocumentExtraction, deleteDocument, getDocumentImpact } from '../lib/supabase';
-import { Folder, FileText, ExternalLink, RefreshCw, AlertCircle, CheckCircle2, Clock, Trash2, CornerDownRight } from 'lucide-react';
+import {
+  getDocumentUrl, invokeDocumentExtraction, deleteDocument, getDocumentImpact,
+  FORCEABLE_TYPES, type ForceableType,
+} from '../lib/supabase';
+import { Folder, FileText, ExternalLink, RefreshCw, AlertCircle, CheckCircle2, Clock, Trash2, CornerDownRight, Shuffle } from 'lucide-react';
 import { usesOf } from '../lib/documentLinks';
 
 function formatDate(value: string | null) {
@@ -49,6 +52,10 @@ export function DocumentsView({ onNavigate }: DocumentsViewProps = {}) {
   // Delete is confirmed inline rather than via window.confirm, so the impact on
   // the profile can be shown before anything is destroyed.
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  // Which document is having its type corrected. Classification is right most of
+  // the time and wrong occasionally, and when it is wrong re-reading changes
+  // nothing — the same classifier reaches the same conclusion.
+  const [retypingId, setRetypingId] = useState<string | null>(null);
   const [impact, setImpact] = useState<{ policies: number; accounts: number; cards: number; taxDocs: number } | null>(null);
   const [removeImported, setRemoveImported] = useState(true);
 
@@ -87,11 +94,12 @@ export function DocumentsView({ onNavigate }: DocumentsViewProps = {}) {
     }
   };
 
-  const retryExtraction = async (id: string) => {
+  const retryExtraction = async (id: string, forceType?: ForceableType) => {
     setError(null);
     setBusyId(id);
+    setRetypingId(null);
     try {
-      await invokeDocumentExtraction(id);
+      await invokeDocumentExtraction(id, forceType);
       await refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Extraction failed.');
@@ -200,6 +208,36 @@ export function DocumentsView({ onNavigate }: DocumentsViewProps = {}) {
                   )}
                 </div>
 
+                {retypingId === doc.id && (
+                  <div className="mt-4 rounded-2xl border border-cmd-gold/30 bg-cmd-gold/5 p-4">
+                    <p className="text-sm font-semibold text-cmd-offwhite">What is this document?</p>
+                    <p className="mt-1 text-xs leading-5 text-cmd-muted">
+                      Command will read it again down the path you pick instead of the one it chose.
+                      What it originally decided is kept, so a correction shows where the reading
+                      needs work.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {FORCEABLE_TYPES.map((type) => (
+                        <button
+                          key={type.code}
+                          type="button"
+                          onClick={() => retryExtraction(doc.id, type.code)}
+                          className="rounded-xl border border-cmd-border bg-cmd-black/60 px-3 py-1.5 text-xs text-cmd-offwhite transition hover:border-cmd-gold hover:text-cmd-gold"
+                        >
+                          {type.label}
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => setRetypingId(null)}
+                        className="rounded-xl px-3 py-1.5 text-xs text-cmd-muted transition hover:text-cmd-offwhite"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="mt-4 flex flex-wrap gap-2 border-t border-cmd-border pt-4">
                   <button
                     type="button"
@@ -224,7 +262,7 @@ export function DocumentsView({ onNavigate }: DocumentsViewProps = {}) {
                     className="inline-flex items-center gap-2 rounded-xl border border-cmd-gold/40 bg-cmd-gold/10 px-4 py-2 text-sm font-medium text-cmd-gold transition hover:bg-cmd-gold/20 disabled:opacity-40"
                     title={
                       doc.status === 'processed'
-                        ? 'Reads the document again and updates what it found. It will not create a duplicate.'
+                        ? 'Reads the document again and replaces what it found before, rather than adding a second entry.'
                         : 'Reads the document and files what it finds.'
                     }
                   >
@@ -234,6 +272,19 @@ export function DocumentsView({ onNavigate }: DocumentsViewProps = {}) {
                       : doc.status === 'processed'
                         ? 'Read it again'
                         : 'Run extraction'}
+                  </button>
+
+                  {/* Re-reading runs the same classifier and reaches the same
+                      conclusion, so a misread document cannot be recovered by
+                      trying again — which is exactly what it invites you to do. */}
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => setRetypingId(retypingId === doc.id ? null : doc.id)}
+                    className="inline-flex items-center gap-2 rounded-xl border border-cmd-border bg-cmd-black/60 px-4 py-2 text-sm font-medium text-cmd-offwhite transition hover:border-cmd-gold hover:text-cmd-gold disabled:opacity-40"
+                    title="Tell Command what this document is and read it again down that path."
+                  >
+                    <Shuffle className="h-4 w-4" /> Wrong type?
                   </button>
 
                   <button

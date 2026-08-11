@@ -1,5 +1,6 @@
 import React from 'react';
 import { useHousehold } from '../useHousehold';
+import { UnfiledDocuments } from '../components/UnfiledDocuments';
 import { UploadDropzone } from '../components/UploadDropzone';
 import { HomeHealth } from '../components/HomeHealth';
 import { HomeSystemsPanel } from '../components/HomeSystemsPanel';
@@ -71,6 +72,19 @@ export function HomeView() {
           </div>
         </section>
       )}
+
+      <UnfiledDocuments
+        section="home"
+        documents={data?.documents ?? []}
+        data={{
+          legalDocuments: data?.legalDocuments, legalExtractions: data?.legalExtractions,
+          insurancePolicies: data?.insurancePolicies, insuranceExtractions: data?.insuranceExtractions,
+          financeAccounts: data?.financeAccounts, creditCards: data?.creditCards,
+          creditStatements: data?.creditStatements, mortgageStatements: data?.mortgageStatements,
+          taxDocuments: data?.taxDocuments, taxReturns: data?.taxReturns,
+        }}
+        onChanged={refresh}
+      />
 
       {/* Demoted: still one click away, no longer the headline. */}
       <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">

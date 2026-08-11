@@ -17,10 +17,11 @@ import {
   typesInCategory,
   type LegalCategory,
 } from '../lib/legalTaxonomy';
-import { linkFor, unfiledFor, type RecordLink } from '../lib/documentLinks';
+import { DocumentLinkBadge } from '../components/DocumentLinkBadge';
+import { UnfiledDocuments } from '../components/UnfiledDocuments';
 import { LegalDocumentDetail } from '../components/LegalDocumentDetail';
 import { LegalHealth } from '../components/LegalHealth';
-import { AlertTriangle, ChevronDown, ChevronRight, FileText, FileWarning, Gavel, Info, Paperclip, ShieldCheck } from 'lucide-react';
+import { AlertTriangle, ChevronDown, ChevronRight, FileText, Gavel, Info, ShieldCheck } from 'lucide-react';
 
 function statusLabel(code: string | null | undefined): string {
   return LEGAL_DOCUMENT_STATUSES.find((s) => s.code === code)?.label ?? 'Not stated in the document';
@@ -121,35 +122,6 @@ interface LegalViewProps {
   focusId?: string | null;
 }
 
-/**
- * Whether a record has a file behind it. "No document on file" is a legitimate
- * state, not a failure — Command knows the directive exists because the user
- * said so — but it has to be visible, or five records and one PDF look like the
- * same five things.
- */
-function DocumentLinkBadge({ link, onOpen }: { link: RecordLink; onOpen: () => void }) {
-  if (link.state === 'linked') {
-    return (
-      <button
-        type="button"
-        onClick={onOpen}
-        className="inline-flex items-center gap-1.5 rounded-full border border-cmd-border bg-cmd-black/60 px-3 py-1 text-xs text-cmd-offwhite transition hover:border-cmd-gold hover:text-cmd-gold"
-      >
-        <Paperclip className="h-3 w-3" /> View document
-      </button>
-    );
-  }
-  return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
-      link.state === 'document_removed'
-        ? 'border-amber-500/30 bg-amber-500/5 text-amber-200'
-        : 'border-cmd-border bg-cmd-black/60 text-cmd-muted'
-    }`}>
-      <FileWarning className="h-3 w-3" /> {link.label}
-    </span>
-  );
-}
-
 export function LegalView({ focusId = null }: LegalViewProps) {
   const { data, refresh } = useHousehold();
   const [openId, setOpenId] = useState<string | null>(focusId);
@@ -170,11 +142,6 @@ export function LegalView({ focusId = null }: LegalViewProps) {
   const flags = data?.legalIssueFlags ?? [];
   const storedDocuments = data?.documents ?? [];
 
-  // Legal files sitting in the vault that no legal record or reading depends on.
-  // Without this they are invisible here while the user believes they are filed.
-  const unfiled = unfiledFor('legal', storedDocuments, {
-    legalDocuments: documents, legalExtractions: extractions,
-  });
 
   const openStored = async (documentId: string) => {
     const stored = storedDocuments.find((d) => d.id === documentId);
@@ -234,7 +201,7 @@ export function LegalView({ focusId = null }: LegalViewProps) {
         <h2 className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Your documents</h2>
       </div>
 
-      {extractions.length === 0 && documents.length === 0 && unfiled.length === 0 ? (
+      {extractions.length === 0 && documents.length === 0 ? (
         <section className="rounded-3xl border border-dashed border-cmd-border bg-cmd-black/50 p-8 text-center">
           <FileText className="mx-auto h-6 w-6 text-cmd-muted" />
           <p className="mt-4 text-cmd-muted">
@@ -394,8 +361,9 @@ export function LegalView({ focusId = null }: LegalViewProps) {
                   <p className="mt-2 text-sm text-cmd-muted">Attorney: {doc.attorney ?? 'Not set'}</p>
                   <div className="mt-3">
                     <DocumentLinkBadge
-                      link={linkFor(doc.source_document_id, storedDocuments)}
-                      onOpen={() => doc.source_document_id && openStored(doc.source_document_id)}
+                      sourceDocumentId={doc.source_document_id}
+                      documents={storedDocuments}
+                      everHadDocument={Boolean(doc.source_extraction_id)}
                     />
                   </div>
                 </div>
@@ -410,47 +378,19 @@ export function LegalView({ focusId = null }: LegalViewProps) {
         </section>
       )}
 
-      {unfiled.length > 0 && (
-        <section className="rounded-3xl border border-amber-500/25 bg-amber-500/5 p-6">
-          <p className="text-xs uppercase tracking-[0.24em] text-amber-200/80">In the vault, not yet filed</p>
-          <h2 className="mt-2 text-2xl font-semibold text-cmd-offwhite">
-            {unfiled.length} legal file{unfiled.length === 1 ? '' : 's'} nothing here depends on
-          </h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-cmd-muted">
-            These are in your Document Vault but have not produced a record in this section — either
-            the reading has not been run or it was never confirmed. Until then nothing on this page
-            counts them.
-          </p>
-          <div className="mt-5 space-y-3">
-            {unfiled.map((file) => (
-              <div key={file.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-cmd-border bg-cmd-black/40 p-4">
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold text-cmd-offwhite">{file.name}</p>
-                  <p className="text-xs text-cmd-muted">
-                    {file.status === 'processed' ? 'Read, but not confirmed into this section' : 'Not read yet'}
-                  </p>
-                </div>
-                <div className="flex shrink-0 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => openStored(file.id)}
-                    className="rounded-xl border border-cmd-border bg-cmd-black/60 px-3 py-1.5 text-xs text-cmd-offwhite transition hover:border-cmd-gold hover:text-cmd-gold"
-                  >
-                    View file
-                  </button>
-                  <button
-                    type="button"
-                    onClick={async () => { await invokeDocumentExtraction(file.id); await refresh(); }}
-                    className="rounded-xl border border-cmd-gold/40 bg-cmd-gold/10 px-3 py-1.5 text-xs text-cmd-gold transition hover:bg-cmd-gold/20"
-                  >
-                    Read it
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
+
+      <UnfiledDocuments
+        section="legal"
+        documents={data?.documents ?? []}
+        data={{
+          legalDocuments: data?.legalDocuments, legalExtractions: data?.legalExtractions,
+          insurancePolicies: data?.insurancePolicies, insuranceExtractions: data?.insuranceExtractions,
+          financeAccounts: data?.financeAccounts, creditCards: data?.creditCards,
+          creditStatements: data?.creditStatements, mortgageStatements: data?.mortgageStatements,
+          taxDocuments: data?.taxDocuments, taxReturns: data?.taxReturns,
+        }}
+        onChanged={refresh}
+      />
 
       {/* Demoted: still one click away, no longer the headline. */}
       <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">

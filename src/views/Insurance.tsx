@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useHousehold } from '../useHousehold';
+import { UnfiledDocuments } from '../components/UnfiledDocuments';
+import { DocumentLinkBadge } from '../components/DocumentLinkBadge';
 import { UploadDropzone } from '../components/UploadDropzone';
 import {
   uploadDocumentAsset,
@@ -439,6 +441,13 @@ export function InsuranceView() {
                         Policy #{policy.policy_number ?? 'N/A'}
                         {policy.coverage_amount ? ` · ${currency(policy.coverage_amount)} limit` : ''}
                       </p>
+                      <div className="mt-3">
+                        <DocumentLinkBadge
+                          sourceDocumentId={policy.source_document_id}
+                          documents={data?.documents ?? []}
+                          everHadDocument={Boolean(policy.source_extraction_id)}
+                        />
+                      </div>
                     </div>
                     <div className="mt-4 text-right sm:mt-0">
                       <p className="text-sm text-cmd-muted">Renewal</p>
@@ -551,6 +560,19 @@ export function InsuranceView() {
           })
         )}
       </section>
+
+      <UnfiledDocuments
+        section="insurance"
+        documents={data?.documents ?? []}
+        data={{
+          legalDocuments: data?.legalDocuments, legalExtractions: data?.legalExtractions,
+          insurancePolicies: data?.insurancePolicies, insuranceExtractions: data?.insuranceExtractions,
+          financeAccounts: data?.financeAccounts, creditCards: data?.creditCards,
+          creditStatements: data?.creditStatements, mortgageStatements: data?.mortgageStatements,
+          taxDocuments: data?.taxDocuments, taxReturns: data?.taxReturns,
+        }}
+        onChanged={refresh}
+      />
 
       {/* Demoted: still one click away, no longer the headline. */}
       <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">

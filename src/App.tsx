@@ -128,7 +128,7 @@ function App() {
       case 'credit':
         return <CreditView />;
       case 'documents':
-        return <DocumentsView />;
+        return <DocumentsView onNavigate={navigate} />;
       case 'profile':
         return <ProfileView />;
       default:

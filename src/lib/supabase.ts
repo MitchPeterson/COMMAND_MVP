@@ -370,6 +370,8 @@ export interface FinanceAccount {
   institution: string | null;
   balance: number | null;
   as_of_date: string | null;
+  /** The vault file this came from, where one exists. ON DELETE SET NULL. */
+  source_document_id?: string | null;
   created_at: string;
 }
 
@@ -1030,6 +1032,8 @@ export interface CreditCard {
   rewards_type: string | null;
   rewards_value_ytd: number | null;
   annual_fee: number | null;
+  /** The vault file this came from, where one exists. ON DELETE SET NULL. */
+  source_document_id?: string | null;
   created_at: string;
   // Added with the statement extraction schema; optional because cards entered
   // by hand before it do not carry them.

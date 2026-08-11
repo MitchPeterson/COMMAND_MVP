@@ -25,6 +25,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.25.4',
+    date: '2026-08-11',
+    title: 'The vault and your sections now agree',
+    items: [
+      'Every legal record says whether a document sits behind it, and opens it when one does',
+      'Every file in the vault says what it produced — or that nothing depends on it yet',
+      'Legal files uploaded but never confirmed into the section are now listed instead of silently ignored',
+      'Fixed the Legal page printing "no legal documents read yet" directly above a list of legal documents',
+    ],
+  },
+  {
     version: '0.25.3',
     date: '2026-08-11',
     title: 'See what each extraction costs',

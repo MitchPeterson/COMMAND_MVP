@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useHousehold } from '../useHousehold';
 import { getDocumentUrl, invokeDocumentExtraction, deleteDocument, getDocumentImpact } from '../lib/supabase';
-import { Folder, FileText, ExternalLink, RefreshCw, AlertCircle, CheckCircle2, Clock, Trash2 } from 'lucide-react';
+import { Folder, FileText, ExternalLink, RefreshCw, AlertCircle, CheckCircle2, Clock, Trash2, CornerDownRight } from 'lucide-react';
+import { usesOf } from '../lib/documentLinks';
 
 function formatDate(value: string | null) {
   if (!value) return 'Unknown';
@@ -35,7 +36,11 @@ function StatusBadge({ status }: { status: string | null | undefined }) {
   );
 }
 
-export function DocumentsView() {
+interface DocumentsViewProps {
+  onNavigate?: (view: string) => void;
+}
+
+export function DocumentsView({ onNavigate }: DocumentsViewProps = {}) {
   const { data, refresh } = useHousehold();
   const documents = data?.documents ?? [];
   const extractions = data?.documentExtractions ?? [];
@@ -122,6 +127,16 @@ export function DocumentsView() {
           {documents.map((doc) => {
             const extraction = extractions.find((item) => item.document_id === doc.id);
             const busy = busyId === doc.id;
+            // What this file is actually responsible for. Nothing is a real
+            // answer: the file is here and no part of the app depends on it,
+            // which is exactly the state a user cannot otherwise see.
+            const uses = usesOf(doc.id, {
+              legalDocuments: data?.legalDocuments, legalExtractions: data?.legalExtractions,
+              insurancePolicies: data?.insurancePolicies, insuranceExtractions: data?.insuranceExtractions,
+              financeAccounts: data?.financeAccounts, creditCards: data?.creditCards,
+              creditStatements: data?.creditStatements, mortgageStatements: data?.mortgageStatements,
+              taxDocuments: data?.taxDocuments, taxReturns: data?.taxReturns,
+            });
 
             return (
               <div key={doc.id} className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-5">
@@ -149,6 +164,40 @@ export function DocumentsView() {
                     <p className="text-sm text-cmd-muted">Uploaded</p>
                     <p className="mt-1 font-semibold text-cmd-offwhite">{formatDate(doc.uploaded_at)}</p>
                   </div>
+                </div>
+
+                {/* What this file produced. A document the user believes is
+                    "in Command" while nothing depends on it is the gap between
+                    the vault and a section's inventory, and it was invisible
+                    from both sides. */}
+                <div className="mt-4 border-t border-cmd-border pt-4">
+                  {uses.length === 0 ? (
+                    <p className="flex items-center gap-2 text-xs text-cmd-muted">
+                      <CornerDownRight className="h-3.5 w-3.5 shrink-0" />
+                      {doc.status === 'processed'
+                        ? 'Read, but nothing in your sections depends on it yet — the reading may still be waiting for you to confirm it.'
+                        : 'Not filed to a section yet.'}
+                    </p>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <CornerDownRight className="h-3.5 w-3.5 shrink-0 text-cmd-muted" />
+                      {uses.map((use, index) => (
+                        <button
+                          key={`${use.section}-${index}`}
+                          type="button"
+                          onClick={() => onNavigate?.(use.section)}
+                          disabled={!onNavigate}
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs transition ${
+                            use.pending
+                              ? 'border-cmd-gold/40 bg-cmd-gold/10 text-cmd-gold hover:bg-cmd-gold/20'
+                              : 'border-cmd-border bg-cmd-black/60 text-cmd-offwhite hover:border-cmd-gold hover:text-cmd-gold'
+                          } ${onNavigate ? 'cursor-pointer' : 'cursor-default'}`}
+                        >
+                          {use.label} · {use.detail}{use.pending ? ' · needs review' : ''}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2 border-t border-cmd-border pt-4">

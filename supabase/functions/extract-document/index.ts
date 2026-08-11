@@ -22,6 +22,19 @@ const anthropicModel = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-opus-5';
 const CLASSIFY_MODEL = Deno.env.get('ANTHROPIC_CLASSIFY_MODEL') ?? 'claude-haiku-4-5';
 const GENERIC_MODEL = Deno.env.get('ANTHROPIC_GENERIC_MODEL') ?? 'claude-sonnet-5';
 
+// Form-shaped documents — a mortgage statement, a warranty card, a 1040 — are
+// tabular, single-pass, and read against a strict schema. The hard judgement in
+// this function lives in the insurance and legal paths, which stay on
+// ANTHROPIC_MODEL. Splitting them means the expensive model is spent where it
+// earns its price rather than on reading a printed table.
+const FORM_MODEL = Deno.env.get('ANTHROPIC_FORM_MODEL') ?? 'claude-sonnet-5';
+const CREDIT_MODEL = Deno.env.get('ANTHROPIC_CREDIT_MODEL') ?? anthropicModel;
+
+// Effort drives thinking tokens, which are billed at the output rate. Dialing it
+// down is the fastest lever on a bill that is mostly output, so it is a secret
+// rather than a constant.
+const EXTRACT_EFFORT = Deno.env.get('ANTHROPIC_EFFORT') ?? 'high';
+
 if (!supabaseUrl || !supabaseServiceRole) {
   throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for this function.');
 }
@@ -1648,7 +1661,20 @@ async function persistCreditStatement(
 }
 
 function json(body: unknown, status: number): Response {
-  return new Response(JSON.stringify(body), {
+  // Every response carries what it cost. Attaching it here rather than at each
+  // return means a path added later cannot forget to report its own bill.
+  const usage = ledgerSummary();
+  if (usage) {
+    console.log(
+      `cost $${usage.estimated_cost_usd} · ${usage.calls} calls · ` +
+      `cache hit ${(usage.cache_hit_ratio * 100).toFixed(0)}% · ` +
+      `${usage.fresh_input_tokens} fresh in / ${usage.cache_read_tokens} cached / ${usage.output_tokens} out`,
+    );
+  }
+  const payload = usage && body && typeof body === 'object' && !Array.isArray(body)
+    ? { ...(body as Record<string, unknown>), usage }
+    : body;
+  return new Response(JSON.stringify(payload), {
     status,
     headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' },
   });
@@ -1727,9 +1753,81 @@ function cacheGate(timeoutMs = 12000) {
   };
 }
 
+// ─────────────────────────────────────────────────────────────
+// Cost accounting
+// ─────────────────────────────────────────────────────────────
+// Three concurrent passes exist so they can share one cached copy of the
+// document. Whether they actually did was invisible: usage came back on every
+// response and was thrown away. A cache read costs a tenth of fresh input, so
+// the gap between hitting and missing is roughly three times the bill for a
+// document — the single biggest unknown in what this function costs to run.
+//
+// This is a cost log, not billing. Two invocations sharing one isolate would
+// blend their totals. The numbers are for choosing a model, not for reconciling
+// an invoice.
+
+interface UsageLine {
+  label: string;
+  model: string;
+  input: number;
+  output: number;
+  cache_write: number;
+  cache_read: number;
+}
+
+// Dollars per million tokens. Sonnet 5 carries introductory pricing of $2/$10
+// through 2026-08-31; the standard rate is used here so an estimate is never
+// cheerier than the invoice.
+const PRICES: Record<string, { input: number; output: number }> = {
+  'claude-opus-5': { input: 5, output: 25 },
+  'claude-fable-5': { input: 10, output: 50 },
+  'claude-sonnet-5': { input: 3, output: 15 },
+  'claude-haiku-4-5': { input: 1, output: 5 },
+};
+
+function priceOf(model: string): { input: number; output: number } {
+  const key = Object.keys(PRICES).find((k) => model.startsWith(k));
+  return key ? PRICES[key] : { input: 5, output: 25 };
+}
+
+let ledger: UsageLine[] = [];
+
+function lineCost(line: UsageLine): number {
+  const price = priceOf(line.model);
+  // A cache write costs 1.25x fresh input; a cache read costs 0.1x.
+  return (
+    line.input * price.input +
+    line.cache_write * price.input * 1.25 +
+    line.cache_read * price.input * 0.1 +
+    line.output * price.output
+  ) / 1_000_000;
+}
+
+function ledgerSummary() {
+  if (ledger.length === 0) return null;
+  const sum = (pick: (l: UsageLine) => number) => ledger.reduce((t, l) => t + pick(l), 0);
+  const cacheRead = sum((l) => l.cache_read);
+  const freshInput = sum((l) => l.input + l.cache_write);
+  return {
+    calls: ledger.length,
+    estimated_cost_usd: Number(ledger.reduce((t, l) => t + lineCost(l), 0).toFixed(4)),
+    cache_read_tokens: cacheRead,
+    fresh_input_tokens: freshInput,
+    // 0 means every pass re-sent the document and the concurrency buys nothing
+    // but wall clock. Near 0.6 means two of three passes read the cache.
+    cache_hit_ratio: cacheRead + freshInput > 0
+      ? Number((cacheRead / (cacheRead + freshInput)).toFixed(3))
+      : 0,
+    output_tokens: sum((l) => l.output),
+    passes: ledger.map((l) => ({ ...l, cost_usd: Number(lineCost(l).toFixed(4)) })),
+  };
+}
+
 // deno-lint-ignore no-explicit-any
 interface CallOptions {
   model?: string;
+  /** Names the pass in the cost log. */
+  label?: string;
   /** Fires when the response starts arriving — the moment its cache entry becomes readable. */
   onFirstEvent?: () => void;
 }
@@ -1781,6 +1879,17 @@ async function callClaude(
   }
 
   const response = await stream.finalMessage();
+
+  // Recorded before any error is thrown: a refusal or a truncation is billed.
+  const usage = response.usage;
+  ledger.push({
+    label: options.label ?? `pass ${ledger.length + 1}`,
+    model,
+    input: usage?.input_tokens ?? 0,
+    output: usage?.output_tokens ?? 0,
+    cache_write: usage?.cache_creation_input_tokens ?? 0,
+    cache_read: usage?.cache_read_input_tokens ?? 0,
+  });
 
   if (response.stop_reason === 'refusal') {
     throw new Error(`Claude declined to process this document (${response.stop_details?.category ?? 'unspecified'})`);
@@ -1991,6 +2100,7 @@ async function persistInsurance(doc: any, extraction: any): Promise<string> {
 }
 
 Deno.serve(async (req: Request) => {
+  ledger = [];
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
   if (!anthropic) {
@@ -2088,7 +2198,7 @@ Deno.serve(async (req: Request) => {
       2048,
       // Not cached: caches are per-model, so an entry written here would never
       // be read by the extraction passes below.
-      { model: CLASSIFY_MODEL },
+      { model: CLASSIFY_MODEL, label: 'classify' },
     );
 
     if (classification.is_insurance) {
@@ -2120,7 +2230,7 @@ Deno.serve(async (req: Request) => {
         `lienholders, mortgagees, loss payees and other financial interests are not people ` +
         `covered by the policy: give them role "other" and state what they hold in relationship, ` +
         `so they are never mistaken for drivers or insureds.`,
-        IDENTITY_SCHEMA, 'high', 16000, { onFirstEvent: gate.onFirstEvent },
+        IDENTITY_SCHEMA, EXTRACT_EFFORT, 16000, { onFirstEvent: gate.onFirstEvent, label: 'insurance identity' },
       );
 
       // The other two wait for the first response to begin, which is when its
@@ -2143,7 +2253,7 @@ Deno.serve(async (req: Request) => {
         `but add a not_found row only for coverages a reader would reasonably expect on this kind ` +
         `of policy and which genuinely do not appear — at most 8 of them. Do not enumerate every ` +
         `coverage that could theoretically exist.`,
-        COVERAGE_SCHEMA, 'high', 16000,
+        COVERAGE_SCHEMA, EXTRACT_EFFORT, 16000, { label: 'insurance coverages' },
       );
 
       // Degradable: a declarations page legitimately has little here, and losing
@@ -2163,7 +2273,7 @@ Deno.serve(async (req: Request) => {
         `Keep policy_language to the operative sentence or clause — an excerpt of roughly 300 ` +
         `characters, not the whole section. Group repeated boilerplate into one entry rather than ` +
         `repeating it per page.`,
-        TERMS_SCHEMA, 'high', 24000,
+        TERMS_SCHEMA, EXTRACT_EFFORT, 24000, { label: 'insurance terms' },
       ).catch((err) => {
         console.warn('Terms pass failed; keeping identity and coverage results:', err);
         return {
@@ -2377,7 +2487,7 @@ Deno.serve(async (req: Request) => {
         `witness_signatures_present, marked_draft, referenced_attachment_present, pages_complete.\n\n` +
         `The plain-language summary is two or three sentences describing what the document does, ` +
         `in the words you would use to a friend. No advice, no assessment.`,
-        LEGAL_COMMON_SCHEMA, 'high', 12000, { onFirstEvent: legalGate.onFirstEvent },
+        LEGAL_COMMON_SCHEMA, EXTRACT_EFFORT, 12000, { onFirstEvent: legalGate.onFirstEvent, label: 'legal common' },
       ).catch(degrade('common', {
         document_title: '', document_status: 'unknown', page_count: 0, document_language: '',
         plain_language_summary: '', fields: [], execution_observations: [],
@@ -2401,7 +2511,7 @@ Deno.serve(async (req: Request) => {
         `the document says how multiple agents or trustees act together, set acts_jointly. Include ` +
         `addresses and stated relationships where given — they matter for matching people to the ` +
         `household later — but never assert a match yourself.`,
-        LEGAL_PARTIES_SCHEMA, 'high', 12000,
+        LEGAL_PARTIES_SCHEMA, EXTRACT_EFFORT, 12000, { label: 'legal parties' },
       ).catch(degrade('parties', { parties: [] }));
 
       const provisionsPass = callClaude(
@@ -2413,7 +2523,7 @@ Deno.serve(async (req: Request) => {
         `or waives it, and "not_determinable" when these pages simply do not settle it. Put the ` +
         `document's own operative wording in document_language and your plain-language reading in ` +
         `summary — never replace the first with the second.`,
-        LEGAL_PROVISIONS_SCHEMA, 'high', 16000,
+        LEGAL_PROVISIONS_SCHEMA, EXTRACT_EFFORT, 16000, { label: 'legal provisions' },
       ).catch(degrade('provisions', { provisions: [] }));
 
       const [common, partyData, provisionData] = await Promise.all([commonPass, partiesPass, provisionsPass]);
@@ -2507,7 +2617,7 @@ Deno.serve(async (req: Request) => {
         `In apr_terms, emit one entry per interest rate the statement lists, with the balance ` +
         `subject to that rate and the interest charged at it where shown. Promotional rates carry ` +
         `their balance and expiration date when printed.`,
-        CREDIT_STATEMENT_SCHEMA, 'high', 12000, { onFirstEvent: creditGate.onFirstEvent },
+        CREDIT_STATEMENT_SCHEMA, EXTRACT_EFFORT, 12000, { onFirstEvent: creditGate.onFirstEvent, label: 'credit statement', model: CREDIT_MODEL },
       ).catch((err) => {
         console.warn('Credit statement pass failed:', err instanceof Error ? err.message : String(err));
         return {
@@ -2576,7 +2686,7 @@ Deno.serve(async (req: Request) => {
         `Read this filed tax return. File name: ${document.name}\n\n${TAX_RETURN_RULES}\n\n` +
         `Emit one entry in fields per value genuinely printed, using these codes:\n` +
         `${TAX_RETURN_FIELD_CODES}\n\nOmit a code entirely rather than guessing at it.`,
-        TAX_RETURN_SCHEMA, 'high', 8000,
+        TAX_RETURN_SCHEMA, EXTRACT_EFFORT, 8000, { model: FORM_MODEL, label: 'tax return' },
       );
 
       const taxYear = num(parsed.tax_year)
@@ -2705,7 +2815,7 @@ Deno.serve(async (req: Request) => {
         `Read this mortgage statement. File name: ${document.name}\n\n${MORTGAGE_RULES}\n\n` +
         `Emit one entry in fields per value genuinely printed, using these codes:\n` +
         `${MORTGAGE_FIELD_CODES}\n\nOmit a code entirely rather than guessing at it.`,
-        MORTGAGE_SCHEMA, 'high', 8000,
+        MORTGAGE_SCHEMA, EXTRACT_EFFORT, 8000, { model: FORM_MODEL, label: 'mortgage' },
       );
 
       // deno-lint-ignore no-explicit-any
@@ -2786,7 +2896,7 @@ Deno.serve(async (req: Request) => {
         `Read this document about a household system or appliance. File name: ${document.name}\n\n` +
         `${APPLIANCE_RULES}\n\nIdentify what the equipment is, who made it, and what any warranty ` +
         `covers and until when. Leave a field empty rather than guessing at it.`,
-        APPLIANCE_SCHEMA, 'high', 8000,
+        APPLIANCE_SCHEMA, EXTRACT_EFFORT, 8000, { model: FORM_MODEL, label: 'appliance' },
       );
 
       const row = {
@@ -2890,7 +3000,7 @@ Deno.serve(async (req: Request) => {
       GENERIC_SCHEMA,
       'medium',
       4096,
-      { model: GENERIC_MODEL },
+      { model: GENERIC_MODEL, label: 'generic' },
     );
 
     const fields: Record<string, string> = {};

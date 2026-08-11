@@ -73,6 +73,13 @@ const INSURANCE_TYPES = [
   'boat', 'valuables', 'motorcycle', 'rv', 'earthquake', 'health', 'other', 'unknown',
 ];
 
+// What a user may override the classifier with. Each maps onto a branch below;
+// anything not here would silently do nothing, which is worse than refusing.
+const FORCEABLE_TYPES = [
+  'credit_card_statement', 'mortgage_statement', 'insurance_dec_page',
+  'tax_return', 'legal_document', 'bank_statement', 'paystub',
+];
+
 const LEGACY_TYPES = [
   'mortgage_statement', 'insurance_dec_page', 'credit_card_statement',
   'bank_statement', 'tax_document', 'paystub', 'unknown',
@@ -417,7 +424,23 @@ Legal classification rules:
    judgement about whether the document is valid or effective.
 8. document_title is the document's own title, verbatim. Empty string if untitled.
 9. page_count is the number of pages provided. 0 if you cannot tell.
-10. tax_document_type is "tax_return" only for a filed or prepared return —
+10. legacy_type separates the financial documents, and the distinction that
+   matters most is credit_card_statement versus bank_statement. They look alike
+   — an institution, an account, a period, a list of transactions — and a card
+   issued by a bank is branded like a bank document. Decide it on the figures,
+   not the letterhead:
+
+     credit_card_statement has a credit limit, available credit, a minimum
+     payment due, a payment due date, and APR or interest-charge disclosures.
+     It usually reports rewards. The balance is money owed.
+
+     bank_statement has deposits and withdrawals against a running balance, and
+     no credit limit, no minimum payment and no APR table. The balance is money
+     held.
+
+   A "minimum payment due" or a stated credit limit settles it: that is a credit
+   card statement. Get this right — a whole extraction path depends on it.
+11. tax_document_type is "tax_return" only for a filed or prepared return —
    a Form 1040 with its schedules, or a preparer's copy of one. An individual
    information form is "w2", "1099", "1098", "k1" or "1095". A tax organizer, a
    notice from a tax authority, or a worksheet is "other_tax_form". Anything not
@@ -2116,7 +2139,7 @@ Deno.serve(async (req: Request) => {
   const { data: userData, error: userError } = await caller.auth.getUser();
   if (userError || !userData?.user) return json({ error: 'Invalid or expired session' }, 401);
 
-  let body: { document_id?: unknown };
+  let body: { document_id?: unknown; force_type?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -2124,6 +2147,17 @@ Deno.serve(async (req: Request) => {
   }
   const documentId = body?.document_id;
   if (typeof documentId !== 'string') return json({ error: 'Missing document_id' }, 400);
+
+  // The user's answer about what a document is beats the classifier's. Any
+  // classifier is wrong sometimes, and without this a misread document is stuck
+  // — re-reading it just runs the same classification again, which is exactly
+  // what happened to a credit card statement that kept landing on the generic
+  // path. Restricted to the routing fields so it can redirect a reading and
+  // nothing else.
+  const forcedType = typeof body?.force_type === 'string' ? body.force_type : null;
+  if (forcedType && !FORCEABLE_TYPES.includes(forcedType)) {
+    return json({ error: `Cannot read a document as '${forcedType}'` }, 400);
+  }
 
   const { data: document, error: documentError } = await admin
     .from('documents').select('*').eq('id', documentId).single();
@@ -2200,6 +2234,36 @@ Deno.serve(async (req: Request) => {
       // be read by the extraction passes below.
       { model: CLASSIFY_MODEL, label: 'classify' },
     );
+
+    // Applied after classification rather than instead of it, so the reading
+    // still records what Command thought on its own — a correction is evidence
+    // that the classifier needs work, and overwriting it would hide that.
+    if (forcedType) {
+      console.log(`forced type: ${classification.legacy_type} -> ${forcedType}`);
+      classification.classified_as = classification.legacy_type;
+      classification.forced = true;
+      if (forcedType === 'insurance_dec_page') {
+        classification.is_insurance = true;
+        classification.legacy_type = 'insurance_dec_page';
+      } else if (forcedType === 'legal_document') {
+        classification.is_insurance = false;
+        classification.legal_recognition = 'legal';
+        if (!classification.legal_type || classification.legal_type === 'not_legal') {
+          classification.legal_type = 'unknown_legal_document';
+        }
+      } else if (forcedType === 'tax_return') {
+        classification.is_insurance = false;
+        classification.tax_document_type = 'tax_return';
+      } else if (forcedType === 'mortgage_statement') {
+        classification.is_insurance = false;
+        classification.home_document_type = 'mortgage_statement';
+        classification.legacy_type = 'mortgage_statement';
+      } else {
+        classification.is_insurance = false;
+        classification.legal_recognition = 'not_legal';
+        classification.legacy_type = forcedType;
+      }
+    }
 
     if (classification.is_insurance) {
       const context =

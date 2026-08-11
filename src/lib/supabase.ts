@@ -2119,6 +2119,19 @@ export async function deleteInsurancePolicy(policyId: string): Promise<boolean> 
   return true;
 }
 
+/** What a user may tell Command a document actually is. Mirrors FORCEABLE_TYPES. */
+export const FORCEABLE_TYPES = [
+  { code: 'credit_card_statement', label: 'Credit card statement' },
+  { code: 'mortgage_statement', label: 'Mortgage statement' },
+  { code: 'insurance_dec_page', label: 'Insurance policy or declarations page' },
+  { code: 'legal_document', label: 'Legal document' },
+  { code: 'tax_return', label: 'Tax return' },
+  { code: 'bank_statement', label: 'Bank statement' },
+  { code: 'paystub', label: 'Pay stub' },
+] as const;
+
+export type ForceableType = typeof FORCEABLE_TYPES[number]['code'];
+
 export async function getDocumentUrl(filePath: string): Promise<string | null> {
   const { data, error } = await supabase.storage.from(storageBucket).createSignedUrl(filePath, 300);
   if (error || !data?.signedUrl) {
@@ -2128,10 +2141,18 @@ export async function getDocumentUrl(filePath: string): Promise<string | null> {
   return data.signedUrl;
 }
 
-export async function invokeDocumentExtraction(documentId: string): Promise<boolean> {
+/**
+ * `forceType` overrides what the classifier decided the document is. Any
+ * classifier is wrong sometimes, and without an override a misread document is
+ * stuck: re-reading it just runs the same classification again.
+ */
+export async function invokeDocumentExtraction(
+  documentId: string,
+  forceType?: ForceableType,
+): Promise<boolean> {
   // Pass the object directly — supabase-js serializes it and sets the JSON content type.
   const { error } = await supabase.functions.invoke('extract-document', {
-    body: { document_id: documentId },
+    body: forceType ? { document_id: documentId, force_type: forceType } : { document_id: documentId },
   });
   if (error) {
     // The function returns a JSON body describing the failure; surface it rather than

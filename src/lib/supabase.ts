@@ -5,6 +5,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { currentReadings } from './readings';
+import type { ExecutionObservation } from '../components/ExecutionStatus';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
@@ -492,6 +493,12 @@ export interface LegalDocumentExtraction {
   review_status: 'pending_review' | 'confirmed' | 'partially_confirmed' | 'discarded';
   failure_reason: string | null;
   extraction_version: number;
+  /**
+   * What Command could see of how the document was executed — a signature block,
+   * a notarization, witnesses. Written by the extractor since August 8 and never
+   * declared here, so no screen could read it.
+   */
+  execution_observations?: ExecutionObservation[] | null;
   /** The reading this one replaced. Written by the extractor, never by the UI. */
   supersedes_extraction_id?: string | null;
   content_hash: string | null;

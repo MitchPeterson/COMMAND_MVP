@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.25.6',
+    date: '2026-08-11',
+    title: 'One document, one entry',
+    items: [
+      'A document read more than once now appears once — the newest reading wins, and older ones are kept as history rather than shown as separate documents',
+      'The Legal grade no longer counts a re-read document twice',
+      'The same duplication in Insurance is fixed too, where confirming both readings would have put a policy on file twice',
+    ],
+  },
+  {
     version: '0.25.5',
     date: '2026-08-11',
     title: 'Every section agrees with the vault',

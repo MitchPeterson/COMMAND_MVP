@@ -1,5 +1,7 @@
 import React from 'react';
 import { useHousehold } from '../useHousehold';
+import { UnfiledDocuments } from '../components/UnfiledDocuments';
+import { DocumentLinkBadge } from '../components/DocumentLinkBadge';
 import { TaxHealth } from '../components/TaxHealth';
 import { TaxYearPanel } from '../components/TaxYearPanel';
 import { TaxBaseline } from '../components/TaxBaseline';
@@ -126,6 +128,12 @@ export function TaxesView() {
                   <div>
                     <p className="text-sm font-semibold text-cmd-offwhite">{doc.name}</p>
                     <p className="text-sm text-cmd-muted">{doc.tax_year} · {doc.doc_type}</p>
+                    <div className="mt-2">
+                      <DocumentLinkBadge
+                        sourceDocumentId={doc.document_id}
+                        documents={data?.documents ?? []}
+                      />
+                    </div>
                   </div>
                 </div>
                 <div className="mt-4 text-right sm:mt-0">
@@ -137,6 +145,19 @@ export function TaxesView() {
           </div>
         )}
       </section>
+      <UnfiledDocuments
+        section="taxes"
+        documents={data?.documents ?? []}
+        data={{
+          legalDocuments: data?.legalDocuments, legalExtractions: data?.legalExtractions,
+          insurancePolicies: data?.insurancePolicies, insuranceExtractions: data?.insuranceExtractions,
+          financeAccounts: data?.financeAccounts, creditCards: data?.creditCards,
+          creditStatements: data?.creditStatements, mortgageStatements: data?.mortgageStatements,
+          taxDocuments: data?.taxDocuments, taxReturns: data?.taxReturns,
+        }}
+        onChanged={refresh}
+      />
+
       {/* Demoted: still one click away, no longer the headline. */}
       <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
         <UploadDropzone

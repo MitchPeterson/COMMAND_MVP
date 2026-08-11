@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.25.5',
+    date: '2026-08-11',
+    title: 'Every section agrees with the vault',
+    items: [
+      'Insurance, Credit, Home and Taxes now show whether a record has a document behind it, the same way Legal does',
+      'Every section lists files sitting in the vault that it isn\'t counting, and says the grade was calculated without them',
+    ],
+  },
+  {
     version: '0.25.4',
     date: '2026-08-11',
     title: 'The vault and your sections now agree',

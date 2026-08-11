@@ -1,5 +1,7 @@
 import React from 'react';
 import { useHousehold } from '../useHousehold';
+import { UnfiledDocuments } from '../components/UnfiledDocuments';
+import { DocumentLinkBadge } from '../components/DocumentLinkBadge';
 import { UploadDropzone } from '../components/UploadDropzone';
 import { CreditHealth } from '../components/CreditHealth';
 import { CreditStatementReview } from '../components/CreditStatementReview';
@@ -134,6 +136,12 @@ export function CreditView() {
                       Limit {money(card.credit_limit)} · Balance {money(card.current_balance)}
                       {card.annual_fee ? ` · ${money(card.annual_fee)} annual fee` : ''}
                     </p>
+                    <div className="mt-3">
+                      <DocumentLinkBadge
+                        sourceDocumentId={card.source_document_id}
+                        documents={data?.documents ?? []}
+                      />
+                    </div>
                     {card.rewards_type && (
                       <p className="mt-1 text-sm text-cmd-muted">
                         {card.rewards_type}
@@ -156,6 +164,19 @@ export function CreditView() {
           </div>
         </section>
       )}
+
+      <UnfiledDocuments
+        section="credit"
+        documents={data?.documents ?? []}
+        data={{
+          legalDocuments: data?.legalDocuments, legalExtractions: data?.legalExtractions,
+          insurancePolicies: data?.insurancePolicies, insuranceExtractions: data?.insuranceExtractions,
+          financeAccounts: data?.financeAccounts, creditCards: data?.creditCards,
+          creditStatements: data?.creditStatements, mortgageStatements: data?.mortgageStatements,
+          taxDocuments: data?.taxDocuments, taxReturns: data?.taxReturns,
+        }}
+        onChanged={refresh}
+      />
 
       {/* Demoted: still one click away, no longer the headline. */}
       <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">

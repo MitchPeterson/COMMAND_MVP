@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.25.3',
+    date: '2026-08-11',
+    title: 'See what each extraction costs',
+    items: [
+      'Every extraction now reports what it cost, how many tokens hit the prompt cache, and the price of each pass',
+      'Mortgage, warranty and tax-return reading moved to a cheaper model — those are printed tables read against a strict schema, not the judgment calls insurance and legal make',
+      'Model and effort are now settable per path without a code change',
+    ],
+  },
+  {
     version: '0.25.2',
     date: '2026-08-10',
     title: 'The dashboard and the Taxes page were not the same section',

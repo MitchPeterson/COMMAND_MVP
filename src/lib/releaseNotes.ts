@@ -25,6 +25,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.29.0',
+    date: '2026-08-12',
+    title: 'See where the API money went',
+    items: [
+      'A collapsed report at the bottom of Profile breaking down every document reading by pass, model and file — including what was spent on readings that failed, and what the replay cache saved',
+    ],
+  },
+  {
     version: '0.28.1',
     date: '2026-08-12',
     title: 'A spend limit reads as a spend limit',

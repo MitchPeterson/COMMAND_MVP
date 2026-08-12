@@ -4,6 +4,7 @@ import { signOut, updateHouseholdProfile } from '../lib/supabase';
 import { HouseholdHistory } from '../components/HouseholdHistory';
 import { PeopleEditor } from '../components/PeopleEditor';
 import { VersionHistory } from '../components/VersionHistory';
+import { ApiUsageReport } from '../components/ApiUsageReport';
 import { UserCircle2, ArrowLeftRight, MapPin, Shield, Sparkles } from 'lucide-react';
 
 function formatCurrency(value: number | null | undefined) {
@@ -234,6 +235,10 @@ export function ProfileView() {
         </div>
       </section>
       {household?.id && <HouseholdHistory householdId={household.id} />}
+
+      {/* Collapsed by default and last on the page: a tool for whoever pays the
+          bill, not part of what Command is for. */}
+      <ApiUsageReport />
 
     </div>
   );

@@ -3589,3 +3589,133 @@ export async function deleteLoan(id: string): Promise<boolean> {
   if (error) throw new Error(`Could not remove that: ${error.message}`);
   return true;
 }
+
+// ─────────────────────────────────────────────────────────────
+// API usage
+// ─────────────────────────────────────────────────────────────
+
+export interface ApiUsageRow {
+  id: string;
+  household_id: string;
+  document_id: string | null;
+  document_name: string | null;
+  label: string;
+  model: string;
+  input_tokens: number;
+  output_tokens: number;
+  cache_write_tokens: number;
+  cache_read_tokens: number;
+  cost_usd: number;
+  replayed: boolean;
+  saved_usd: number;
+  duration_ms: number | null;
+  succeeded: boolean;
+  created_at: string;
+}
+
+/**
+ * Every call the signed-in user paid for, across every household they own.
+ * Deliberately not filtered by household: RLS already scopes it to this user,
+ * and "why did my balance run down" is a question about the account rather than
+ * about one household.
+ */
+export async function getApiUsage(limit = 2000): Promise<ApiUsageRow[]> {
+  const { data, error } = await supabase
+    .from('api_usage_log')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) {
+    console.error('Error fetching API usage:', error);
+    return [];
+  }
+  return (data ?? []) as ApiUsageRow[];
+}
+
+export interface UsageBucket {
+  key: string;
+  calls: number;
+  cost: number;
+  saved: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+export interface UsageSummary {
+  calls: number;
+  cost: number;
+  saved: number;
+  replayed: number;
+  failed: number;
+  failedCost: number;
+  inputTokens: number;
+  outputTokens: number;
+  /** Share of spend that is output tokens — usually the surprise. */
+  outputCostShare: number | null;
+  byModel: UsageBucket[];
+  byLabel: UsageBucket[];
+  byDocument: UsageBucket[];
+  firstAt: string | null;
+  lastAt: string | null;
+}
+
+const RATES: Record<string, { input: number; output: number }> = {
+  'claude-opus-5': { input: 5, output: 25 },
+  'claude-fable-5': { input: 10, output: 50 },
+  'claude-sonnet-5': { input: 3, output: 15 },
+  'claude-haiku-4-5': { input: 1, output: 5 },
+};
+
+function rateFor(model: string) {
+  const key = Object.keys(RATES).find((k) => model.startsWith(k));
+  return key ? RATES[key] : null;
+}
+
+export function summarizeUsage(rows: ApiUsageRow[]): UsageSummary {
+  const bucket = (pick: (r: ApiUsageRow) => string): UsageBucket[] => {
+    const map = new Map<string, UsageBucket>();
+    for (const row of rows) {
+      const key = pick(row) || '—';
+      const held = map.get(key) ?? {
+        key, calls: 0, cost: 0, saved: 0, inputTokens: 0, outputTokens: 0,
+      };
+      held.calls += 1;
+      held.cost += Number(row.cost_usd) || 0;
+      held.saved += Number(row.saved_usd) || 0;
+      held.inputTokens += row.input_tokens + row.cache_write_tokens + row.cache_read_tokens;
+      held.outputTokens += row.output_tokens;
+      map.set(key, held);
+    }
+    return [...map.values()].sort((a, b) => b.cost - a.cost || b.calls - a.calls);
+  };
+
+  const cost = rows.reduce((t, r) => t + (Number(r.cost_usd) || 0), 0);
+  // What share of the bill is output. Computed from the per-model rates rather
+  // than assumed, since the answer differs by model and is usually a surprise.
+  let outputCost = 0;
+  let priced = 0;
+  for (const row of rows) {
+    const rate = rateFor(row.model);
+    if (!rate || row.replayed) continue;
+    outputCost += (row.output_tokens * rate.output) / 1_000_000;
+    priced += Number(row.cost_usd) || 0;
+  }
+
+  const dates = rows.map((r) => r.created_at).filter(Boolean).sort();
+  return {
+    calls: rows.length,
+    cost,
+    saved: rows.reduce((t, r) => t + (Number(r.saved_usd) || 0), 0),
+    replayed: rows.filter((r) => r.replayed).length,
+    failed: rows.filter((r) => !r.succeeded).length,
+    failedCost: rows.filter((r) => !r.succeeded).reduce((t, r) => t + (Number(r.cost_usd) || 0), 0),
+    inputTokens: rows.reduce((t, r) => t + r.input_tokens + r.cache_write_tokens + r.cache_read_tokens, 0),
+    outputTokens: rows.reduce((t, r) => t + r.output_tokens, 0),
+    outputCostShare: priced > 0 ? outputCost / priced : null,
+    byModel: bucket((r) => r.model),
+    byLabel: bucket((r) => r.label.replace(/ \(replayed\)$/, '')),
+    byDocument: bucket((r) => r.document_name ?? 'Document since deleted'),
+    firstAt: dates[0] ?? null,
+    lastAt: dates[dates.length - 1] ?? null,
+  };
+}

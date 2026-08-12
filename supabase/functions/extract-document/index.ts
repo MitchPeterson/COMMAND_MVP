@@ -1847,7 +1847,42 @@ let ledger: UsageLine[] = [];
 // called from a dozen places and threading these through every one of them
 // would be a lot of edits for no added safety.
 let currentHouseholdId: string | null = null;
+let currentDocumentId: string | null = null;
+let currentDocumentName: string | null = null;
 let bypassCache = false;
+
+/**
+ * Records what a call cost, as it completes rather than at the end of the
+ * request. A failed extraction still consumed tokens, and those are exactly the
+ * calls worth finding when a balance runs down faster than expected.
+ *
+ * Never throws. Losing a cost record is a reporting gap; failing the extraction
+ * over one would cost the user their document.
+ */
+async function recordUsage(line: UsageLine, durationMs: number, succeeded: boolean) {
+  if (!currentHouseholdId) return;
+  try {
+    const { error } = await admin.from('api_usage_log').insert({
+      household_id: currentHouseholdId,
+      document_id: currentDocumentId,
+      document_name: currentDocumentName,
+      label: line.label,
+      model: line.model,
+      input_tokens: line.input,
+      output_tokens: line.output,
+      cache_write_tokens: line.cache_write,
+      cache_read_tokens: line.cache_read,
+      cost_usd: lineCost(line),
+      replayed: line.replayed ?? false,
+      saved_usd: line.saved_usd ?? 0,
+      duration_ms: Math.round(durationMs),
+      succeeded,
+    });
+    if (error) console.warn('Could not record usage:', error.message);
+  } catch (err) {
+    console.warn('Could not record usage:', err);
+  }
+}
 
 async function sha256(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
@@ -1948,11 +1983,13 @@ async function callClaude(
       .maybeSingle();
 
     if (hit) {
-      ledger.push({
+      const replayLine: UsageLine = {
         label: `${options.label ?? 'pass'} (replayed)`,
         model, input: 0, output: 0, cache_write: 0, cache_read: 0,
         replayed: true, saved_usd: Number(hit.original_cost_usd ?? 0),
-      });
+      };
+      ledger.push(replayLine);
+      await recordUsage(replayLine, 0, true);
       // Best effort: a failed bookkeeping update must not discard a good answer.
       await admin.from('extraction_response_cache')
         .update({ hit_count: (hit.hit_count ?? 0) + 1, last_used_at: new Date().toISOString() })
@@ -1980,7 +2017,9 @@ async function callClaude(
     }
   }
 
+  const startedAt = Date.now();
   const response = await stream.finalMessage();
+  const durationMs = Date.now() - startedAt;
 
   // Recorded before any error is thrown: a refusal or a truncation is billed.
   const usage = response.usage;
@@ -1992,6 +2031,11 @@ async function callClaude(
     cache_write: usage?.cache_creation_input_tokens ?? 0,
     cache_read: usage?.cache_read_input_tokens ?? 0,
   });
+
+  // A refusal or a truncation costs the same as a success, so the row is written
+  // before either is thrown — flagged as failed so it can be totalled apart.
+  const usable = response.stop_reason !== 'refusal' && response.stop_reason !== 'max_tokens';
+  await recordUsage(ledger[ledger.length - 1], durationMs, usable);
 
   if (response.stop_reason === 'refusal') {
     throw new Error(`Claude declined to process this document (${response.stop_details?.category ?? 'unspecified'})`);
@@ -2229,6 +2273,8 @@ async function persistInsurance(doc: any, extraction: any): Promise<string> {
 Deno.serve(async (req: Request) => {
   ledger = [];
   currentHouseholdId = null;
+  currentDocumentId = null;
+  currentDocumentName = null;
   bypassCache = false;
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
@@ -2279,6 +2325,9 @@ Deno.serve(async (req: Request) => {
   // Set only after ownership is proven, so the cache can never be keyed to a
   // household the caller does not own.
   currentHouseholdId = household.id;
+  currentDocumentId = document.id;
+  // Snapshotted: the document may be deleted later and the spend still happened.
+  currentDocumentName = document.name ?? null;
   if (!document.file_path) return json({ error: 'Document has no storage path' }, 400);
 
   const failDocument = async (message: string, status: number) => {

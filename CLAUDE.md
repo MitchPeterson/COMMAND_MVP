@@ -270,11 +270,15 @@ The household to put in front of someone. Every figure is consistent across
 sections, so the findings agree with each other rather than each inventing a story.
 
 - **Marcus** 47 · **Priya** 44 · **Nina** 16 (17 on Oct 5) · **Dev** 10 · **Kai** infant
-- Edina MN · HHI $412K · net worth $3.65M · home $985K · mortgage $421,840 at 3.125%
+- Edina MN · HHI $412K · net worth stated $3.30M against $2.76M on file · home $985K
+- Mortgage $421,840 at 3.125% · Volvo loan · federal student loan · an 8.25% HELOC
 - Drives: $2M umbrella against $3.65M net worth, wills executed 2016 before Kai,
   no financial POA for Priya, a 19-year-old furnace flagged at its last service,
   a Citi card carrying $9,413 at 24.49%, and a 2025 return that puts the
   safe harbor at $78,364 with a $9,200 capital loss carrying forward.
+- Finances demonstrates the reconciliation finding at a believable size: $540K
+  of the stated net worth is not on file, and the 8.25% HELOC against $86K of
+  idle savings drives the rate-spread trade-off.
 - Six real PDFs in the vault: two declarations pages, a will, a mortgage
   statement, a card statement and the 1040.
 

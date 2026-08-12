@@ -25,6 +25,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.28.1',
+    date: '2026-08-12',
+    title: 'A spend limit reads as a spend limit',
+    items: [
+      'Hitting an Anthropic usage cap now says so, names the date it resets, and points at the setting that raises it — instead of being reported as an empty balance, which sends you to the wrong screen',
+    ],
+  },
+  {
     version: '0.28.0',
     date: '2026-08-12',
     title: 'Stop paying twice for the same reading',

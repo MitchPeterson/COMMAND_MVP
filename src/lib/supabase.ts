@@ -2175,7 +2175,19 @@ export async function invokeDocumentExtraction(
     // and where to fix it.
     const outOfCredit = /credit balance is too low|insufficient.{0,20}credit/i.test(raw);
 
-    const message = outOfCredit
+    // A spend cap is a different state from an empty balance and has a different
+    // fix: the account has money, a ceiling was set, and it either resets on a
+    // date the API names or can be raised now. Telling someone to top up an
+    // account that is already funded sends them to the wrong screen.
+    const capReached = /usage limit|spend limit|reached your specified/i.test(raw);
+    const resetsOn = raw.match(/regain access on (\d{4}-\d{2}-\d{2})/i)?.[1] ?? null;
+
+    const message = capReached
+      ? `your Anthropic account has hit a usage limit, so nothing can be read right now` +
+        `${resetsOn ? `. It resets on ${resetsOn}` : ''}. Raise the limit under Settings, Limits at ` +
+        `platform.claude.com, or wait for the reset — the file is safe here and you can read it ` +
+        `from the vault afterwards.`
+      : outOfCredit
       ? 'your Anthropic API account is out of credits, so nothing can be read right now. ' +
         'Top it up at platform.claude.com under Plans & Billing — the file is safe here and you ' +
         'can run extraction again from the vault afterwards.'

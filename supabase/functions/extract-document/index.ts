@@ -1761,11 +1761,28 @@ function withDocumentCache(content: unknown[]): unknown[] {
 }
 
 /**
- * A cache entry is readable only once its own response has started arriving, so
- * firing all the passes at once means every one of them pays full price. This
- * releases the rest the moment the first pass starts streaming — or after a
- * ceiling, because a missed cache read costs money and a stalled function costs
- * the whole extraction.
+ * Releases the later passes once the first one starts streaming, which is when
+ * its cache entry becomes readable.
+ *
+ * Measured 2026-08-11, and it does not do what it was written to do. Two
+ * concurrent passes over an identical document, both handed the same
+ * cache_control'd content, each wrote its own cache entry and neither read the
+ * other's: 0% hit ratio on a cold run. A second run of the same document then
+ * read both entries back at exactly the token counts the first run wrote
+ * (3128 -> 3128, 3606 -> 3606), which is the tell — each pass has its own entry,
+ * keyed separately.
+ *
+ * The likely cause is that the cache key covers the structured-output schema,
+ * not just the message prefix, so passes that share a document but differ in
+ * schema can never share an entry however the timing is arranged. Unverified.
+ *
+ * Kept because it costs nothing and still helps across runs, and because the
+ * concurrency itself is load-bearing for a different reason: three sequential
+ * passes took 133s against a ~150s wall clock.
+ *
+ * The bill is mostly output anyway — 68% of a measured credit statement — so
+ * ANTHROPIC_EFFORT and the model's output rate are the levers that matter here,
+ * not input caching.
  */
 function cacheGate(timeoutMs = 12000) {
   let release: () => void = () => {};

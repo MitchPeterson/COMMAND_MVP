@@ -119,6 +119,24 @@ Extracted insurance lands in nine normalized tables plus the `insurance_liabilit
 - **Edge Functions have a ~150s wall clock** on the free plan. Three sequential passes on a 12-page policy took 133s. They run concurrently for this reason.
 - **Long policies need streaming.** Passes stream and take `finalMessage()`; a high `max_tokens` on a non-streaming request risks HTTP timeouts.
 
+### What it costs — measured Aug 11, 2026
+
+A bank-branded credit card statement, cold: **$0.17**. Classify on Haiku is 3% of
+that; the two Opus passes are the other 97%. **68% of the total is output tokens**,
+not input — so `ANTHROPIC_EFFORT` and the model's output rate ($25/MTok on Opus
+against $15 on Sonnet) are the levers that matter, and input caching is not.
+
+The concurrent passes do **not** share a document cache. Both wrote their own
+entry and neither read the other's (0% hit cold); a re-run then read both back at
+exactly the counts the first run wrote, which is how you can tell. The cache key
+appears to cover the output schema, not just the message prefix — unverified.
+Caching therefore only pays on a re-read, worth about 25%.
+
+Every model is a Supabase secret, so the cost profile changes without a deploy:
+`ANTHROPIC_MODEL` (insurance and legal), `ANTHROPIC_FORM_MODEL` (mortgage,
+appliance, tax return), `ANTHROPIC_CREDIT_MODEL`, `ANTHROPIC_CLASSIFY_MODEL`,
+`ANTHROPIC_GENERIC_MODEL`, `ANTHROPIC_EFFORT`.
+
 ## Database
 
 All tables use RLS via `household_owner(household_id)`. Core: `households`, `household_profile`, `insurance_policies`, `legal_documents`, `assets`, `maintenance_records`, `priority_actions`, `timeline_events`, `documents`, `document_extractions`, `section_scores`, plus the v2 pillar tables (`finance_accounts`, `budget_summary`, `tax_documents`, `tax_recommendations`, `family_members`, `family_milestones`, `credit_cards`).

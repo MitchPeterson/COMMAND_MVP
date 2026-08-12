@@ -25,6 +25,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.27.1',
+    date: '2026-08-12',
+    title: 'A second property counts toward net worth',
+    items: [
+      'Real estate now comes from your itemized property records, falling back to the profile figure only when nothing is itemized — a rental or a cabin was being dropped from net worth entirely',
+    ],
+  },
+  {
     version: '0.27.0',
     date: '2026-08-12',
     title: 'Finances becomes a real section',

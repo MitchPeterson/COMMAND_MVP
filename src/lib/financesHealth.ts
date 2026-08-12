@@ -112,10 +112,20 @@ export function computeFinancesHealth(
   const vehicleValue = assets
     .filter((a) => a.type === 'vehicle')
     .reduce((sum, a) => sum + (a.current_value ?? 0), 0);
+
+  // Real estate comes from the assets table when anything is itemized there, and
+  // from the profile figure only when nothing is. Taking both double-counts the
+  // house; excluding real_estate outright — which this did first — silently
+  // dropped a second property, so a rental or a cabin never reached net worth.
+  const realEstate = assets.filter((a) => a.type === 'real_estate');
+  const realEstateValue = realEstate.length > 0
+    ? realEstate.reduce((sum, a) => sum + (a.current_value ?? 0), 0)
+    : homeValue;
+
   const otherProperty = assets
     .filter((a) => a.type !== 'vehicle' && a.type !== 'real_estate')
     .reduce((sum, a) => sum + (a.current_value ?? 0), 0);
-  const propertyAssets = homeValue + vehicleValue + otherProperty;
+  const propertyAssets = realEstateValue + vehicleValue + otherProperty;
   const totalAssets = liquidAssets + investedAssets + otherAccounts + propertyAssets;
 
   // ── Debts, read from whichever section owns each record ───────────────────
@@ -268,6 +278,14 @@ export function computeFinancesHealth(
       severity: 'info',
       title: 'No accounts on file',
       detail: 'Balances drive everything on this page.',
+    });
+  }
+  if (realEstate.length > 0 && homeValue > 0 && Math.abs(realEstateValue - homeValue) > homeValue * 0.1) {
+    dataFindings.push({
+      severity: 'info',
+      title: 'Your profile home value and the property on file disagree',
+      detail: `The profile says ${money(homeValue)}; the property records total ${money(realEstateValue)}. ` +
+        `The itemized records are used here.`,
     });
   }
   if (!mortgage && homeValue > 0) {

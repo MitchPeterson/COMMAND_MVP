@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.27.0',
+    date: '2026-08-12',
+    title: 'Finances becomes a real section',
+    items: [
+      'A Finances grade that reconciles the net worth you stated against what is actually on file — the figure the insurance findings depend on',
+      'A balance sheet assembled from every section: accounts and property against the mortgage from Home, card balances from Credit, and loans',
+      'Car, student, personal, HELOC and 401(k) loans can be recorded, and a car loan ties to the vehicle it is secured against',
+    ],
+  },
+  {
     version: '0.26.0',
     date: '2026-08-11',
     title: 'Tell Command when it reads a document wrong',

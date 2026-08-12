@@ -3441,3 +3441,134 @@ export async function importCharitableFromCards(
   if (error) throw new Error(`Could not import those: ${error.message}`);
   return rows.length;
 }
+
+// ─────────────────────────────────────────────────────────────
+// Loans
+// ─────────────────────────────────────────────────────────────
+// Everything owed that is not a card or the mortgage. Those two stay in Credit
+// and Home with the records they belong to; Finances reads all three.
+
+export type LoanType =
+  | 'auto' | 'student' | 'personal' | 'heloc' | 'home_equity'
+  | 'retirement_plan' | 'medical' | 'business' | 'other';
+
+export interface Loan {
+  id: string;
+  household_id: string;
+  loan_type: LoanType;
+  name: string;
+  lender: string | null;
+  account_number_last4: string | null;
+  /** The asset it is secured against — a car loan points at the vehicle. */
+  secured_by_asset_id: string | null;
+  original_amount: number | null;
+  current_balance: number | null;
+  interest_rate: number | null;
+  apr: number | null;
+  rate_type: 'fixed' | 'variable' | 'unknown' | null;
+  monthly_payment: number | null;
+  term_months: number | null;
+  remaining_payments: number | null;
+  origination_date: string | null;
+  maturity_date: string | null;
+  payment_due_day: number | null;
+  balance_as_of: string | null;
+  is_federal: boolean | null;
+  in_deferment: boolean;
+  status: 'active' | 'paid_off' | 'in_default' | 'deferred' | 'closed';
+  entry_source: string;
+  source_document_id?: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+export const LOAN_TYPES: Array<{ code: LoanType; label: string; securable: boolean }> = [
+  { code: 'auto', label: 'Auto loan', securable: true },
+  { code: 'student', label: 'Student loan', securable: false },
+  { code: 'personal', label: 'Personal loan', securable: false },
+  { code: 'heloc', label: 'HELOC', securable: false },
+  { code: 'home_equity', label: 'Home equity loan', securable: false },
+  { code: 'retirement_plan', label: '401(k) or retirement plan loan', securable: false },
+  { code: 'medical', label: 'Medical debt', securable: false },
+  { code: 'business', label: 'Business loan', securable: false },
+  { code: 'other', label: 'Something else', securable: true },
+];
+
+export function loanTypeLabel(code: string): string {
+  return LOAN_TYPES.find((t) => t.code === code)?.label ?? code;
+}
+
+export async function getLoans(householdId: string): Promise<Loan[]> {
+  const { data, error } = await supabase
+    .from('loans').select('*').eq('household_id', householdId)
+    .order('current_balance', { ascending: false, nullsFirst: false });
+  if (error) {
+    console.error('Error fetching loans:', error);
+    return [];
+  }
+  return (data ?? []) as Loan[];
+}
+
+export type LoanInput = FromForm<Omit<Loan, 'id' | 'household_id' | 'created_at'>>;
+
+function loanPatch(input: Partial<LoanInput>): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  const numeric = new Set([
+    'original_amount', 'current_balance', 'interest_rate', 'apr', 'monthly_payment',
+    'term_months', 'remaining_payments', 'payment_due_day',
+  ]);
+  for (const [key, value] of Object.entries(input)) {
+    if (value === undefined) continue;
+    if (numeric.has(key)) {
+      const parsed = value === '' || value === null ? null : Number(String(value).replace(/[^0-9.\-]/g, ''));
+      patch[key] = parsed !== null && Number.isFinite(parsed) ? parsed : null;
+    } else if (key === 'in_deferment') {
+      patch[key] = Boolean(value);
+    } else if (key === 'is_federal') {
+      patch[key] = value === null || value === '' ? null : Boolean(value);
+    } else if (key === 'account_number_last4') {
+      // The column rejects anything but four digits, and a rejected write would
+      // lose the whole loan rather than one field.
+      const digits = String(value ?? '').replace(/\D/g, '').slice(-4);
+      patch[key] = digits.length === 4 ? digits : null;
+    } else {
+      patch[key] = String(value ?? '').trim() || null;
+    }
+  }
+  return patch;
+}
+
+export async function addLoan(householdId: string, input: LoanInput): Promise<Loan> {
+  if (!input.name) throw new Error('Give the loan a name.');
+  const { data, error } = await supabase
+    .from('loans')
+    .insert([{
+      ...loanPatch(input),
+      household_id: householdId,
+      name: String(input.name).trim(),
+      loan_type: input.loan_type ?? 'other',
+      status: input.status ?? 'active',
+      entry_source: 'manual',
+    }])
+    .select('*').single();
+  if (error || !data) {
+    console.error('Failed to add the loan:', error);
+    throw new Error(`Could not save that: ${error?.message ?? 'no row returned'}`);
+  }
+  return data as Loan;
+}
+
+export async function updateLoan(id: string, input: Partial<LoanInput>): Promise<boolean> {
+  const { error } = await supabase
+    .from('loans')
+    .update({ ...loanPatch(input), updated_at: new Date().toISOString() })
+    .eq('id', id);
+  if (error) throw new Error(`Could not save that: ${error.message}`);
+  return true;
+}
+
+export async function deleteLoan(id: string): Promise<boolean> {
+  const { error } = await supabase.from('loans').delete().eq('id', id);
+  if (error) throw new Error(`Could not remove that: ${error.message}`);
+  return true;
+}

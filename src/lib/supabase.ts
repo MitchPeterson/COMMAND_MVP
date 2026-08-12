@@ -2149,11 +2149,16 @@ export async function getDocumentUrl(filePath: string): Promise<string | null> {
 export async function invokeDocumentExtraction(
   documentId: string,
   forceType?: ForceableType,
+  fresh = false,
 ): Promise<boolean> {
   // Pass the object directly — supabase-js serializes it and sets the JSON content type.
-  const { error } = await supabase.functions.invoke('extract-document', {
-    body: forceType ? { document_id: documentId, force_type: forceType } : { document_id: documentId },
-  });
+  const body: Record<string, unknown> = { document_id: documentId };
+  if (forceType) body.force_type = forceType;
+  // Bypasses the response cache and buys a new answer. Correcting a type already
+  // implies this, so it is only needed to re-read a document whose type was right
+  // and whose answer was not.
+  if (fresh) body.fresh = true;
+  const { error } = await supabase.functions.invoke('extract-document', { body });
   if (error) {
     // The function returns a JSON body describing the failure; surface it rather than
     // logging an opaque FunctionsHttpError.

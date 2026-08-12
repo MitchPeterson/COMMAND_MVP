@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.28.0',
+    date: '2026-08-12',
+    title: 'Stop paying twice for the same reading',
+    items: [
+      'Extractions are replayed from a cache when the document, the prompts, the schema and the model are all unchanged — re-reading a document you have already read now costs nothing',
+      'The cost line reports what a replay saved',
+    ],
+  },
+  {
     version: '0.27.1',
     date: '2026-08-12',
     title: 'A second property counts toward net worth',

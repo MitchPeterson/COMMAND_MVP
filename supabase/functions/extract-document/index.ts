@@ -35,6 +35,12 @@ const CREDIT_MODEL = Deno.env.get('ANTHROPIC_CREDIT_MODEL') ?? anthropicModel;
 // rather than a constant.
 const EXTRACT_EFFORT = Deno.env.get('ANTHROPIC_EFFORT') ?? 'high';
 
+// Replaying a previous answer instead of buying it again. On by default: the
+// cache key covers everything that determines the result, so a hit is the same
+// computation rather than a guess that it would have been. Set to 'off' to
+// disable, or send fresh:true on a single request to bypass and overwrite.
+const RESPONSE_CACHE_ON = (Deno.env.get('ANTHROPIC_RESPONSE_CACHE') ?? 'on') !== 'off';
+
 if (!supabaseUrl || !supabaseServiceRole) {
   throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for this function.');
 }
@@ -1689,7 +1695,9 @@ function json(body: unknown, status: number): Response {
   const usage = ledgerSummary();
   if (usage) {
     console.log(
-      `cost $${usage.estimated_cost_usd} · ${usage.calls} calls · ` +
+      `cost $${usage.estimated_cost_usd}` +
+      (usage.replayed > 0 ? ` (replayed ${usage.replayed}, saved $${usage.saved_by_replay_usd})` : '') +
+      ` · ${usage.calls} calls · ` +
       `cache hit ${(usage.cache_hit_ratio * 100).toFixed(0)}% · ` +
       `${usage.fresh_input_tokens} fresh in / ${usage.cache_read_tokens} cached / ${usage.output_tokens} out`,
     );
@@ -1813,6 +1821,10 @@ interface UsageLine {
   output: number;
   cache_write: number;
   cache_read: number;
+  /** True when the answer came from the response cache and cost nothing. */
+  replayed?: boolean;
+  /** What the call would have cost, on a replay. */
+  saved_usd?: number;
 }
 
 // Dollars per million tokens. Sonnet 5 carries introductory pricing of $2/$10
@@ -1831,8 +1843,19 @@ function priceOf(model: string): { input: number; output: number } {
 }
 
 let ledger: UsageLine[] = [];
+// Request-scoped, set once per invocation alongside the ledger. callClaude is
+// called from a dozen places and threading these through every one of them
+// would be a lot of edits for no added safety.
+let currentHouseholdId: string | null = null;
+let bypassCache = false;
+
+async function sha256(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 function lineCost(line: UsageLine): number {
+  if (line.replayed) return 0;
   const price = priceOf(line.model);
   // A cache write costs 1.25x fresh input; a cache read costs 0.1x.
   return (
@@ -1848,9 +1871,12 @@ function ledgerSummary() {
   const sum = (pick: (l: UsageLine) => number) => ledger.reduce((t, l) => t + pick(l), 0);
   const cacheRead = sum((l) => l.cache_read);
   const freshInput = sum((l) => l.input + l.cache_write);
+  const saved = ledger.reduce((t, l) => t + (l.saved_usd ?? 0), 0);
   return {
     calls: ledger.length,
+    replayed: ledger.filter((l) => l.replayed).length,
     estimated_cost_usd: Number(ledger.reduce((t, l) => t + lineCost(l), 0).toFixed(4)),
+    saved_by_replay_usd: Number(saved.toFixed(4)),
     cache_read_tokens: cacheRead,
     fresh_input_tokens: freshInput,
     // 0 means every pass re-sent the document and the concurrency buys nothing
@@ -1901,6 +1927,42 @@ async function callClaude(
     request.fallbacks = 'default';
   }
 
+  // ── Replay, if this exact computation has been paid for before ───────────
+  // The key covers the document, the instructions, the schema, the model, the
+  // effort and the extractor version, so a hit cannot return an answer produced
+  // by different code. Changing a prompt invalidates it without anyone having to
+  // remember to.
+  const cacheKey = RESPONSE_CACHE_ON && currentHouseholdId && !bypassCache
+    ? await sha256([
+        JSON.stringify(content), instructions, JSON.stringify(schema),
+        model, effort, String(maxTokens), EXTRACTOR_VERSION,
+      ].join('\u0000'))
+    : null;
+
+  if (cacheKey && currentHouseholdId) {
+    const { data: hit } = await admin
+      .from('extraction_response_cache')
+      .select('id, response, original_cost_usd, hit_count')
+      .eq('household_id', currentHouseholdId)
+      .eq('cache_key', cacheKey)
+      .maybeSingle();
+
+    if (hit) {
+      ledger.push({
+        label: `${options.label ?? 'pass'} (replayed)`,
+        model, input: 0, output: 0, cache_write: 0, cache_read: 0,
+        replayed: true, saved_usd: Number(hit.original_cost_usd ?? 0),
+      });
+      // Best effort: a failed bookkeeping update must not discard a good answer.
+      await admin.from('extraction_response_cache')
+        .update({ hit_count: (hit.hit_count ?? 0) + 1, last_used_at: new Date().toISOString() })
+        .eq('id', hit.id);
+      // The gate exists to stagger live calls; nothing is in flight to wait for.
+      options.onFirstEvent?.();
+      return hit.response;
+    }
+  }
+
   // Streamed: a long policy needs a high max_tokens, and non-streaming requests
   // at that size risk HTTP timeouts. finalMessage() still gives one whole reply.
   // deno-lint-ignore no-explicit-any
@@ -1939,7 +2001,32 @@ async function callClaude(
   }
   const block = response.content.find((b) => b.type === 'text');
   if (!block || block.type !== 'text' || !block.text) throw new Error('Claude returned no extraction content');
-  return JSON.parse(block.text);
+  const parsed = JSON.parse(block.text);
+
+  // Stored after parsing, so a response that could not be parsed is never
+  // replayed. Upserted because two concurrent passes over an identical document
+  // would otherwise race on the same key.
+  if (cacheKey && currentHouseholdId) {
+    const line = ledger[ledger.length - 1];
+    const { error: cacheError } = await admin.from('extraction_response_cache').upsert({
+      household_id: currentHouseholdId,
+      cache_key: cacheKey,
+      label: options.label ?? null,
+      model,
+      response: parsed,
+      input_tokens: line?.input ?? 0,
+      output_tokens: line?.output ?? 0,
+      cache_write_tokens: line?.cache_write ?? 0,
+      cache_read_tokens: line?.cache_read ?? 0,
+      original_cost_usd: line ? lineCost(line) : 0,
+      last_used_at: new Date().toISOString(),
+    }, { onConflict: 'household_id,cache_key' });
+    // Never fatal. Failing to cache costs money; failing the extraction costs
+    // the user their document.
+    if (cacheError) console.warn('Could not cache the response:', cacheError.message);
+  }
+
+  return parsed;
 }
 
 /** Common provenance columns lifted off any extracted record. */
@@ -2141,6 +2228,8 @@ async function persistInsurance(doc: any, extraction: any): Promise<string> {
 
 Deno.serve(async (req: Request) => {
   ledger = [];
+  currentHouseholdId = null;
+  bypassCache = false;
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
   if (!anthropic) {
@@ -2156,7 +2245,7 @@ Deno.serve(async (req: Request) => {
   const { data: userData, error: userError } = await caller.auth.getUser();
   if (userError || !userData?.user) return json({ error: 'Invalid or expired session' }, 401);
 
-  let body: { document_id?: unknown; force_type?: unknown };
+  let body: { document_id?: unknown; force_type?: unknown; fresh?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -2171,6 +2260,9 @@ Deno.serve(async (req: Request) => {
   // what happened to a credit card statement that kept landing on the generic
   // path. Restricted to the routing fields so it can redirect a reading and
   // nothing else.
+  // Correcting a document's type means being dissatisfied with the last answer,
+  // so it always buys a fresh one rather than replaying what was rejected.
+  bypassCache = body?.fresh === true || typeof body?.force_type === 'string';
   const forcedType = typeof body?.force_type === 'string' ? body.force_type : null;
   if (forcedType && !FORCEABLE_TYPES.includes(forcedType)) {
     return json({ error: `Cannot read a document as '${forcedType}'` }, 400);
@@ -2184,6 +2276,9 @@ Deno.serve(async (req: Request) => {
     .from('households').select('id')
     .eq('id', document.household_id).eq('user_id', userData.user.id).maybeSingle();
   if (!household) return json({ error: 'Document not found' }, 404);
+  // Set only after ownership is proven, so the cache can never be keyed to a
+  // household the caller does not own.
+  currentHouseholdId = household.id;
   if (!document.file_path) return json({ error: 'Document has no storage path' }, 400);
 
   const failDocument = async (message: string, status: number) => {

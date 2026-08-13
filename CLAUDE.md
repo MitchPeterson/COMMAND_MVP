@@ -132,10 +132,41 @@ exactly the counts the first run wrote, which is how you can tell. The cache key
 appears to cover the output schema, not just the message prefix — unverified.
 Caching therefore only pays on a re-read, worth about 25%.
 
-Every model is a Supabase secret, so the cost profile changes without a deploy:
-`ANTHROPIC_MODEL` (insurance and legal), `ANTHROPIC_FORM_MODEL` (mortgage,
-appliance, tax return), `ANTHROPIC_CREDIT_MODEL`, `ANTHROPIC_CLASSIFY_MODEL`,
-`ANTHROPIC_GENERIC_MODEL`, `ANTHROPIC_EFFORT`.
+### The tuned configuration — Aug 13, 2026
+
+| Path | Model | Effort | Why |
+|---|---|---|---|
+| Classify | Haiku 4.5 | low | 3% of the bill |
+| Insurance identity, coverages | Sonnet 5 | high | judgement about what is covered |
+| Insurance terms | Sonnet 5 | medium | degradable by design |
+| Legal common, parties, provisions | Sonnet 5 | high | judgement about what binds |
+| Credit statement | Sonnet 5 | high | figures that drive findings |
+| Credit transactions | Sonnet 5 | medium | list transcription |
+| Mortgage, appliance | Sonnet 5 | medium | labelled fields off a form |
+| Tax return | Sonnet 5 | high | a wrong total tax is load-bearing |
+| Generic | Haiku 4.5 | — | fallback for documents nothing claimed |
+
+Sonnet against Opus was measured on the credit fixture: **identical extraction**
+(same institution, last four, balance, limit, minimum; one field more), at 28%
+less on standard rates and about half on the introductory pricing. Everything is
+an env var: `ANTHROPIC_MODEL`, `ANTHROPIC_FORM_MODEL`, `ANTHROPIC_CREDIT_MODEL`,
+`ANTHROPIC_CLASSIFY_MODEL`, `ANTHROPIC_GENERIC_MODEL`, `ANTHROPIC_EFFORT`,
+`ANTHROPIC_EFFORT_MECHANICAL`, `ANTHROPIC_RESPONSE_CACHE`.
+
+**Repeat readings are free.** `extraction_response_cache` replays a result when
+the document, prompts, schema, model, effort and extractor version all match, so
+re-reading costs nothing and returns in about a second. `api_usage_log` records
+every call; the report is at the bottom of Profile.
+
+### Local models: measured and rejected, Aug 12, 2026
+
+`gemma4:26b` (Q4, 18GB) on the laptop generates at **1.5 tokens/second** and
+processes prompts at 15/s. A typical extraction needs 3,500+ output tokens, so
+40 minutes a document, and an 18-page policy spends ~17 minutes on the prompt
+alone before generating. The model is capable on paper — vision, tools, 262k
+context — and the speed makes it unusable regardless. Do not revisit without
+real GPU behind it. There is also an architectural blocker: extraction runs in a
+Supabase Edge Function and cannot reach `localhost`.
 
 ## Database
 

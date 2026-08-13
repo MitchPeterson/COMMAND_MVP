@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.29.1',
+    date: '2026-08-13',
+    title: 'The tuned extraction configuration',
+    items: [
+      'Effort is now split by the kind of work: full effort where a pass makes a judgment, less where it transcribes a list or lifts labeled fields off a form',
+      'Documents no specialist path claims are read by the cheapest model rather than a mid-tier one',
+    ],
+  },
+  {
     version: '0.29.0',
     date: '2026-08-12',
     title: 'See where the API money went',

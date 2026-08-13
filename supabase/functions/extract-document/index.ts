@@ -20,7 +20,7 @@ const anthropicModel = Deno.env.get('ANTHROPIC_MODEL') ?? 'claude-opus-5';
 // the model, because the document is the bulk of the input and it is sent three
 // times.
 const CLASSIFY_MODEL = Deno.env.get('ANTHROPIC_CLASSIFY_MODEL') ?? 'claude-haiku-4-5';
-const GENERIC_MODEL = Deno.env.get('ANTHROPIC_GENERIC_MODEL') ?? 'claude-sonnet-5';
+const GENERIC_MODEL = Deno.env.get('ANTHROPIC_GENERIC_MODEL') ?? 'claude-haiku-4-5';
 
 // Form-shaped documents — a mortgage statement, a warranty card, a 1040 — are
 // tabular, single-pass, and read against a strict schema. The hard judgement in
@@ -30,10 +30,22 @@ const GENERIC_MODEL = Deno.env.get('ANTHROPIC_GENERIC_MODEL') ?? 'claude-sonnet-
 const FORM_MODEL = Deno.env.get('ANTHROPIC_FORM_MODEL') ?? 'claude-sonnet-5';
 const CREDIT_MODEL = Deno.env.get('ANTHROPIC_CREDIT_MODEL') ?? anthropicModel;
 
-// Effort drives thinking tokens, which are billed at the output rate. Dialing it
-// down is the fastest lever on a bill that is mostly output, so it is a secret
-// rather than a constant.
+// Effort drives thinking tokens, which are billed at the output rate — and
+// output is roughly two thirds of the bill, so this is the largest single lever
+// on cost. It is split rather than global because the passes are not the same
+// kind of work.
+//
+// High is for judgement: deciding what a coverage means, whether a provision
+// binds, which figure on a return is the total tax. Those are the passes worth
+// paying for.
+//
+// Medium is for mechanical reading — transcribing a transaction list, lifting
+// labelled fields off a statement — and for the terms pass, which is degradable
+// by design and records a gap rather than failing when it comes up short.
+//
+// Both are secrets, so this judgement can be overruled without a code change.
 const EXTRACT_EFFORT = Deno.env.get('ANTHROPIC_EFFORT') ?? 'high';
+const MECHANICAL_EFFORT = Deno.env.get('ANTHROPIC_EFFORT_MECHANICAL') ?? 'medium';
 
 // Replaying a previous answer instead of buying it again. On by default: the
 // cache key covers everything that determines the result, so a hit is the same
@@ -2498,7 +2510,7 @@ Deno.serve(async (req: Request) => {
         `Keep policy_language to the operative sentence or clause — an excerpt of roughly 300 ` +
         `characters, not the whole section. Group repeated boilerplate into one entry rather than ` +
         `repeating it per page.`,
-        TERMS_SCHEMA, EXTRACT_EFFORT, 24000, { label: 'insurance terms' },
+        TERMS_SCHEMA, MECHANICAL_EFFORT, 24000, { label: 'insurance terms' },
       ).catch((err) => {
         console.warn('Terms pass failed; keeping identity and coverage results:', err);
         return {
@@ -2871,7 +2883,7 @@ Deno.serve(async (req: Request) => {
         // Transcription, not judgment: medium effort reads a transaction table
         // as accurately as high and is markedly faster, which is what keeps a
         // real multi-page statement inside the edge wall clock.
-        CREDIT_TRANSACTIONS_SCHEMA, 'medium', 24000,
+        CREDIT_TRANSACTIONS_SCHEMA, MECHANICAL_EFFORT, 24000, { label: 'credit transactions', model: CREDIT_MODEL },
       ).catch((err) => {
         console.warn('Credit transactions pass failed:', err instanceof Error ? err.message : String(err));
         return { transactions: [], transaction_count_stated: 0, truncated: false };
@@ -3040,7 +3052,7 @@ Deno.serve(async (req: Request) => {
         `Read this mortgage statement. File name: ${document.name}\n\n${MORTGAGE_RULES}\n\n` +
         `Emit one entry in fields per value genuinely printed, using these codes:\n` +
         `${MORTGAGE_FIELD_CODES}\n\nOmit a code entirely rather than guessing at it.`,
-        MORTGAGE_SCHEMA, EXTRACT_EFFORT, 8000, { model: FORM_MODEL, label: 'mortgage' },
+        MORTGAGE_SCHEMA, MECHANICAL_EFFORT, 8000, { model: FORM_MODEL, label: 'mortgage' },
       );
 
       // deno-lint-ignore no-explicit-any
@@ -3121,7 +3133,7 @@ Deno.serve(async (req: Request) => {
         `Read this document about a household system or appliance. File name: ${document.name}\n\n` +
         `${APPLIANCE_RULES}\n\nIdentify what the equipment is, who made it, and what any warranty ` +
         `covers and until when. Leave a field empty rather than guessing at it.`,
-        APPLIANCE_SCHEMA, EXTRACT_EFFORT, 8000, { model: FORM_MODEL, label: 'appliance' },
+        APPLIANCE_SCHEMA, MECHANICAL_EFFORT, 8000, { model: FORM_MODEL, label: 'appliance' },
       );
 
       const row = {

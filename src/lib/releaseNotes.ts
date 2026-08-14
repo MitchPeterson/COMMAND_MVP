@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.30.0',
+    date: '2026-08-14',
+    title: 'Where the money went',
+    items: [
+      'Monthly spending by category in Finances, built from the card statements Command has read — with what it covers stated first, because a breakdown of part of your spending looks exactly like a breakdown of all of it',
+      'A card payment is treated as a transfer rather than negative spending; a refund offsets its own category',
+    ],
+  },
+  {
     version: '0.29.1',
     date: '2026-08-13',
     title: 'The tuned extraction configuration',

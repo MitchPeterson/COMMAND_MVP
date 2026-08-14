@@ -1,6 +1,7 @@
 import React from 'react';
 import type {
-  Asset, BudgetSummary, CreditCard, FinanceAccount, HouseholdProfile, Loan, MortgageAccount,
+  Asset, BudgetSummary, CreditCard, CreditTransaction, FinanceAccount, HouseholdProfile,
+  Loan, MortgageAccount,
 } from '../lib/supabase';
 import { computeFinancesHealth, type FinanceFindingSeverity } from '../lib/financesHealth';
 import { gradeTone } from '../lib/coverageHealth';
@@ -14,6 +15,7 @@ interface Props {
   assets: Asset[];
   budget?: BudgetSummary | null;
   profile?: HouseholdProfile | null;
+  transactions?: CreditTransaction[];
 }
 
 const money = (value: number) =>
@@ -34,7 +36,7 @@ function SheetRow({ label, value, muted = false }: { label: string; value: numbe
 export function FinancesHealth(props: Props) {
   const result = computeFinancesHealth(
     props.accounts, props.loans, props.cards, props.mortgage,
-    props.assets, props.budget, props.profile,
+    props.assets, props.budget, props.profile, props.transactions ?? [],
   );
   const {
     score, grade, findings, dataFindings, confidence, confidenceReason,

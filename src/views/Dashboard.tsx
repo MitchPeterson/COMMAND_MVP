@@ -176,9 +176,10 @@ export function DashboardView({ onNavigate }: DashboardProps) {
     () => computeFinancesHealth(
       data?.financeAccounts ?? [], data?.loans ?? [], data?.creditCards ?? [],
       data?.mortgage ?? null, data?.assets ?? [], data?.budgetSummary ?? null, data?.profile,
+      data?.creditTransactions ?? [],
     ),
     [data?.financeAccounts, data?.loans, data?.creditCards, data?.mortgage,
-      data?.assets, data?.budgetSummary, data?.profile],
+      data?.assets, data?.budgetSummary, data?.profile, data?.creditTransactions],
   );
 
   // Any section with a live score overrides its stored row. The stored rows were

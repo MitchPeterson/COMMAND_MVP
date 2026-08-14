@@ -15,9 +15,10 @@
 // answers.
 
 import type {
-  Asset, BudgetSummary, CreditCard, FinanceAccount, HouseholdProfile,
-  Loan, MortgageAccount,
+  Asset, BudgetSummary, CreditCard, CreditTransaction, FinanceAccount,
+  HouseholdProfile, Loan, MortgageAccount,
 } from './supabase';
+import { monthlySpending } from './spending';
 
 export type FinanceFindingSeverity = 'critical' | 'attention' | 'info';
 
@@ -91,6 +92,7 @@ export function computeFinancesHealth(
   assets: Asset[],
   budget: BudgetSummary | null | undefined,
   profile: HouseholdProfile | null | undefined,
+  transactions: CreditTransaction[] = [],
 ): FinancesHealthResult {
   const findings: FinanceFinding[] = [];
   const dataFindings: FinanceFinding[] = [];
@@ -269,6 +271,29 @@ export function computeFinancesHealth(
       title: `${federalStudent.length} federal student loan${federalStudent.length === 1 ? '' : 's'} on file`,
       detail: 'Federal loans carry repayment and forgiveness options that private ones do not. ' +
         'Refinancing privately gives those up permanently — worth confirming before any consolidation.',
+    });
+  }
+
+  // How much of the household's spending Command can actually see. Stated as a
+  // limit on the assessment rather than as a finding: the household is not doing
+  // anything wrong, Command simply cannot see most of the money.
+  const spending = monthlySpending(transactions);
+  if (spending.months.length > 0 && monthlyExpenses && monthlyExpenses > 0) {
+    const share = (spending.months[0].total / monthlyExpenses) * 100;
+    if (share < 60) {
+      dataFindings.push({
+        severity: 'info',
+        title: `Command sees about ${Math.round(share)}% of your monthly spending`,
+        detail: `${money(spending.months[0].total)} of ${money(monthlyExpenses)} in recorded expenses ` +
+          `comes from card statements that have been read. Cash, checks, debit and anything paid ` +
+          `from checking are not counted.`,
+      });
+    }
+  } else if (spending.months.length === 0) {
+    dataFindings.push({
+      severity: 'info',
+      title: 'No spending Command can see',
+      detail: 'Card statements have not been read, so where the money goes is unknown.',
     });
   }
 

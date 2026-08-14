@@ -4,6 +4,7 @@ import { UploadDropzone } from '../components/UploadDropzone';
 import { UnfiledDocuments } from '../components/UnfiledDocuments';
 import { FinancesHealth } from '../components/FinancesHealth';
 import { LoanList } from '../components/LoanList';
+import { MonthlySpending } from '../components/MonthlySpending';
 import { DocumentLinkBadge } from '../components/DocumentLinkBadge';
 import { uploadDocumentAsset, invokeDocumentExtraction, type FinanceAccount } from '../lib/supabase';
 import { Wallet } from 'lucide-react';
@@ -51,6 +52,7 @@ export function FinancesView() {
         assets={data?.assets ?? []}
         budget={data?.budgetSummary ?? null}
         profile={data?.profile ?? null}
+        transactions={data?.creditTransactions ?? []}
       />
 
       <UnfiledDocuments
@@ -64,6 +66,12 @@ export function FinancesView() {
           taxDocuments: data?.taxDocuments, taxReturns: data?.taxReturns,
         }}
         onChanged={refresh}
+      />
+
+      <MonthlySpending
+        transactions={data?.creditTransactions ?? []}
+        cards={data?.creditCards ?? []}
+        budget={data?.budgetSummary ?? null}
       />
 
       <div className="flex items-center gap-2 px-1">

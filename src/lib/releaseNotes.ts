@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.30.1',
+    date: '2026-08-14',
+    title: 'A long statement saves what it read',
+    items: [
+      'The transaction list is now abandoned at an internal deadline instead of the whole extraction being killed by the server — balances, limits and APRs are kept, and the list says it fell short',
+      'Removed a stagger between concurrent passes that was measured to buy nothing and cost up to twelve seconds on exactly the documents that were timing out',
+    ],
+  },
+  {
     version: '0.30.0',
     date: '2026-08-14',
     title: 'Where the money went',

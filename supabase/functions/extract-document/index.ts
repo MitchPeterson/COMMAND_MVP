@@ -53,6 +53,41 @@ const MECHANICAL_EFFORT = Deno.env.get('ANTHROPIC_EFFORT_MECHANICAL') ?? 'medium
 // disable, or send fresh:true on a single request to bypass and overwrite.
 const RESPONSE_CACHE_ON = (Deno.env.get('ANTHROPIC_RESPONSE_CACHE') ?? 'on') !== 'off';
 
+// Supabase kills an edge function at roughly 150 seconds and nothing catches
+// that: the process disappears, so no error handler runs, no partial result is
+// written, and the user gets "took longer than the server allows" with an empty
+// record behind it. This deadline sits below the platform's, so a pass that is
+// running long is abandoned by us — leaving a degraded but saved extraction —
+// rather than taking the whole request down with it.
+const REQUEST_DEADLINE_MS = Number(Deno.env.get('EXTRACT_DEADLINE_MS') ?? 115_000);
+
+// A very long statement generates more transaction lines than will fit in the
+// time available. Transcribing the first N and saying so beats losing all of
+// them to a kill.
+const TRANSACTION_CAP = Number(Deno.env.get('EXTRACT_TRANSACTION_CAP') ?? 120);
+
+let requestStartedAt = 0;
+
+/**
+ * Resolves with `fallback` if the pass has not finished by the deadline. Only
+ * for passes that are degradable by design — one that records a gap rather than
+ * losing everything else in the request.
+ */
+function withDeadline<T>(work: Promise<T>, fallback: T, label: string): Promise<T> {
+  const remaining = REQUEST_DEADLINE_MS - (Date.now() - requestStartedAt);
+  if (remaining <= 0) {
+    console.warn(`${label}: no time left, skipped`);
+    return Promise.resolve(fallback);
+  }
+  return Promise.race([
+    work,
+    new Promise<T>((resolve) => setTimeout(() => {
+      console.warn(`${label}: abandoned at the internal deadline with ${remaining}ms allowed`);
+      resolve(fallback);
+    }, remaining)),
+  ]);
+}
+
 if (!supabaseUrl || !supabaseServiceRole) {
   throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for this function.');
 }
@@ -1780,39 +1815,6 @@ function withDocumentCache(content: unknown[]): unknown[] {
   );
 }
 
-/**
- * Releases the later passes once the first one starts streaming, which is when
- * its cache entry becomes readable.
- *
- * Measured 2026-08-11, and it does not do what it was written to do. Two
- * concurrent passes over an identical document, both handed the same
- * cache_control'd content, each wrote its own cache entry and neither read the
- * other's: 0% hit ratio on a cold run. A second run of the same document then
- * read both entries back at exactly the token counts the first run wrote
- * (3128 -> 3128, 3606 -> 3606), which is the tell — each pass has its own entry,
- * keyed separately.
- *
- * The likely cause is that the cache key covers the structured-output schema,
- * not just the message prefix, so passes that share a document but differ in
- * schema can never share an entry however the timing is arranged. Unverified.
- *
- * Kept because it costs nothing and still helps across runs, and because the
- * concurrency itself is load-bearing for a different reason: three sequential
- * passes took 133s against a ~150s wall clock.
- *
- * The bill is mostly output anyway — 68% of a measured credit statement — so
- * ANTHROPIC_EFFORT and the model's output rate are the levers that matter here,
- * not input caching.
- */
-function cacheGate(timeoutMs = 12000) {
-  let release: () => void = () => {};
-  const opened = new Promise<void>((resolve) => { release = resolve; });
-  return {
-    onFirstEvent: () => release(),
-    wait: () => Promise.race([opened, new Promise<void>((r) => setTimeout(r, timeoutMs))]),
-  };
-}
-
 // ─────────────────────────────────────────────────────────────
 // Cost accounting
 // ─────────────────────────────────────────────────────────────
@@ -1941,8 +1943,6 @@ interface CallOptions {
   model?: string;
   /** Names the pass in the cost log. */
   label?: string;
-  /** Fires when the response starts arriving — the moment its cache entry becomes readable. */
-  onFirstEvent?: () => void;
 }
 
 // deno-lint-ignore no-explicit-any
@@ -2006,8 +2006,6 @@ async function callClaude(
       await admin.from('extraction_response_cache')
         .update({ hit_count: (hit.hit_count ?? 0) + 1, last_used_at: new Date().toISOString() })
         .eq('id', hit.id);
-      // The gate exists to stagger live calls; nothing is in flight to wait for.
-      options.onFirstEvent?.();
       return hit.response;
     }
   }
@@ -2017,17 +2015,6 @@ async function callClaude(
   // deno-lint-ignore no-explicit-any
   const stream = anthropic!.beta.messages.stream(request as any);
 
-  if (options.onFirstEvent) {
-    let fired = false;
-    const fire = () => { if (!fired) { fired = true; options.onFirstEvent!(); } };
-    try {
-      // deno-lint-ignore no-explicit-any
-      (stream as any).on('streamEvent', fire);
-    } catch {
-      // If the SDK does not expose the event, the caller's timeout releases the
-      // other passes instead. A missed cache read costs money, never correctness.
-    }
-  }
 
   const startedAt = Date.now();
   const response = await stream.finalMessage();
@@ -2283,6 +2270,7 @@ async function persistInsurance(doc: any, extraction: any): Promise<string> {
 }
 
 Deno.serve(async (req: Request) => {
+  requestStartedAt = Date.now();
   ledger = [];
   currentHouseholdId = null;
   currentDocumentId = null;
@@ -2450,7 +2438,6 @@ Deno.serve(async (req: Request) => {
       // PDF exceeded it and the function was killed mid-extraction. Concurrently
       // the cost is the slowest single pass, not their sum.
       const cached = withDocumentCache(content);
-      const gate = cacheGate();
 
       const identityPass = callClaude(
         cached,
@@ -2467,13 +2454,14 @@ Deno.serve(async (req: Request) => {
         `lienholders, mortgagees, loss payees and other financial interests are not people ` +
         `covered by the policy: give them role "other" and state what they hold in relationship, ` +
         `so they are never mistaken for drivers or insureds.`,
-        IDENTITY_SCHEMA, EXTRACT_EFFORT, 16000, { onFirstEvent: gate.onFirstEvent, label: 'insurance identity' },
+        IDENTITY_SCHEMA, EXTRACT_EFFORT, 16000, { label: 'insurance identity' },
       );
 
-      // The other two wait for the first response to begin, which is when its
-      // document cache becomes readable. They then read it instead of re-sending
-      // the document.
-      await gate.wait();
+      // All three start together. They used to be staggered so the later ones
+      // could read the first one's document cache, but that was measured on
+      // 2026-08-11 and does not happen — each pass writes its own entry and
+      // reads none of the others. The stagger was pure added latency on exactly
+      // the long documents that are already close to the wall clock.
 
       const coveragePass = callClaude(
         cached,
@@ -2707,7 +2695,6 @@ Deno.serve(async (req: Request) => {
       };
 
       const legalCached = withDocumentCache(content);
-      const legalGate = cacheGate();
 
       const commonPass = callClaude(
         legalCached,
@@ -2724,16 +2711,13 @@ Deno.serve(async (req: Request) => {
         `witness_signatures_present, marked_draft, referenced_attachment_present, pages_complete.\n\n` +
         `The plain-language summary is two or three sentences describing what the document does, ` +
         `in the words you would use to a friend. No advice, no assessment.`,
-        LEGAL_COMMON_SCHEMA, EXTRACT_EFFORT, 12000, { onFirstEvent: legalGate.onFirstEvent, label: 'legal common' },
+        LEGAL_COMMON_SCHEMA, EXTRACT_EFFORT, 12000, { label: 'legal common' },
       ).catch(degrade('common', {
         document_title: '', document_status: 'unknown', page_count: 0, document_language: '',
         plain_language_summary: '', fields: [], execution_observations: [],
         unresolved_items: [{ item: 'Common document attributes', why_unresolved: 'The extraction pass failed. Retry from the document vault.' }],
       }));
 
-      // Released once the first pass starts streaming, so these two read the
-      // cached document rather than re-sending it.
-      await legalGate.wait();
 
       const partiesPass = callClaude(
         legalCached,
@@ -2843,7 +2827,6 @@ Deno.serve(async (req: Request) => {
       const creditContext = `File name: ${document.name}\n\n${CREDIT_RULES}`;
 
       const creditCached = withDocumentCache(content);
-      const creditGate = cacheGate();
 
       const statementPass = callClaude(
         creditCached,
@@ -2854,7 +2837,7 @@ Deno.serve(async (req: Request) => {
         `In apr_terms, emit one entry per interest rate the statement lists, with the balance ` +
         `subject to that rate and the interest charged at it where shown. Promotional rates carry ` +
         `their balance and expiration date when printed.`,
-        CREDIT_STATEMENT_SCHEMA, EXTRACT_EFFORT, 12000, { onFirstEvent: creditGate.onFirstEvent, label: 'credit statement', model: CREDIT_MODEL },
+        CREDIT_STATEMENT_SCHEMA, EXTRACT_EFFORT, 12000, { label: 'credit statement', model: CREDIT_MODEL },
       ).catch((err) => {
         console.warn('Credit statement pass failed:', err instanceof Error ? err.message : String(err));
         return {
@@ -2862,8 +2845,6 @@ Deno.serve(async (req: Request) => {
           unresolved_items: [{ item: 'Statement summary', why_unresolved: 'The extraction pass failed. Retry from the document vault.' }],
         };
       });
-
-      await creditGate.wait();
 
       const transactionsPass = callClaude(
         creditCached,
@@ -2877,9 +2858,9 @@ Deno.serve(async (req: Request) => {
         `the issuer said, the other is your reading of it.\n\n` +
         `Set truncated true if you could not fit every line, and transaction_count_stated to the ` +
         `count the statement itself reports if it prints one.\n\n` +
-        `If the statement runs to more than 200 transactions, transcribe the first 200 in order and ` +
-        `set truncated true rather than working through all of them — a partial list that arrives is ` +
-        `worth more than a complete one that times out.`,
+        `If the statement runs to more than ${TRANSACTION_CAP} transactions, transcribe the first ` +
+        `${TRANSACTION_CAP} in order and set truncated true rather than working through all of them ` +
+        `— a partial list that arrives is worth more than a complete one that times out.`,
         // Transcription, not judgment: medium effort reads a transaction table
         // as accurately as high and is markedly faster, which is what keeps a
         // real multi-page statement inside the edge wall clock.
@@ -2889,7 +2870,17 @@ Deno.serve(async (req: Request) => {
         return { transactions: [], transaction_count_stated: 0, truncated: false };
       });
 
-      const [statementData, transactionData] = await Promise.all([statementPass, transactionsPass]);
+      // The statement summary is the part worth protecting: balances, limits and
+      // APRs are what the section is graded on, while the transaction list is
+      // detail. So the list is the one abandoned when time runs short.
+      const [statementData, transactionData] = await Promise.all([
+        statementPass,
+        withDeadline(
+          transactionsPass,
+          { transactions: [], transaction_count_stated: 0, truncated: true, abandoned: true },
+          'credit transactions',
+        ),
+      ]);
       const counts = await persistCreditStatement(
         statementId, document.household_id, statementData, transactionData,
       );
@@ -2906,6 +2897,9 @@ Deno.serve(async (req: Request) => {
         reprocessed: Boolean(existingStatement),
         counts,
         transactions_truncated: transactionData.truncated === true,
+        // Distinguishes "the statement had more lines than fit" from "we ran out
+        // of time and stopped". The user can act on the second by re-reading.
+        transactions_abandoned: transactionData.abandoned === true,
       }, 200);
     }
 

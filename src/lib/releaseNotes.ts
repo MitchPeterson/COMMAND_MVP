@@ -25,6 +25,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.31.1',
+    date: '2026-08-14',
+    title: 'Two things were both called confirm',
+    items: [
+      'Checking a statement\'s values and adding it to a card are different actions, and only the second one counts — every screen that showed zero now says which step is outstanding instead of telling you to confirm something you already confirmed',
+    ],
+  },
+  {
     version: '0.31.0',
     date: '2026-08-14',
     title: 'A statement now tells you something',

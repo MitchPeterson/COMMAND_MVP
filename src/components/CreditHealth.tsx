@@ -7,12 +7,14 @@ import { AlertTriangle, CheckCircle2, Info, ShieldAlert } from 'lucide-react';
 interface Props {
   cards: CreditCardRow[];
   profile?: HouseholdProfile | null;
+  /** Statements read but never added to a card — invisible to every figure here. */
+  awaitingCard?: number;
 }
 
 const money = (value: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 
-export function CreditHealth({ cards, profile }: Props) {
+export function CreditHealth({ cards, profile, awaitingCard = 0 }: Props) {
   const {
     score, grade, findings, dataFindings, confidence, confidenceReason,
     totalLimit, totalBalance, utilization, cardCount,
@@ -74,8 +76,9 @@ export function CreditHealth({ cards, profile }: Props) {
 
       {cardCount === 0 ? (
         <p className="mt-6 text-sm text-cmd-muted">
-          No cards on file yet. Add a card below and Command will track utilization against your
-          limits and your income, and tell you what it can — and cannot — see.
+          {awaitingCard > 0
+            ? `${awaitingCard} statement${awaitingCard === 1 ? ' has' : 's have'} been read but not added to a card, so nothing here counts ${awaitingCard === 1 ? 'it' : 'them'} yet. Use "Add as a new card" on the statement below — checking the individual values does not do it.`
+            : 'No cards on file yet. Add a card below and Command will track utilization against your limits and your income, and tell you what it can — and cannot — see.'}
         </p>
       ) : (
         <div className="mt-6 space-y-3">

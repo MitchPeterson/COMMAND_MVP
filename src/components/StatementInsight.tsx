@@ -9,7 +9,8 @@
 import React from 'react';
 import { ArrowRight, Percent, TrendingUp, Wallet } from 'lucide-react';
 import type { CreditCard, CreditStatement, CreditTransaction } from '../lib/supabase';
-import { analyzeStatementFit, CATALOG_AS_OF } from '../lib/cardFit';
+import { analyzeStatementFit, matchProfile, CATALOG_AS_OF } from '../lib/cardFit';
+import { CardProfilePanel } from './CardProfilePanel';
 
 interface Props {
   statement: CreditStatement;
@@ -115,24 +116,6 @@ export function StatementInsight({ statement, transactions, cards }: Props) {
           </div>
         )}
 
-        {fit.betterCard && !interestDominates && (
-          <div className="flex gap-3 rounded-2xl border border-cmd-border bg-cmd-black/40 px-4 py-3">
-            <TrendingUp className="mt-0.5 h-4 w-4 shrink-0 text-cmd-muted" />
-            <div>
-              <p className="text-sm font-semibold text-cmd-offwhite">
-                {fit.betterCard.profile.issuer} {fit.betterCard.profile.product} suits this mix better
-              </p>
-              <p className="mt-1 text-sm text-cmd-muted">
-                On spending like this month&rsquo;s it would be worth roughly{' '}
-                {money(fit.betterCard.gainPerYear)} a year more, after its{' '}
-                {fit.betterCard.profile.annualFee > 0
-                  ? `${money(fit.betterCard.profile.annualFee)} annual fee`
-                  : 'no annual fee'}.
-                {fit.betterCard.profile.note ? ` ${fit.betterCard.profile.note}` : ''}
-              </p>
-            </div>
-          </div>
-        )}
 
         {!fit.profile && (
           <div className="rounded-2xl border border-cmd-border bg-cmd-black/40 px-4 py-3">
@@ -147,6 +130,15 @@ export function StatementInsight({ statement, transactions, cards }: Props) {
           </div>
         )}
       </div>
+
+      <CardProfilePanel
+        issuer={statement.institution}
+        product={statement.card_product}
+        totals={fit.totals}
+        heldKeys={cards
+          .map((c) => matchProfile(c.issuer, c.card_name)?.key)
+          .filter((k): k is string => Boolean(k))}
+      />
 
       <p className="mt-4 text-xs leading-5 text-cmd-muted/70">
         Earning rates are published headline rates as of {CATALOG_AS_OF}, valued at a cent a point.

@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.31.0',
+    date: '2026-08-14',
+    title: 'A statement now tells you something',
+    items: [
+      'Reading a credit card statement shows what the spending was, what it earned, whether a card you already hold would have earned more on it, and whether a different card suits the mix — before you confirm anything',
+      'Command now knows what common cards earn by category, so it can say a purchase went on the wrong card rather than only comparing your cards\' overall returns',
+    ],
+  },
+  {
     version: '0.30.1',
     date: '2026-08-14',
     title: 'A long statement saves what it read',

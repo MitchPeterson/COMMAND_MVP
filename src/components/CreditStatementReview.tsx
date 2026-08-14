@@ -1,3 +1,4 @@
+import { StatementInsight } from './StatementInsight';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   getCreditStatementDetail,
@@ -11,12 +12,14 @@ import {
   type CreditStatement,
   type CreditStatementDetail,
   type CreditStatementField,
+  type CreditTransaction,
 } from '../lib/supabase';
 import { Check, ChevronDown, ChevronRight, Loader2, Pencil, Quote, X } from 'lucide-react';
 
 interface Props {
   statement: CreditStatement;
   cards: CreditCardRow[];
+  transactions: CreditTransaction[];
   onConfirmed: () => Promise<void> | void;
 }
 
@@ -188,7 +191,7 @@ function FieldRow({
  * never applied, because silently merging two cards is not recoverable by
  * looking at the screen.
  */
-export function CreditStatementReview({ statement, cards, onConfirmed }: Props) {
+export function CreditStatementReview({ statement, cards, transactions, onConfirmed }: Props) {
   const [detail, setDetail] = useState<CreditStatementDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -286,10 +289,19 @@ export function CreditStatementReview({ statement, cards, onConfirmed }: Props) 
 
   return (
     <div className="mt-5 space-y-5 border-t border-cmd-border pt-5">
+      {/* Above the review controls, because it is the answer and they are the
+          filing. A statement that produced only a confirmation prompt read as
+          busywork even when the extraction had been perfect. */}
+      <StatementInsight statement={statement} transactions={transactions} cards={cards} />
+
       <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-cmd-gold/25 bg-cmd-black/30 p-4">
         <p className="mr-auto text-sm text-cmd-muted">
           {decided} of {detail.fields.length} values confirmed
           {unreviewed > 0 ? ` · ${unreviewed} still to review` : ''}
+          <span className="mt-0.5 block text-xs text-cmd-muted/70">
+            Adding it puts the card on file, so utilization, fees and this spending are
+            tracked against your other cards month to month.
+          </span>
         </p>
         <button type="button" disabled={busy || unreviewed === 0} onClick={confirmAll} className={`${btn} ${btnIdle} px-3 py-1.5`}>
           <Check className="h-3.5 w-3.5" /> Confirm all

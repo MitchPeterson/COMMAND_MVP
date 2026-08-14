@@ -84,7 +84,12 @@ export function CreditView() {
                   </button>
                 </div>
                 {openStatement === statement.id && (
-                  <CreditStatementReview statement={statement} cards={cards} onConfirmed={refresh} />
+                  <CreditStatementReview
+                    statement={statement}
+                    cards={cards}
+                    transactions={data?.creditTransactions ?? []}
+                    onConfirmed={refresh}
+                  />
                 )}
               </div>
             ))}

@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.32.0',
+    date: '2026-08-14',
+    title: 'What each card is good for',
+    items: [
+      'Every card now carries a plain summary, its strengths and trade-offs, and the protections it comes with — extended warranty, travel cover, lounge access, foreign transaction fees and the rest',
+      'Bonus categories are valued against your own spending, so a 6% grocery rate is reported with what it actually returned you and whether it covered the annual fee',
+      'Alternatives are ranked on what they would net you after their own fee, not on headline rates',
+    ],
+  },
+  {
     version: '0.31.1',
     date: '2026-08-14',
     title: 'Two things were both called confirm',

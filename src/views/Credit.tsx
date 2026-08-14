@@ -6,6 +6,8 @@ import { UploadDropzone } from '../components/UploadDropzone';
 import { CreditHealth } from '../components/CreditHealth';
 import { CreditStatementReview } from '../components/CreditStatementReview';
 import { CardStrategy } from '../components/CardStrategy';
+import { CardProfilePanel } from '../components/CardProfilePanel';
+import { analyzeStatementFit, matchProfile } from '../lib/cardFit';
 import { uploadDocumentAsset, invokeDocumentExtraction, type CreditCard as CreditCardRow } from '../lib/supabase';
 import { CreditCard } from 'lucide-react';
 
@@ -34,6 +36,16 @@ export function CreditView() {
   const cards = data?.creditCards ?? [];
   // Read, reviewed field by field, and still attached to no card — the state
   // that made the whole section look broken.
+  const allTransactions = data?.creditTransactions ?? [];
+  // What each card is judged on: its own transactions. analyzeStatementFit does
+  // the category grouping and drops fees and cash advances, so the same
+  // vocabulary is used here as on a statement.
+  const spendFor = (cardId: string) =>
+    analyzeStatementFit(allTransactions.filter((t) => t.credit_card_id === cardId), null, null).totals;
+  const heldKeys = cards
+    .map((c) => matchProfile(c.issuer, c.card_name)?.key)
+    .filter((k): k is string => Boolean(k));
+
   const awaitingCard = (data?.creditStatements ?? []).filter(
     (s) => s.review_status !== 'confirmed'
       && s.review_status !== 'partially_confirmed'
@@ -139,10 +151,8 @@ export function CreditView() {
             {sorted.map((card) => {
               const utilization = utilizationOf(card);
               return (
-                <div
-                  key={card.id}
-                  className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-5 sm:flex sm:items-center sm:justify-between"
-                >
+                <div key={card.id} className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-5">
+                <div className="sm:flex sm:items-center sm:justify-between">
                   <div className="min-w-0">
                     <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">
                       {card.issuer ?? 'Issuer not recorded'}
@@ -174,6 +184,14 @@ export function CreditView() {
                       <p className="mt-1 text-xs text-cmd-muted/70">Needs a limit and balance</p>
                     )}
                   </div>
+                </div>
+
+                <CardProfilePanel
+                  issuer={card.issuer}
+                  product={card.card_name}
+                  totals={spendFor(card.id)}
+                  heldKeys={heldKeys.filter((k) => k !== matchProfile(card.issuer, card.card_name)?.key)}
+                />
                 </div>
               );
             })}

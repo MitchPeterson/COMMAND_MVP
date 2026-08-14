@@ -32,6 +32,13 @@ function utilizationTone(value: number | null): string {
 export function CreditView() {
   const { data, refresh } = useHousehold();
   const cards = data?.creditCards ?? [];
+  // Read, reviewed field by field, and still attached to no card — the state
+  // that made the whole section look broken.
+  const awaitingCard = (data?.creditStatements ?? []).filter(
+    (s) => s.review_status !== 'confirmed'
+      && s.review_status !== 'partially_confirmed'
+      && s.review_status !== 'discarded',
+  ).length;
   const statements = data?.creditStatements ?? [];
   const [openStatement, setOpenStatement] = React.useState<string | null>(null);
 
@@ -48,7 +55,11 @@ export function CreditView() {
   return (
     <div className="space-y-6">
       {/* The grade leads, as coverage does on Insurance. */}
-      <CreditHealth cards={cards} profile={data?.profile ?? null} />
+      <CreditHealth
+        cards={cards}
+        profile={data?.profile ?? null}
+        awaitingCard={awaitingCard}
+      />
 
       {pending.length > 0 && (
         <section className="rounded-3xl border border-cmd-gold/25 bg-cmd-charcoal p-6">

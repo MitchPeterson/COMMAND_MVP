@@ -72,6 +72,12 @@ export function CardStrategy({
   const [result, setResult] = useState<string | null>(null);
 
   const strategy = computeRewardsStrategy(cards, statements, transactions);
+  // Read, but never attached to a card — so invisible to every calculation here.
+  const awaitingCard = statements.filter(
+    (s) => s.review_status !== 'confirmed'
+      && s.review_status !== 'partially_confirmed'
+      && s.review_status !== 'discarded',
+  ).length;
   const topCategories = strategy.categories.slice(0, 6);
 
   const research = async () => {
@@ -125,10 +131,26 @@ export function CardStrategy({
       </div>
 
       {strategy.periodsCovered === 0 ? (
-        <p className="mt-6 rounded-2xl border border-dashed border-cmd-border bg-cmd-black/40 p-5 text-sm text-cmd-muted">
-          Confirm a statement and Command can show what each card actually earns you, where your spending
-          goes, and what putting it on a different card would be worth.
-        </p>
+        // "Confirm" meant two different things and only one of them counted, so
+        // a user could confirm every value on a statement and still be told to
+        // confirm a statement. Name the step that is actually outstanding.
+        awaitingCard > 0 ? (
+          <div className="mt-6 rounded-2xl border border-cmd-gold/30 bg-cmd-gold/5 p-5">
+            <p className="text-sm font-semibold text-cmd-offwhite">
+              {awaitingCard} statement{awaitingCard === 1 ? ' has' : 's have'} been read but not added to a card
+            </p>
+            <p className="mt-1 text-sm leading-6 text-cmd-muted">
+              Checking the individual values does not finish it. Use <strong className="text-cmd-offwhite">
+              Add as a new card</strong> on the statement above, and the spending, earnings and
+              comparisons below fill in. Until then nothing here counts it.
+            </p>
+          </div>
+        ) : (
+          <p className="mt-6 rounded-2xl border border-dashed border-cmd-border bg-cmd-black/40 p-5 text-sm text-cmd-muted">
+            Upload a card statement and Command can show what each card actually earns you, where your
+            spending goes, and what putting it on a different card would be worth.
+          </p>
+        )
       ) : (
         <>
           {/* ── Grounded: their own statements ───────────────────────────── */}

@@ -273,6 +273,10 @@ export function CreditStatementReview({ statement, cards, transactions, onConfir
 
   const decided = detail.fields.filter((f) => f.review_state === 'confirmed' || f.review_state === 'edited').length;
   const unreviewed = detail.fields.filter((f) => f.review_state === 'unreviewed').length;
+  // The statement's own status, not its fields'. This is the one every
+  // calculation in the section keys off.
+  const alreadyOnFile = statement.review_status === 'confirmed'
+    || statement.review_status === 'partially_confirmed';
   const spendByCategory = new Map<string, number>();
   for (const tx of detail.transactions) {
     if (tx.direction !== 'charge' || tx.amount == null) continue;
@@ -298,9 +302,16 @@ export function CreditStatementReview({ statement, cards, transactions, onConfir
         <p className="mr-auto text-sm text-cmd-muted">
           {decided} of {detail.fields.length} values confirmed
           {unreviewed > 0 ? ` · ${unreviewed} still to review` : ''}
+          {/* Checking values and adding the card are two different actions and
+              both were called "confirm". Someone could tick every value, be told
+              24 of 24 were confirmed, and still see "0 statements" everywhere
+              else — with nothing on screen explaining the gap. */}
           <span className="mt-0.5 block text-xs text-cmd-muted/70">
-            Adding it puts the card on file, so utilization, fees and this spending are
-            tracked against your other cards month to month.
+            {alreadyOnFile
+              ? 'This statement is on your card. Utilization, fees and spending count it.'
+              : unreviewed === 0
+                ? 'One step left: nothing counts this statement until it is added to a card.'
+                : 'Checking values does not add the card — that is the gold button.'}
           </span>
         </p>
         <button type="button" disabled={busy || unreviewed === 0} onClick={confirmAll} className={`${btn} ${btnIdle} px-3 py-1.5`}>
@@ -310,7 +321,11 @@ export function CreditStatementReview({ statement, cards, transactions, onConfir
           type="button"
           disabled={busy || decided === 0}
           onClick={addToProfile}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-cmd-gold bg-cmd-gold/15 px-4 py-2 text-sm font-semibold text-cmd-gold transition hover:bg-cmd-gold/25 disabled:opacity-40"
+          className={`inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-semibold transition disabled:opacity-40 ${
+            alreadyOnFile
+              ? 'border-cmd-border bg-cmd-black/60 text-cmd-muted hover:text-cmd-offwhite'
+              : 'border-cmd-gold bg-cmd-gold text-cmd-black hover:bg-cmd-gold/85'
+          }`}
         >
           {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
           {targetCardId ? 'Update this card' : 'Add as a new card'}

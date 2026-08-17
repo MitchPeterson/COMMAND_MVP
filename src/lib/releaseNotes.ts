@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.39.0',
+    date: '2026-08-17',
+    title: 'A friendlier start',
+    items: [
+      'A brand new Dashboard is a setup guide rather than a score of zero beside seven more — it welcomes you, shows three things worth doing, and becomes the summary once a few areas have something in them',
+      'Every empty section now says what it is for, which other sections it strengthens, the one document worth starting with, and what else it can use',
+    ],
+  },
+  {
     version: '0.38.0',
     date: '2026-08-17',
     title: 'An empty section explains itself',

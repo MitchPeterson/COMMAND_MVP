@@ -9,7 +9,7 @@
 // one action that starts it.
 
 import React from 'react';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, FileText, Sparkles } from 'lucide-react';
 import type { SectionIntroCopy } from '../lib/sectionIntros';
 
 interface Props {
@@ -33,8 +33,24 @@ export function SectionIntro({ intro, onAction, icon }: Props) {
           {intro.title}
         </h1>
 
+        {/* Why the section exists, before anything is asked of the user. */}
+        <p className="mt-3 text-base leading-7 text-cmd-offwhite/90">{intro.purpose}</p>
+
         {/* Kept near a readable measure rather than stretched to the card. */}
-        <p className="mt-4 text-sm leading-7 text-cmd-muted sm:text-base">{intro.body}</p>
+        <p className="mt-4 text-sm leading-7 text-cmd-muted">{intro.body}</p>
+
+        {intro.feeds.length > 0 && (
+          <p className="mt-4 inline-flex flex-wrap items-center justify-center gap-1.5 rounded-full border border-cmd-border bg-cmd-black/40 px-4 py-1.5 text-xs text-cmd-muted">
+            <Sparkles className="h-3 w-3 shrink-0 text-cmd-gold" />
+            Filling this in also sharpens{' '}
+            {intro.feeds.map((f, i) => (
+              <React.Fragment key={f}>
+                {i > 0 && (i === intro.feeds.length - 1 ? ' and ' : ', ')}
+                <span className="text-cmd-offwhite">{f}</span>
+              </React.Fragment>
+            ))}
+          </p>
+        )}
 
         <button
           type="button"
@@ -43,6 +59,35 @@ export function SectionIntro({ intro, onAction, icon }: Props) {
         >
           {intro.ctaLabel} <ArrowRight className="h-4 w-4" />
         </button>
+
+        {/* What to reach for, and what else counts. Named in plain words rather
+            than form numbers, because "a declarations page" is findable and
+            "Form ACORD 25" is not. */}
+        <div className="mt-9 w-full rounded-2xl border border-cmd-border bg-cmd-black/40 p-5 text-left">
+          <p className="text-xs uppercase tracking-[0.2em] text-cmd-muted">Start with</p>
+          <p className="mt-2 text-sm font-semibold text-cmd-offwhite">{intro.primary.label}</p>
+          <p className="mt-1 text-sm leading-6 text-cmd-muted">{intro.primary.why}</p>
+
+          {intro.also.length > 0 && (
+            <>
+              <p className="mt-5 text-xs uppercase tracking-[0.2em] text-cmd-muted">
+                Also useful, whenever you have them
+              </p>
+              <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                {intro.also.map((item) => (
+                  <li key={item} className="flex items-start gap-2 text-sm text-cmd-muted">
+                    <FileText className="mt-0.5 h-3.5 w-3.5 shrink-0 text-cmd-muted/60" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-4 text-xs leading-5 text-cmd-muted/70">
+                One is enough to begin. Nothing here has to be done in a sitting, and nothing reaches
+                your profile until you confirm it.
+              </p>
+            </>
+          )}
+        </div>
       </div>
     </section>
   );

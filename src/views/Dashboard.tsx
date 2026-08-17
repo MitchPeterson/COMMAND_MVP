@@ -17,6 +17,8 @@ import {
 import { FirstInsight } from '../components/FirstInsight';
 import { WeeklyBrief } from '../components/WeeklyBrief';
 import { GettingStarted, type SetupStep } from '../components/GettingStarted';
+import { FollowUps } from '../components/FollowUps';
+import { collectFollowUps } from '../lib/followUps';
 import { SECTION_INTROS, familiarityState } from '../lib/sectionIntros';
 import { buildDigest, readSnapshot, writeSnapshot, isDigestDue, type DigestInput } from '../lib/digest';
 import { taxDeadlines } from '../lib/taxYear';
@@ -232,6 +234,16 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
   // Three of seven is the point where a summary starts being worth more than a
   // guide — enough sections have something that the scores mean something.
   const stillSettingUp = setupSteps.filter((s) => s.done).length < 3;
+
+  // Questions the documents raised about sections other than their own. The
+  // extractor has recorded the names and vehicles on every policy since August
+  // and nothing has ever compared them to the household.
+  const followUps = useMemo(
+    () => collectFollowUps(
+      data?.insuranceExtractions ?? [], data?.familyMembers ?? [], data?.assets ?? [],
+    ),
+    [data?.insuranceExtractions, data?.familyMembers, data?.assets],
+  );
 
   // ── The brief ───────────────────────────────────────────────────────────
   // Assembled here because this is where all seven assessments already exist.
@@ -496,6 +508,7 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
             onClose={closeBrief}
           />
         )}
+        <FollowUps followUps={followUps} onOpen={(section) => onNavigate?.(section)} />
         <GettingStarted
           steps={setupSteps}
           userName={data?.profile?.primary_first_name ?? data?.profile?.primary_name ?? null}
@@ -516,6 +529,8 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
           onClose={closeBrief}
         />
       )}
+
+      <FollowUps followUps={followUps} onOpen={(section) => onNavigate?.(section)} />
 
       {firstInsight && !insightDismissed && (
         <FirstInsight

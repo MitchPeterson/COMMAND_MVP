@@ -25,6 +25,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.41.0',
+    date: '2026-08-17',
+    title: 'Your documents raise the next questions',
+    items: [
+      'A policy naming a driver Command has never heard of, or a car that is not among the things you own, now becomes a question you can answer in a second — filling in sections you had not thought about',
+    ],
+  },
+  {
     version: '0.40.0',
     date: '2026-08-17',
     title: 'Plainer words, and every upload shows its worth',

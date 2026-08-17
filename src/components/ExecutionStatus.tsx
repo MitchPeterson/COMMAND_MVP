@@ -50,15 +50,27 @@ const ICONS: Record<Tone, React.ElementType> = {
   neutral: HelpCircle,
 };
 
+/**
+ * The list, whatever arrived. `execution_observations` is a JSONB column that
+ * was declared with an object default, and `{} ?? []` is `{}` — so an empty
+ * object reached `.some()` and threw, blanking the entire Legal view rather than
+ * degrading one badge. The loader coerces this now and the column default is
+ * fixed, but a component that renders a list should not be able to take a page
+ * down because a column changed shape.
+ */
+function list(observations: ExecutionObservation[] | null | undefined): ExecutionObservation[] {
+  return Array.isArray(observations) ? observations : [];
+}
+
 /** True only when the document positively says so — never inferred from absence. */
 function observed(observations: ExecutionObservation[], fragment: string): boolean {
-  return observations.some(
+  return list(observations).some(
     (o) => (o.observation_code ?? '').includes(fragment) && o.state === 'observed',
   );
 }
 
 function notObserved(observations: ExecutionObservation[], fragment: string): boolean {
-  const matching = observations.filter((o) => (o.observation_code ?? '').includes(fragment));
+  const matching = list(observations).filter((o) => (o.observation_code ?? '').includes(fragment));
   // A scan showing a conformed "/s/" signature produces both an observed and a
   // not-observed entry. Anything observed wins, so the two never contradict.
   return matching.length > 0 && matching.every((o) => o.state === 'not_observed');
@@ -73,13 +85,16 @@ export interface ExecutionSummary {
 
 export function summarizeExecution(
   documentStatus: string | null | undefined,
-  observations: ExecutionObservation[] = [],
+  observations: ExecutionObservation[] | null | undefined = [],
 ): ExecutionSummary {
   const status = (documentStatus ?? '').toLowerCase();
+  // Every read of the list goes through list(), so a non-array argument degrades
+  // to "nothing observed" rather than throwing.
+  const seen = list(observations);
   const marks: string[] = [];
-  if (observed(observations, 'signature')) marks.push('signed');
-  if (observed(observations, 'notar')) marks.push('notarized');
-  if (observed(observations, 'witness')) marks.push('witnessed');
+  if (observed(seen, 'signature')) marks.push('signed');
+  if (observed(seen, 'notar')) marks.push('notarized');
+  if (observed(seen, 'witness')) marks.push('witnessed');
 
   if (status === 'draft') {
     return {
@@ -132,7 +147,7 @@ export function summarizeExecution(
       detail: 'The document does not label its own status, but Command saw these in this copy.',
     };
   }
-  if (notObserved(observations, 'signature')) {
+  if (notObserved(seen, 'signature')) {
     return {
       label: 'No signature seen',
       tone: 'draft',
@@ -149,7 +164,7 @@ export function summarizeExecution(
 }
 
 export function ExecutionStatus({ documentStatus, observations, className = '' }: Props) {
-  const summary = summarizeExecution(documentStatus, observations ?? []);
+  const summary = summarizeExecution(documentStatus, observations);
   const Icon = ICONS[summary.tone];
   return (
     <span

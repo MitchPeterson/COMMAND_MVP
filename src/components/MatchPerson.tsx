@@ -19,8 +19,12 @@ import { rankPeople } from '../lib/personMatch';
 interface Props {
   /** The name exactly as the document wrote it. */
   documentName: string;
-  /** The extracted row, where the answer is recorded. */
-  partyId: string | null;
+  /**
+   * Every extracted row naming this person. A named insured has one per policy,
+   * and all of them are settled together — otherwise the second policy asks the
+   * same question again.
+   */
+  partyIds: string[];
   members: FamilyMember[];
   /** The user chose to add someone new — hand off to the editor. */
   onAddNew: () => void;
@@ -28,13 +32,13 @@ interface Props {
   onCancel: () => void;
 }
 
-export function MatchPerson({ documentName, partyId, members, onAddNew, onDone, onCancel }: Props) {
+export function MatchPerson({ documentName, partyIds, members, onAddNew, onDone, onCancel }: Props) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const candidates = rankPeople(documentName, members);
 
   const link = async (member: FamilyMember) => {
-    if (!partyId) {
+    if (partyIds.length === 0) {
       // Nothing to write the match against; adding is the only honest option.
       setError('Command could not find the record this question came from. Add the person instead.');
       return;
@@ -42,7 +46,7 @@ export function MatchPerson({ documentName, partyId, members, onAddNew, onDone, 
     setBusy(member.id);
     setError(null);
     try {
-      await resolveInsuredPartyMatch(partyId, member.id);
+      await resolveInsuredPartyMatch(partyIds, member.id);
       await onDone();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save that match.');

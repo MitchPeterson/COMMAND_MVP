@@ -41,6 +41,17 @@ export interface FollowUp {
   actionLabel: string;
 }
 
+/**
+ * A key for things that are the same thing written differently. Addresses are
+ * the reason this exists: two policies covering one house wrote
+ * "13150 Danube Ln, Rosemount, MN 55068" and "13150 DANUBE LN, ROSEMOUNT MN
+ * 55068", which differ by one comma and asked the household twice whether it
+ * lived there.
+ */
+function normalizeKey(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
 /** Names are compared loosely: documents shout, abbreviate and reverse them. */
 function nameKey(value: string | null | undefined): string {
   return (value ?? '')
@@ -86,14 +97,26 @@ export function followUpsFromInsurance(
   const out: FollowUp[] = [];
   const seen = new Set<string>();
 
+  // A person named on two policies has a row under each, and confirming one of
+  // them left the other asking. The answer is about the person, not the row —
+  // so a name settled anywhere is settled everywhere.
+  const settledNames = new Set<string>();
+  for (const extraction of extractions) {
+    for (const party of extraction.insurance_insured_parties ?? []) {
+      if (!party.name || !party.matched_family_member_id) continue;
+      if (members.some((m) => m.id === party.matched_family_member_id)) {
+        settledNames.add(nameKey(party.name));
+      }
+    }
+  }
+
   for (const extraction of extractions) {
     const carrier = extraction.carrier ?? 'your policy';
 
     for (const party of extraction.insurance_insured_parties ?? []) {
       if (!party.name || !HOUSEHOLD_ROLES.includes(party.role)) continue;
       // Already settled, whether the answer was a new person or an existing one.
-      if (party.matched_family_member_id
-        && members.some((m) => m.id === party.matched_family_member_id)) continue;
+      if (settledNames.has(nameKey(party.name))) continue;
       if (members.some((m) => sameName(m.name, party.name))) continue;
       const id = `party:${nameKey(party.name)}`;
       if (seen.has(id)) continue;
@@ -115,7 +138,7 @@ export function followUpsFromInsurance(
       const label = [item.year, item.make, item.model].filter(Boolean).join(' ')
         || item.description || 'a vehicle';
       if (assets.some((a) => describesVehicle(a.name, item.year, item.make, item.model))) continue;
-      const id = `vehicle:${label.toLowerCase()}`;
+      const id = `vehicle:${normalizeKey(label)}`;
       if (seen.has(id)) continue;
       seen.add(id);
       out.push({
@@ -132,7 +155,7 @@ export function followUpsFromInsurance(
     for (const item of extraction.insurance_insured_assets ?? []) {
       if (item.asset_type !== 'property' || !item.address) continue;
       if (assets.some((a) => a.type === 'real_estate')) continue;
-      const id = `property:${item.address.toLowerCase()}`;
+      const id = `property:${normalizeKey(item.address)}`;
       if (seen.has(id)) continue;
       seen.add(id);
       out.push({

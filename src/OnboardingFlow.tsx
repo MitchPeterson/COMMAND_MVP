@@ -85,14 +85,17 @@ const LIFE_EVENTS = [
 ];
 
 // BUG FIX: column is 'section' not 'section_name', status must be valid SectionStatus
+// One row per section that exists. 'advisory' and 'healthcare' were seeded here
+// too and had no page, no scorer and no nav entry — so the dashboard listed two
+// sections a user could not open, and healthcare reported a score for an
+// assessment that never ran. Neither is coming back until there is something
+// behind it.
 const SECTION_SCORE_DEFAULTS = [
-  { section: 'advisory', score: 0, status: 'review' },
   { section: 'insurance', score: 0, status: 'review' },
   { section: 'legal', score: 0, status: 'review' },
   { section: 'family', score: 0, status: 'review' },
   { section: 'home', score: 0, status: 'review' },
   { section: 'tax', score: 0, status: 'review' },
-  { section: 'healthcare', score: 0, status: 'review' },
   { section: 'finances', score: 0, status: 'review' },
   { section: 'credit', score: 0, status: 'review' },
 ];
@@ -1653,8 +1656,8 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
                 })()}
 
                 <div className="bg-[#C9A24D]/5 border border-[#C9A24D]/15 rounded-xl p-4">
-                  <div className="text-[#C9A24D] text-xs tracking-wider uppercase mb-1">9 pillars activated</div>
-                  <p className="text-[#808084] text-sm">Insurance, legal, home, finances, taxes, healthcare, family, credit, and advisory.</p>
+                  <div className="text-[#C9A24D] text-xs tracking-wider uppercase mb-1">7 pillars activated</div>
+                  <p className="text-[#808084] text-sm">Insurance, legal, home, finances, taxes, family, and credit.</p>
                 </div>
               </div>
 

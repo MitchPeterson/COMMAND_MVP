@@ -228,10 +228,6 @@ export function ProfileView() {
             </div>
             <p className="mt-2 text-xs text-cmd-muted/70">Click for the release history</p>
           </div>
-          <div className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-5">
-            <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Legacy mode</p>
-            <p className="mt-3 text-xl font-semibold text-cmd-offwhite">Old interface still available</p>
-          </div>
         </div>
       </section>
       {household?.id && <HouseholdHistory householdId={household.id} />}

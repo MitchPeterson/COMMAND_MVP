@@ -28,8 +28,6 @@ import {
   Clock,
   AlertTriangle,
   ArrowRight,
-  HeartPulse,
-  Compass,
 } from 'lucide-react';
 
 const severityOrder = ['critical', 'high', 'medium', 'low'] as const;
@@ -68,13 +66,12 @@ const sectionLabels: Record<string, string> = {
   taxes: 'Taxes',
   finances: 'Finances',
   family: 'Family',
-  advisory: 'Advisory',
-  health: 'Health',
 };
 
-// Sections that have a page to land on. The rest still show a score — they just
-// are not pretending to be a link that goes nowhere.
-const ROUTABLE_SECTIONS = new Set([
+// The sections that exist. A stored row for anything else — 'advisory' and
+// 'healthcare' were seeded for every household — is dropped rather than listed,
+// because a row on this page is a promise there is a section behind it.
+const REAL_SECTIONS = new Set([
   'insurance', 'legal', 'credit', 'home', 'finances', 'taxes', 'family',
 ]);
 
@@ -86,8 +83,6 @@ const sectionIcons: Record<string, React.ElementType> = {
   taxes: Receipt,
   family: Users,
   credit: CreditCard,
-  health: HeartPulse,
-  advisory: Compass,
 };
 
 function formatDateLabel(dateString?: string | null) {
@@ -298,7 +293,9 @@ export function DashboardView({ onNavigate }: DashboardProps) {
       const keep = rowIsLive || row.score > existing.score ? row : existing;
       byKey.set(row.section, keep);
     }
-    const deduped = [...byKey.values()];
+    // Anything without a section behind it never reaches the page, so it also
+    // never reaches the household score below.
+    const deduped = [...byKey.values()].filter((row) => REAL_SECTIONS.has(row.section));
     // A zero means nothing has been put into that section, not that it is
     // failing. Ranking those first put the sections with the least information
     // at the top of the page, which is the opposite of useful.
@@ -617,7 +614,7 @@ export function DashboardView({ onNavigate }: DashboardProps) {
               <div className="space-y-3">
                 {sectionScores.map((section) => {
                   const Icon = sectionIcons[section.section] ?? FileText;
-                  const routable = Boolean(onNavigate) && ROUTABLE_SECTIONS.has(section.section);
+                  const routable = Boolean(onNavigate) && REAL_SECTIONS.has(section.section);
                   const isCritical = section.status === 'action_needed';
                   const isWarning = section.status === 'review';
                   return (

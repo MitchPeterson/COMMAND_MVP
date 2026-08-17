@@ -45,17 +45,17 @@ export interface SectionIntroCopy {
 export const SECTION_INTROS: Record<string, SectionIntroCopy> = {
   insurance: {
     section: 'insurance',
-    title: 'Start with your declarations pages',
+    title: 'Start with your insurance policies',
     purpose: "Whether the cover you pay for actually fits what you own.",
     feeds: ["Finances", "Family", "Home"],
-    primary: { label: "A declarations page", why: "The one-page summary at the front of a policy. It carries every limit, deductible and renewal date Command needs." },
+    primary: { label: "Any insurance policy", why: 'The summary page at the front is the useful part — your insurer may call it a declarations page. It carries the limits, the deductible and the renewal date. The whole policy is fine too.' },
     also: ["Home, auto and umbrella policies", "Life insurance policies", "A renewal notice", "A certificate of insurance"],
     order: 2,
     body:
-      'Upload the declarations page from each policy — home, auto, umbrella, life. Command reads the '
+      'Upload whatever you have for each policy — home, auto, umbrella, life. Command reads the '
       + 'limits, deductibles and renewal dates, then weighs them against what your household actually '
       + 'owns. The question it answers is whether the cover fits the risk, not whether the filing is tidy.',
-    ctaLabel: 'Upload a declarations page',
+    ctaLabel: 'Upload an insurance policy',
   },
   legal: {
     section: 'legal',

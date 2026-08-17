@@ -10,7 +10,7 @@
 // to: plain words, one action at a time, and no jargon on the page at all.
 
 import React from 'react';
-import { ArrowRight, Check, Sparkles } from 'lucide-react';
+import { ArrowRight, Check, Sparkles, Upload } from 'lucide-react';
 import { SECTION_INTROS, type SectionIntroCopy } from '../lib/sectionIntros';
 
 export interface SetupStep extends SectionIntroCopy {
@@ -115,6 +115,48 @@ export function GettingStarted({ steps, userName, onOpen }: Props) {
             </div>
           </div>
         )}
+      </section>
+
+      {/* The escape hatch from the three suggestions. Someone holding a document
+          right now should not have to work out which section wants it — that is
+          Command's job, and saying so is the reassurance. */}
+      <section className="rounded-3xl border border-cmd-gold/25 bg-cmd-charcoal p-6">
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-xs uppercase tracking-[0.24em] text-cmd-gold">Or just start</p>
+            <h2 className="mt-2 text-xl font-semibold text-cmd-offwhite">
+              Have something to hand? Upload it.
+            </h2>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-cmd-muted">
+              You do not have to know which section it belongs to. Command reads it, works out what it
+              is, files it in the right place and tells you what it found.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('command:add-document'))}
+            className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-cmd-gold bg-cmd-gold px-4 py-2.5 text-sm font-semibold text-cmd-black transition hover:bg-cmd-gold/85"
+          >
+            <Upload className="h-4 w-4" /> Upload anything
+          </button>
+        </div>
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          {[
+            'An insurance policy', 'A will or trust', 'A mortgage statement',
+            'Last year\u2019s tax return', 'A credit card statement', 'A bank or investment statement',
+            'An appliance warranty', 'A power of attorney',
+          ].map((idea) => (
+            <span key={idea} className="rounded-full border border-cmd-border bg-cmd-black/40 px-3 py-1 text-xs text-cmd-muted">
+              {idea}
+            </span>
+          ))}
+        </div>
+
+        <p className="mt-5 text-sm leading-6 text-cmd-muted">
+          One document is a real start. Add the rest whenever you come across them — there is no
+          deadline here, and Command fills the picture in as you go rather than waiting for all of it.
+        </p>
       </section>
 
       <p className="flex items-start gap-2 px-1 text-sm leading-6 text-cmd-muted">

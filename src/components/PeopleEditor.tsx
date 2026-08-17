@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   addFamilyMember,
   updateFamilyMember,
@@ -17,6 +17,12 @@ interface Props {
   members: FamilyMember[];
   profile: HouseholdProfile | null;
   onSaved: () => Promise<void> | void;
+  /**
+   * A name a document raised, arriving already filled in. Someone who has just
+   * been asked "is MARCUS WHITFIELD part of your household?" should not then
+   * have to type the name they were shown.
+   */
+  prefillName?: string | null;
 }
 
 interface PersonForm {
@@ -138,7 +144,7 @@ function PersonFields({
  * the profile's denormalized copies (partner name, number of children) — see
  * syncProfilePeople — so nothing downstream reads a stale count.
  */
-export function PeopleEditor({ householdId, members, profile, onSaved }: Props) {
+export function PeopleEditor({ householdId, members, profile, onSaved, prefillName}: Props) {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<PersonForm | null>(null);
   const [adding, setAdding] = useState<Relationship | null>(null);
@@ -159,6 +165,14 @@ export function PeopleEditor({ householdId, members, profile, onSaved }: Props) 
   // not. Say so rather than silently disagreeing with the dashboard.
   const missingSpouse = !hasSpouse && Boolean(profile?.partner_name);
   const missingChildren = Math.max((profile?.num_children ?? 0) - childCount, 0);
+
+  // Opened by the caller, once, when a question sent someone here with a name.
+  useEffect(() => {
+    if (!prefillName) return;
+    setEditingId(null);
+    setAdding('Other');
+    setForm({ name: prefillName, relationship: 'Other', birth_date: '' });
+  }, [prefillName]);
 
   const startAdd = (relationship: Relationship) => {
     setError(null);

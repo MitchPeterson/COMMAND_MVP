@@ -11,10 +11,13 @@
 // which is what exists to be found, and stops there.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { FileText, Menu, Newspaper, Plus, Search, X } from 'lucide-react';
+import { ArrowRight, Check, FileText, Menu, Newspaper, Plus, Search, X } from 'lucide-react';
 import { navItems } from '../views/components/Sidebar';
 import { UploadDropzone } from './UploadDropzone';
-import { uploadDocumentAsset, invokeDocumentExtraction, type Document } from '../lib/supabase';
+import {
+  uploadDocumentAsset, invokeDocumentExtraction,
+  type Document, type ExtractionOutcome,
+} from '../lib/supabase';
 
 interface AppHeaderProps {
   /** Opens the nav drawer. Only rendered below lg, where the rail is hidden. */
@@ -49,6 +52,8 @@ export function AppHeader({ onOpenNav, onOpenBrief, householdId, documents, onNa
   const [open, setOpen] = useState(false);
   const [cursor, setCursor] = useState(0);
   const [uploading, setUploading] = useState(false);
+  // What the last reading produced, so an upload visibly pays for itself.
+  const [outcome, setOutcome] = useState<ExtractionOutcome | null>(null);
   const boxRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -82,7 +87,7 @@ export function AppHeader({ onOpenNav, onOpenBrief, householdId, documents, onNa
 
   // Anything can ask for the upload sheet without knowing where the button is.
   useEffect(() => {
-    const open = () => setUploading(true);
+    const open = () => { setOutcome(null); setUploading(true); };
     window.addEventListener('command:add-document', open);
     return () => window.removeEventListener('command:add-document', open);
   }, []);
@@ -193,7 +198,7 @@ export function AppHeader({ onOpenNav, onOpenBrief, householdId, documents, onNa
 
         <button
           type="button"
-          onClick={() => setUploading(true)}
+          onClick={() => { setOutcome(null); setUploading(true); }}
           disabled={!householdId}
           className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-cmd-gold/40 bg-cmd-gold/10 px-3 py-2 text-sm font-medium text-cmd-gold transition hover:bg-cmd-gold/20 disabled:opacity-40 sm:px-4"
         >
@@ -231,15 +236,44 @@ export function AppHeader({ onOpenNav, onOpenBrief, householdId, documents, onNa
             {/* The same component every section uses. The only difference here is
                 the category: a section knows what it is receiving, this does not,
                 so it goes in unclassified and the extractor decides. */}
-            <UploadDropzone
-              contextLabel=""
-              buttonLabel="Choose a file"
-              onUpload={async (file) => {
-                const uploaded = await uploadDocumentAsset(householdId, file, 'general');
-                await invokeDocumentExtraction(uploaded.id);
-                await onUploaded();
-              }}
-            />
+            {outcome ? (
+              // The payoff, stated before anything is asked of the user again.
+              <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-5">
+                <p className="flex items-center gap-2 text-sm font-semibold text-cmd-offwhite">
+                  <Check className="h-4 w-4 shrink-0 text-emerald-300" /> {outcome.headline}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-cmd-muted">{outcome.detail}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {outcome.section && (
+                    <button
+                      type="button"
+                      onClick={() => { setUploading(false); onNavigate(outcome.section!); }}
+                      className="inline-flex items-center gap-2 rounded-xl border border-cmd-gold bg-cmd-gold px-4 py-2 text-sm font-semibold text-cmd-black transition hover:bg-cmd-gold/85"
+                    >
+                      See what it found <ArrowRight className="h-4 w-4" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => setOutcome(null)}
+                    className="rounded-xl border border-cmd-border px-4 py-2 text-sm text-cmd-muted transition hover:text-cmd-offwhite"
+                  >
+                    Add another
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <UploadDropzone
+                contextLabel=""
+                buttonLabel="Choose a file"
+                onUpload={async (file) => {
+                  const uploaded = await uploadDocumentAsset(householdId, file, 'general');
+                  const found = await invokeDocumentExtraction(uploaded.id);
+                  await onUploaded();
+                  setOutcome(found);
+                }}
+              />
+            )}
           </div>
         </div>
       )}

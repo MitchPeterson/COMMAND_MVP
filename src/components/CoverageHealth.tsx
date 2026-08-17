@@ -72,7 +72,7 @@ export function CoverageHealth({ policies, extractions, profile }: Props) {
 
       {policies.length === 0 ? (
         <p className="mt-6 text-sm text-cmd-muted">
-          Upload a declarations page below and Command will read the coverages, deductibles and
+          Upload an insurance policy below and Command will read the coverages, deductibles and
           limits, then check them against each other.
         </p>
       ) : (

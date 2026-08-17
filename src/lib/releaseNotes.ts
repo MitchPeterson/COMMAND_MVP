@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.40.0',
+    date: '2026-08-17',
+    title: 'Plainer words, and every upload shows its worth',
+    items: [
+      'Insurance asks for a policy rather than a declarations page — you should not need the industry\'s word for it',
+      'The Dashboard invites you to upload anything you have to hand, with examples, and says plainly that the picture fills in as you go',
+      'Finishing an upload now tells you what Command found in it and offers to show you, instead of leaving you to go looking',
+    ],
+  },
+  {
     version: '0.39.0',
     date: '2026-08-17',
     title: 'A friendlier start',

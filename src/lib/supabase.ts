@@ -2201,11 +2201,85 @@ export async function getDocumentUrl(filePath: string): Promise<string | null> {
  * classifier is wrong sometimes, and without an override a misread document is
  * stuck: re-reading it just runs the same classification again.
  */
+/**
+ * What a reading produced, in one sentence, plus where to go and see it.
+ *
+ * Every upload should visibly pay for itself. The function has always returned a
+ * summary of what it found and the client threw it away, so a successful read
+ * looked exactly like a failed one until the user went hunting for the section
+ * it landed in.
+ */
+export interface ExtractionOutcome {
+  section: string | null;
+  headline: string;
+  detail: string;
+}
+
+// deno-lint-ignore-file
+export function describeExtraction(result: Record<string, unknown> | null): ExtractionOutcome {
+  const n = (v: unknown) => (typeof v === 'number' ? v : 0);
+  const counts = (result?.counts ?? {}) as Record<string, number>;
+  const mode = String(result?.mode ?? '');
+  const plural = (count: number, one: string, many = `${one}s`) =>
+    `${count} ${count === 1 ? one : many}`;
+
+  switch (mode) {
+    case 'insurance':
+      return {
+        section: 'insurance',
+        headline: 'Read your policy',
+        detail: `Found ${plural(n(counts.coverages), 'coverage')} and ${plural(n(counts.deductibles), 'deductible')}, `
+          + 'with the page every figure came from. Confirm it and Command starts checking the cover against what you own.',
+      };
+    case 'legal':
+      return {
+        section: 'legal',
+        headline: `Read your ${String(result?.document_type ?? 'document').replace(/_/g, ' ')}`,
+        detail: `Found ${plural(n(counts.parties), 'person named')} and ${plural(n(counts.provisions), 'provision')}, `
+          + 'along with whether it appears signed. Confirm it and it joins your legal picture.',
+      };
+    case 'credit':
+      return {
+        section: 'credit',
+        headline: 'Read your statement',
+        detail: `Found ${plural(n(counts.fields), 'figure')}, ${plural(n(counts.aprs), 'interest rate')} and `
+          + `${plural(n(counts.transactions), 'transaction')}. Command can already tell you what that spending earned.`,
+      };
+    case 'mortgage':
+      return {
+        section: 'home',
+        headline: 'Read your mortgage statement',
+        detail: `Found ${plural(n(result?.fields as number), 'figure')} including the balance, rate and escrow — `
+          + 'which is what your home equity is worked out from.',
+      };
+    case 'tax_return':
+      return {
+        section: 'taxes',
+        headline: `Read your ${result?.tax_year ?? ''} return`.trim(),
+        detail: `Found ${plural(n(result?.fields as number), 'figure')}, each traced to a line on the form. `
+          + 'Your safe-harbor target and any carryforwards come straight from these.',
+      };
+    case 'appliance':
+      return {
+        section: 'home',
+        headline: `Read the paperwork for your ${String(result?.product ?? 'appliance')}`,
+        detail: 'Command added it to your home systems, so its replacement timeline and any warranty are tracked.',
+      };
+    default:
+      return {
+        section: 'documents',
+        headline: 'Read your document',
+        detail: 'It is filed in your vault. Command could not match it to a specialist path, so tell it '
+          + 'what it is with "Wrong type?" and it will read it again properly.',
+      };
+  }
+}
+
 export async function invokeDocumentExtraction(
   documentId: string,
   forceType?: ForceableType,
   fresh = false,
-): Promise<boolean> {
+): Promise<ExtractionOutcome | null> {
   // Pass the object directly — supabase-js serializes it and sets the JSON content type.
   const body: Record<string, unknown> = { document_id: documentId };
   if (forceType) body.force_type = forceType;
@@ -2213,7 +2287,7 @@ export async function invokeDocumentExtraction(
   // implies this, so it is only needed to re-read a document whose type was right
   // and whose answer was not.
   if (fresh) body.fresh = true;
-  const { error } = await supabase.functions.invoke('extract-document', { body });
+  const { data, error } = await supabase.functions.invoke('extract-document', { body });
   if (error) {
     // The function returns a JSON body describing the failure; surface it rather than
     // logging an opaque FunctionsHttpError.
@@ -2256,7 +2330,7 @@ export async function invokeDocumentExtraction(
     // failed upload — surface it as a partial success the user can retry.
     throw new Error(`Document saved, but extraction failed: ${message}`);
   }
-  return true;
+  return describeExtraction((data ?? null) as Record<string, unknown> | null);
 }
 
 function parseNumber(value: string | null | undefined): number | null {

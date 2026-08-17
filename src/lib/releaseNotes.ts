@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.44.0',
+    date: '2026-08-17',
+    title: 'See what is on autopay',
+    items: [
+      'Credit now lists the charges that repeat, with what each costs over a year',
+      'A charge counts as recurring when the statement marks it automatic, the same amount arrives in two periods, or a bill-like category repeats — two flights in two months no longer read as a subscription',
+      'When only one statement has been read, the section says so rather than showing nothing',
+    ],
+  },
+  {
     version: '0.43.1',
     date: '2026-08-17',
     title: 'Add a family member now does something',

@@ -16,6 +16,8 @@ import {
 } from '../lib/firstInsight';
 import { FirstInsight } from '../components/FirstInsight';
 import { WeeklyBrief } from '../components/WeeklyBrief';
+import { GettingStarted, type SetupStep } from '../components/GettingStarted';
+import { SECTION_INTROS, familiarityState } from '../lib/sectionIntros';
 import { buildDigest, readSnapshot, writeSnapshot, isDigestDue, type DigestInput } from '../lib/digest';
 import { taxDeadlines } from '../lib/taxYear';
 import { buildPriorityActions, type RankedAction, type RankedSeverity } from '../lib/priorityActions';
@@ -203,6 +205,33 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
     return pick;
   }, [data?.documents, data?.insurancePolicies, data?.legalDocuments, data?.creditCards,
     data?.financeAccounts, coverage, finances, family, legal]);
+
+  // ── Getting started ─────────────────────────────────────────────────────
+  // A summary of nothing is a zero beside seven zeros, which reads as failure
+  // rather than as a beginning. While the household is new the dashboard is a
+  // setup guide instead, and becomes the summary once there is something to
+  // summarize.
+  const setupSteps = useMemo<SetupStep[]>(() => {
+    const started: Record<string, boolean> = {
+      insurance: familiarityState((data?.insurancePolicies ?? []).length, (data?.insuranceExtractions ?? []).length) === 'started',
+      legal: familiarityState((data?.legalDocuments ?? []).length, (data?.legalExtractions ?? []).length) === 'started',
+      credit: familiarityState((data?.creditCards ?? []).length, (data?.creditStatements ?? []).length) === 'started',
+      home: familiarityState((data?.homeSystems ?? []).length, data?.mortgage ? 1 : 0) === 'started',
+      finances: familiarityState((data?.financeAccounts ?? []).length, (data?.loans ?? []).length) === 'started',
+      taxes: familiarityState((data?.taxReturns ?? []).length, (data?.taxDocuments ?? []).length) === 'started',
+      family: familiarityState((data?.familyMembers ?? []).length) === 'started',
+    };
+    return Object.values(SECTION_INTROS)
+      .filter((intro) => intro.section in started)
+      .sort((a, b) => a.order - b.order)
+      .map((intro) => ({ ...intro, done: started[intro.section] }));
+  }, [data?.insurancePolicies, data?.insuranceExtractions, data?.legalDocuments, data?.legalExtractions,
+    data?.creditCards, data?.creditStatements, data?.homeSystems, data?.mortgage,
+    data?.financeAccounts, data?.loans, data?.taxReturns, data?.taxDocuments, data?.familyMembers]);
+
+  // Three of seven is the point where a summary starts being worth more than a
+  // guide — enough sections have something that the scores mean something.
+  const stillSettingUp = setupSteps.filter((s) => s.done).length < 3;
 
   // ── The brief ───────────────────────────────────────────────────────────
   // Assembled here because this is where all seven assessments already exist.
@@ -454,6 +483,27 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
 
   const scoreState = getScoreState(healthScore);
   const openPriorityCount = rankedActions.length;
+
+  if (stillSettingUp) {
+    return (
+      <div className="space-y-6">
+        {/* The brief still opens over the guide: a deadline is worth knowing
+            about whether or not setup is finished. */}
+        {briefOpen && (
+          <WeeklyBrief
+            digest={digest}
+            onOpenSection={(section) => { closeBrief(); onNavigate?.(section); }}
+            onClose={closeBrief}
+          />
+        )}
+        <GettingStarted
+          steps={setupSteps}
+          userName={data?.profile?.primary_first_name ?? data?.profile?.primary_name ?? null}
+          onOpen={(section) => onNavigate?.(section)}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

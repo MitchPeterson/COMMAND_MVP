@@ -1,3 +1,5 @@
+import { SectionIntro } from '../components/SectionIntro';
+import { introFor } from '../lib/sectionIntros';
 import React, { useEffect, useState } from 'react';
 import { useHousehold } from '../useHousehold';
 import {
@@ -142,9 +144,14 @@ export function DocumentsView({ onNavigate, focusId = null }: DocumentsViewProps
       )}
 
       {documents.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-cmd-border bg-cmd-black/50 p-8 text-center text-cmd-muted">
-          No documents uploaded yet.
-        </div>
+        // The vault has no uploader of its own — the header's is the way in.
+        // Asked for by event rather than by reaching into the header's markup,
+        // which would break the moment a button moved.
+        <SectionIntro
+          intro={introFor('documents')!}
+          icon={<Folder className="h-5 w-5" />}
+          onAction={() => window.dispatchEvent(new CustomEvent('command:add-document'))}
+        />
       ) : (
         <div className="space-y-4">
           {documents.map((doc) => {

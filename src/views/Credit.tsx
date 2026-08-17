@@ -1,3 +1,5 @@
+import { SectionIntro } from '../components/SectionIntro';
+import { familiarityState, introFor } from '../lib/sectionIntros';
 import React from 'react';
 import { useHousehold } from '../useHousehold';
 import { UnfiledDocuments } from '../components/UnfiledDocuments';
@@ -64,14 +66,27 @@ export function CreditView() {
     .slice()
     .sort((a, b) => (utilizationOf(b) ?? -1) - (utilizationOf(a) ?? -1));
 
+
+  const familiarity = familiarityState(cards.length, statements.length);
+  // The uploader stays on the page; the intro's action takes you to it.
+  const goToUploader = () =>
+    document.getElementById('section-uploader')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   return (
     <div className="space-y-6">
       {/* The grade leads, as coverage does on Insurance. */}
-      <CreditHealth
-        cards={cards}
-        profile={data?.profile ?? null}
-        awaitingCard={awaitingCard}
-      />
+      {familiarity === 'unstarted' ? (
+        <SectionIntro
+          intro={introFor('credit')!}
+          icon={<CreditCard className="h-5 w-5" />}
+          onAction={goToUploader}
+        />
+      ) : (
+        <CreditHealth
+          cards={cards}
+          profile={data?.profile ?? null}
+          awaitingCard={awaitingCard}
+        />
+      )}
 
       {pending.length > 0 && (
         <section className="rounded-3xl border border-cmd-gold/25 bg-cmd-charcoal p-6">
@@ -213,7 +228,7 @@ export function CreditView() {
       />
 
       {/* Demoted: still one click away, no longer the headline. */}
-      <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
+      <section id="section-uploader" className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
         <UploadDropzone
           contextLabel="Add a card"
           buttonLabel="Upload a credit card statement"

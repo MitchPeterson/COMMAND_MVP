@@ -1,3 +1,5 @@
+import { SectionIntro } from '../components/SectionIntro';
+import { familiarityState, introFor } from '../lib/sectionIntros';
 import React, { useState } from 'react';
 import { useHousehold } from '../useHousehold';
 import { UnfiledDocuments } from '../components/UnfiledDocuments';
@@ -383,10 +385,23 @@ export function InsuranceView() {
   const extractionFor = (extractionId: string | null | undefined) =>
     extractionId ? insuranceExtractions.find((e) => e.id === extractionId) : undefined;
 
+
+  const familiarity = familiarityState(policies.length, insuranceExtractions.length);
+  // The uploader stays on the page; the intro's action takes you to it.
+  const goToUploader = () =>
+    document.getElementById('section-uploader')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   return (
     <div className="space-y-6">
       {/* Coverage first. The upload is a means to this, not the point of the page. */}
-      <CoverageHealth policies={policies} extractions={insuranceExtractions} profile={data?.profile} />
+      {familiarity === 'unstarted' ? (
+        <SectionIntro
+          intro={introFor('insurance')!}
+          icon={<Shield className="h-5 w-5" />}
+          onAction={goToUploader}
+        />
+      ) : (
+        <CoverageHealth policies={policies} extractions={insuranceExtractions} profile={data?.profile} />
+      )}
 
       <InsurancePolicyReview extractions={insuranceExtractions} onChange={refresh} />
 
@@ -575,7 +590,7 @@ export function InsuranceView() {
       />
 
       {/* Demoted: still one click away, no longer the headline. */}
-      <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
+      <section id="section-uploader" className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
         <UploadDropzone
           contextLabel="Add coverage"
           buttonLabel="Upload a policy or declarations page"

@@ -1,3 +1,5 @@
+import { SectionIntro } from '../components/SectionIntro';
+import { familiarityState, introFor } from '../lib/sectionIntros';
 import React from 'react';
 import { useHousehold } from '../useHousehold';
 import { UnfiledDocuments } from '../components/UnfiledDocuments';
@@ -8,7 +10,7 @@ import { TaxBaseline } from '../components/TaxBaseline';
 import { DeductionLog } from '../components/DeductionLog';
 import { UploadDropzone } from '../components/UploadDropzone';
 import { uploadDocumentAsset, invokeDocumentExtraction } from '../lib/supabase';
-import { FileText } from 'lucide-react';
+import { FileText, Receipt } from 'lucide-react';
 
 export function TaxesView() {
   const { data, refresh } = useHousehold();
@@ -18,18 +20,31 @@ export function TaxesView() {
   // return being filed is last year's. Planning always runs on the current year.
   const planningYear = new Date().getFullYear();
 
+
+  const familiarity = familiarityState((data?.taxReturns ?? []).length, (data?.taxDocuments ?? []).length, (data?.deductionLog ?? []).length);
+  // The uploader stays on the page; the intro's action takes you to it.
+  const goToUploader = () =>
+    document.getElementById('section-uploader')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   return (
     <div className="space-y-6">
-      <TaxHealth
-        taxDocuments={data?.taxDocuments ?? []}
-        profile={data?.profile ?? null}
-        members={data?.familyMembers ?? []}
-        mortgageStatements={data?.mortgageStatements ?? []}
-        financeAccounts={data?.financeAccounts ?? []}
-        legalDocuments={data?.legalDocuments ?? []}
-        taxReturns={data?.taxReturns ?? []}
-        deductions={data?.deductionLog ?? []}
-      />
+      {familiarity === 'unstarted' ? (
+        <SectionIntro
+          intro={introFor('taxes')!}
+          icon={<Receipt className="h-5 w-5" />}
+          onAction={goToUploader}
+        />
+      ) : (
+        <TaxHealth
+          taxDocuments={data?.taxDocuments ?? []}
+          profile={data?.profile ?? null}
+          members={data?.familyMembers ?? []}
+          mortgageStatements={data?.mortgageStatements ?? []}
+          financeAccounts={data?.financeAccounts ?? []}
+          legalDocuments={data?.legalDocuments ?? []}
+          taxReturns={data?.taxReturns ?? []}
+          deductions={data?.deductionLog ?? []}
+        />
+      )}
 
       {data?.household?.id && (
         <TaxBaseline
@@ -159,7 +174,7 @@ export function TaxesView() {
       />
 
       {/* Demoted: still one click away, no longer the headline. */}
-      <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
+      <section id="section-uploader" className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
         <UploadDropzone
           contextLabel="Add a tax document"
           buttonLabel="Upload a W-2, 1099, 1098 or other tax form"

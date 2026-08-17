@@ -25,6 +25,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.38.0',
+    date: '2026-08-17',
+    title: 'An empty section explains itself',
+    items: [
+      'A section you have not started yet opens with what it is for and one thing to do, instead of a grade card reporting a dash and a list of everything it could not assess',
+    ],
+  },
+  {
     version: '0.37.0',
     date: '2026-08-17',
     title: 'A weekly brief of what moved',

@@ -63,7 +63,7 @@ export function CreditHealth({ cards, profile, awaitingCard = 0 }: Props) {
             </p>
           </div>
         </div>
-        <div className="shrink-0 text-right">
+        <div className="shrink-0 text-left sm:text-right">
           <p className="text-sm text-cmd-muted">Utilization</p>
           <p className="text-3xl font-semibold text-cmd-offwhite">
             {utilization == null ? '--' : `${Math.round(utilization)}%`}

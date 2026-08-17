@@ -175,7 +175,7 @@ export function CreditView() {
                       </p>
                     )}
                   </div>
-                  <div className="mt-4 shrink-0 text-right sm:mt-0">
+                  <div className="mt-4 shrink-0 text-left sm:mt-0 sm:text-right">
                     <p className="text-sm text-cmd-muted">Utilization</p>
                     <p className={`mt-1 text-2xl font-semibold ${utilizationTone(utilization)}`}>
                       {utilization == null ? '--' : `${Math.round(utilization)}%`}

@@ -68,7 +68,7 @@ export function TaxHealth(props: Props) {
             </p>
           </div>
         </div>
-        <div className="shrink-0 text-right">
+        <div className="shrink-0 text-left sm:text-right">
           <p className="text-sm text-cmd-muted">Forms gathered</p>
           <p className="text-3xl font-semibold text-cmd-offwhite">
             {received}<span className="text-cmd-muted"> / {expectedCount}</span>

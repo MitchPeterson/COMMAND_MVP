@@ -11,12 +11,14 @@
 // which is what exists to be found, and stops there.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { FileText, Plus, Search, X } from 'lucide-react';
+import { FileText, Menu, Plus, Search, X } from 'lucide-react';
 import { navItems } from '../views/components/Sidebar';
 import { UploadDropzone } from './UploadDropzone';
 import { uploadDocumentAsset, invokeDocumentExtraction, type Document } from '../lib/supabase';
 
 interface AppHeaderProps {
+  /** Opens the nav drawer. Only rendered below lg, where the rail is hidden. */
+  onOpenNav?: () => void;
   householdId?: string | null;
   documents: Document[];
   onNavigate: (view: string, focus?: string) => void;
@@ -40,7 +42,7 @@ function rank(label: string, query: string): number {
   return l.includes(query) ? 2 : -1;
 }
 
-export function AppHeader({ householdId, documents, onNavigate, onUploaded }: AppHeaderProps) {
+export function AppHeader({ onOpenNav, householdId, documents, onNavigate, onUploaded }: AppHeaderProps) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [cursor, setCursor] = useState(0);
@@ -103,7 +105,15 @@ export function AppHeader({ householdId, documents, onNavigate, onUploaded }: Ap
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex items-center gap-3 border-b border-cmd-border bg-cmd-black/80 px-6 py-3 backdrop-blur">
+      <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-cmd-border bg-cmd-black/80 px-4 py-3 backdrop-blur sm:gap-3 sm:px-6">
+        <button
+          type="button"
+          onClick={onOpenNav}
+          aria-label="Open navigation"
+          className="shrink-0 rounded-xl border border-cmd-border bg-cmd-black/60 p-2 text-cmd-offwhite transition hover:border-cmd-gold hover:text-cmd-gold lg:hidden"
+        >
+          <Menu className="h-4 w-4" />
+        </button>
         <div ref={boxRef} className="relative min-w-0 max-w-md flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-cmd-muted" />
           <input
@@ -112,8 +122,9 @@ export function AppHeader({ householdId, documents, onNavigate, onUploaded }: Ap
             onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
             onFocus={() => setOpen(true)}
             onKeyDown={onKeyDown}
-            placeholder="Search sections and documents"
-            className="w-full rounded-xl border border-cmd-border bg-cmd-black/60 py-2 pl-9 pr-8 text-sm text-cmd-offwhite placeholder:text-cmd-muted focus:border-cmd-gold/50 focus:outline-none"
+            placeholder="Search"
+            title="Search sections and documents"
+            className="w-full rounded-xl border border-cmd-border bg-cmd-black/60 py-2 pl-9 pr-8 text-base text-cmd-offwhite placeholder:text-cmd-muted focus:border-cmd-gold/50 focus:outline-none sm:text-sm"
           />
           {query && (
             <button
@@ -165,7 +176,7 @@ export function AppHeader({ householdId, documents, onNavigate, onUploaded }: Ap
           type="button"
           onClick={() => setUploading(true)}
           disabled={!householdId}
-          className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-xl border border-cmd-gold/40 bg-cmd-gold/10 px-4 py-2 text-sm font-medium text-cmd-gold transition hover:bg-cmd-gold/20 disabled:opacity-40"
+          className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-xl border border-cmd-gold/40 bg-cmd-gold/10 px-3 py-2 text-sm font-medium text-cmd-gold transition hover:bg-cmd-gold/20 disabled:opacity-40 sm:px-4"
         >
           <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Add document</span>
         </button>
@@ -173,10 +184,10 @@ export function AppHeader({ householdId, documents, onNavigate, onUploaded }: Ap
 
       {uploading && householdId && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-auto bg-black/70 p-6 backdrop-blur-sm"
+          className="fixed inset-0 z-[60] flex items-start justify-center overflow-auto bg-black/70 p-4 backdrop-blur-sm sm:p-6"
           onClick={(e) => { if (e.target === e.currentTarget) setUploading(false); }}
         >
-          <div className="mt-16 w-full max-w-xl rounded-3xl border border-cmd-border bg-cmd-charcoal p-6">
+          <div className="mt-6 w-full max-w-xl rounded-3xl border border-cmd-border bg-cmd-charcoal p-5 sm:mt-16 sm:p-6">
             <div className="mb-5 flex items-start justify-between gap-4">
               <div>
                 <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Add a document</p>
@@ -202,7 +213,7 @@ export function AppHeader({ householdId, documents, onNavigate, onUploaded }: Ap
                 the category: a section knows what it is receiving, this does not,
                 so it goes in unclassified and the extractor decides. */}
             <UploadDropzone
-              contextLabel="Add a document"
+              contextLabel=""
               buttonLabel="Choose a file"
               onUpload={async (file) => {
                 const uploaded = await uploadDocumentAsset(householdId, file, 'general');

@@ -374,7 +374,7 @@ export function LegalView({ focusId = null }: LegalViewProps) {
                     />
                   </div>
                 </div>
-                <div className="mt-4 text-right sm:mt-0">
+                <div className="mt-4 text-left sm:mt-0 sm:text-right">
                   <p className="text-sm text-cmd-muted">Last reviewed</p>
                   <p className="mt-1 font-semibold text-cmd-offwhite">{doc.last_reviewed ?? 'Unknown'}</p>
                   <p className="mt-3 text-sm text-cmd-muted">Status {doc.status}</p>

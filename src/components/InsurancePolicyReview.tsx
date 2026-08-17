@@ -63,7 +63,7 @@ export function CoverageRow({ coverage }: { coverage: InsuranceCoverageRow }) {
           )}
         </div>
 
-        <div className="shrink-0 text-right">
+        <div className="shrink-0 text-left sm:text-right">
           <p className={`font-semibold ${notFound ? 'text-cmd-muted' : 'text-cmd-offwhite'}`}>
             {notFound ? 'Not in this document' : currency(coverage.limit_amount)}
           </p>

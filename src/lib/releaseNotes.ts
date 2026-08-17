@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.35.0',
+    date: '2026-08-17',
+    title: 'Usable on a phone',
+    items: [
+      'The navigation rail becomes a drawer below desktop widths — it was taking 200px of a 375px screen, leaving every section 175px wide',
+      'Stat blocks that sit to the right of a heading on desktop now align left when they wrap beneath it on a phone',
+      'The add-document sheet opens near the top of a small screen rather than half a screen down',
+    ],
+  },
+  {
     version: '0.34.0',
     date: '2026-08-17',
     title: 'Search and add a document from anywhere',

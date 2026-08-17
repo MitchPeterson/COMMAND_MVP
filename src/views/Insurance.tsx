@@ -449,7 +449,7 @@ export function InsuranceView() {
                         />
                       </div>
                     </div>
-                    <div className="mt-4 text-right sm:mt-0">
+                    <div className="mt-4 text-left sm:mt-0 sm:text-right">
                       <p className="text-sm text-cmd-muted">Renewal</p>
                       <p className="mt-1 font-semibold text-cmd-offwhite">{policy.renewal_date ?? 'TBD'}</p>
                       <p className="mt-2 text-sm text-cmd-muted">

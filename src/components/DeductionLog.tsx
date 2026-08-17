@@ -158,7 +158,7 @@ export function DeductionLog({
             short conversation with a preparer and a long one.
           </p>
         </div>
-        <div className="shrink-0 text-right">
+        <div className="shrink-0 text-left sm:text-right">
           <p className="text-2xl font-semibold text-cmd-offwhite">{money(totals.total)}</p>
           <p className="text-xs uppercase tracking-[0.16em] text-cmd-muted">
             {forYear.length} entr{forYear.length === 1 ? 'y' : 'ies'}

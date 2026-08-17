@@ -25,6 +25,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.32.1',
+    date: '2026-08-17',
+    title: 'The Legal section no longer blanks on a document with no observations',
+    items: [
+      'A column that holds a list was declared with an object default, so a reading with no execution observations crashed the whole page instead of showing one badge without them',
+    ],
+  },
+  {
     version: '0.32.0',
     date: '2026-08-14',
     title: 'What each card is good for',

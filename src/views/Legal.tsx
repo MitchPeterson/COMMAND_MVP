@@ -259,7 +259,7 @@ export function LegalView({ focusId = null }: LegalViewProps) {
                           />
                         </div>
                         <p className="mt-2 text-sm text-cmd-muted">
-                          {summarizeExecution(extraction.document_status, extraction.execution_observations ?? []).detail}
+                          {summarizeExecution(extraction.document_status, extraction.execution_observations).detail}
                         </p>
                         <p className="mt-1 text-sm text-cmd-muted">
                           {[

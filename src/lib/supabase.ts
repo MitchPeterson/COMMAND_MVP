@@ -971,6 +971,33 @@ export async function reviewAllLegalFields(
 }
 
 /** Newest reading per document, newest first. */
+/**
+ * A JSONB column returns whatever was written to it, and one of them was
+ * declared with an object default while holding a list. `?? []` does not catch
+ * that — an empty object is neither null nor undefined — so `{}` reached
+ * `.some()` and took the whole Legal view down to a blank screen.
+ *
+ * The column default is fixed in 20260817090000, but the shape is coerced here
+ * too. A view should not be one bad row away from rendering nothing, and this
+ * layer is the last place that can promise callers what they are getting.
+ */
+function asArray<T>(value: unknown): T[] {
+  return Array.isArray(value) ? (value as T[]) : [];
+}
+
+/**
+ * Coerces the list-shaped JSONB on a legal reading.
+ *
+ * Only execution_observations is handled because it is the only one of the four
+ * list columns this type declares — referenced_documents,
+ * referenced_attachments and unresolved_items exist in the table and nothing on
+ * the client reads them, which is exactly why they never crashed. The migration
+ * repairs their stored shape anyway so that stays true when something does.
+ */
+function normalizeLegalExtraction(row: LegalDocumentExtraction): LegalDocumentExtraction {
+  return { ...row, execution_observations: asArray<ExecutionObservation>(row.execution_observations) };
+}
+
 export async function getLegalExtractions(householdId: string): Promise<LegalDocumentExtraction[]> {
   const { data, error } = await supabase
     .from('legal_document_extractions')
@@ -986,7 +1013,9 @@ export async function getLegalExtractions(householdId: string): Promise<LegalDoc
   // Filtered here rather than in each view: the section listed a re-read
   // document twice and legalHealth graded it twice, and the next consumer would
   // have made the same mistake. Use getLegalReadingHistory for the older ones.
-  return currentReadings((data ?? []) as LegalDocumentExtraction[]);
+  return currentReadings(
+    ((data ?? []) as LegalDocumentExtraction[]).map(normalizeLegalExtraction),
+  );
 }
 
 /** Every reading, including replaced ones, for a document's history view. */
@@ -1006,7 +1035,7 @@ export async function getLegalReadingHistory(
     console.error('Error fetching reading history:', error);
     return [];
   }
-  return (data ?? []) as LegalDocumentExtraction[];
+  return ((data ?? []) as LegalDocumentExtraction[]).map(normalizeLegalExtraction);
 }
 
 export async function getLegalIssueFlags(householdId: string): Promise<LegalIssueFlag[]> {

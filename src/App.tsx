@@ -14,6 +14,7 @@ import { CreditView } from './views/Credit';
 import { DocumentsView } from './views/Documents';
 import { ProfileView } from './views/Profile';
 import { signOut } from './lib/supabase';
+import { AppHeader } from './components/AppHeader';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { WhatsNew } from './components/WhatsNew';
 
@@ -129,7 +130,7 @@ function App() {
       case 'credit':
         return <CreditView />;
       case 'documents':
-        return <DocumentsView onNavigate={navigate} />;
+        return <DocumentsView onNavigate={navigate} focusId={focusId} />;
       case 'profile':
         return <ProfileView />;
       default:
@@ -154,11 +155,22 @@ function App() {
           key={activeView} is what makes it usable rather than a trap. An error
           boundary holds its error until something resets it, so without a key
           per view the first crash would follow you into every other section. */}
-      <main className="min-w-0 flex-1 overflow-x-hidden bg-cmd-charcoal/90 p-6">
-        <ErrorBoundary key={activeView} viewName={activeView} onReset={() => navigate('dashboard')}>
-          {renderView()}
-        </ErrorBoundary>
-      </main>
+      {/* The header sits in the content column rather than above the whole
+          layout, so the sidebar keeps its full height and the search lines up
+          with the section it searches. */}
+      <div className="flex min-w-0 flex-1 flex-col bg-cmd-charcoal/90">
+        <AppHeader
+          householdId={data?.household?.id ?? null}
+          documents={data?.documents ?? []}
+          onNavigate={navigate}
+          onUploaded={refresh}
+        />
+        <main className="min-w-0 flex-1 overflow-x-hidden p-6">
+          <ErrorBoundary key={activeView} viewName={activeView} onReset={() => navigate('dashboard')}>
+            {renderView()}
+          </ErrorBoundary>
+        </main>
+      </div>
     </div>
   );
 }

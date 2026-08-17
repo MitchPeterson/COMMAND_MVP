@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.34.0',
+    date: '2026-08-17',
+    title: 'Search and add a document from anywhere',
+    items: [
+      'A header above every section searches your pillars and document names, and jumps straight to what it finds',
+      'Add document is now reachable from any view — including the Document Vault, which had no uploader of its own',
+    ],
+  },
+  {
     version: '0.33.0',
     date: '2026-08-17',
     title: 'One section crashing no longer takes the app with it',

@@ -25,6 +25,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.43.1',
+    date: '2026-08-17',
+    title: 'Add a family member now does something',
+    items: [
+      'The Family section had no way to add anyone — the editor only existed on Profile — so its button pointed at nothing and answering "is this person in your household?" led nowhere',
+    ],
+  },
+  {
     version: '0.43.0',
     date: '2026-08-17',
     title: 'Take your data, or delete all of it',

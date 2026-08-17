@@ -1,4 +1,5 @@
 import { SectionIntro } from '../components/SectionIntro';
+import { PeopleEditor } from '../components/PeopleEditor';
 import { familiarityState, introFor } from '../lib/sectionIntros';
 import React from 'react';
 import { useHousehold } from '../useHousehold';
@@ -8,8 +9,8 @@ import { ProtectionGap } from '../components/ProtectionGap';
 import { ageOf } from '../lib/familyTimeline';
 import { Users, Gift, Heart } from 'lucide-react';
 
-export function FamilyView() {
-  const { data } = useHousehold();
+export function FamilyView({ focusId = null }: { focusId?: string | null } = {}) {
+  const { data, refresh } = useHousehold();
   const members = data?.familyMembers ?? [];
   const milestones = (data?.familyMilestones ?? []).slice().sort((a, b) => {
     if (!a.event_date) return 1;
@@ -23,8 +24,11 @@ export function FamilyView() {
 
   const familiarity = familiarityState((data?.familyMembers ?? []).length);
   // The uploader stays on the page; the intro's action takes you to it.
+  // Family is typed in, not uploaded, and had no target at all — the intro's
+  // button called getElementById on an id nothing rendered, so clicking it did
+  // nothing whatsoever.
   const goToUploader = () =>
-    document.getElementById('section-uploader')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('section-people')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   return (
     <div className="space-y-6">
       {/* The grade leads, as on every section. */}
@@ -42,6 +46,20 @@ export function FamilyView() {
           mortgage={data?.mortgage ?? null}
           legalDocuments={data?.legalDocuments ?? []}
         />
+      )}
+
+      {/* Adding a person lived only on Profile, so the section named after them
+          had no way to do it and the intro's button pointed at nothing. */}
+      {data?.household?.id && (
+        <div id="section-people">
+          <PeopleEditor
+            householdId={data.household.id}
+            members={data?.familyMembers ?? []}
+            profile={data?.profile ?? null}
+            prefillName={focusId}
+            onSaved={refresh}
+          />
+        </div>
       )}
 
       <ProtectionGap

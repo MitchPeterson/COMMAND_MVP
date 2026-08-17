@@ -21,8 +21,12 @@ import type { Asset, FamilyMember, InsurancePolicyExtraction } from './supabase'
 
 export interface FollowUp {
   id: string;
-  /** Carried to the section so the answer arrives already filled in. */
-  prefill?: { name: string; type: 'vehicle' | 'real_estate' };
+  /**
+   * Carried to the section so the answer arrives already filled in. The type is
+   * only meaningful where the destination has kinds to choose between; a person
+   * is just a name.
+   */
+  prefill?: { name: string; type?: 'vehicle' | 'real_estate' };
   /** Where the answer gets recorded. */
   section: string;
   /** The question, in the user's terms. */
@@ -89,6 +93,7 @@ export function followUpsFromInsurance(
       out.push({
         id,
         section: 'family',
+        prefill: { name: party.name },
         question: `Is ${party.name} part of your household?`,
         evidence: `${carrier} lists them as ${party.relationship || party.role.replace(/_/g, ' ')}, `
           + 'and Command has nobody by that name on file.',

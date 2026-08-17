@@ -1903,24 +1903,9 @@ export async function confirmInsuranceExtraction(extraction: InsurancePolicyExtr
     extraction.insurance_deductibles.find((d) => d.deductible_type === 'standard') ??
     extraction.insurance_deductibles.find((d) => d.amount !== null);
 
-  // Idempotency: the button was clickable while confirm was silently failing, so
-  // a second successful click must not create a duplicate policy.
-  const { data: existing } = await supabase
-    .from('insurance_policies')
-    .select('id')
-    .eq('source_extraction_id', extraction.id)
-    .maybeSingle();
-
-  if (existing) {
-    await supabase
-      .from('insurance_policy_extractions')
-      .update({ review_status: 'confirmed' })
-      .eq('id', extraction.id);
-    return true;
-  }
-
-  const { error: insertError } = await supabase.from('insurance_policies').insert([
-    {
+  // One definition for both paths. Written out twice, an insert and an update
+  // drift the moment a field is added to one of them.
+  const policyValues = {
       household_id: extraction.household_id,
       type: normalizePolicyType(extraction.insurance_type),
       carrier: extraction.carrier,
@@ -1933,8 +1918,49 @@ export async function confirmInsuranceExtraction(extraction: InsurancePolicyExtr
       notes: extraction.plain_language_summary,
       source_document_id: extraction.document_id,
       source_extraction_id: extraction.id,
-    },
-  ]);
+  };
+
+  // Idempotency across re-reads, not just across double-clicks.
+  //
+  // This used to match on source_extraction_id alone. Re-reading a document
+  // creates a new extraction row with a new id, so the guard could not match and
+  // confirming the newer reading inserted a second policy for the same document
+  // — which then double-counted in premium totals and the liability stack.
+  //
+  // The document is the thing that does not change, so it is the key. The
+  // extraction id is still checked first, for the case where a policy was
+  // confirmed from a reading whose document has since been deleted.
+  const byExtraction = await supabase
+    .from('insurance_policies')
+    .select('id')
+    .eq('source_extraction_id', extraction.id)
+    .maybeSingle();
+
+  const byDocument = byExtraction.data || !extraction.document_id
+    ? { data: null }
+    : await supabase
+      .from('insurance_policies')
+      .select('id')
+      .eq('source_document_id', extraction.document_id)
+      .maybeSingle();
+
+  const existing = byExtraction.data ?? byDocument.data;
+
+  if (existing) {
+    // A later reading of the same document supersedes the earlier one, so the
+    // policy is updated rather than left holding whatever the first pass said.
+    await supabase
+      .from('insurance_policies')
+      .update({ ...policyValues, source_extraction_id: extraction.id })
+      .eq('id', existing.id);
+    await supabase
+      .from('insurance_policy_extractions')
+      .update({ review_status: 'confirmed' })
+      .eq('id', extraction.id);
+    return true;
+  }
+
+  const { error: insertError } = await supabase.from('insurance_policies').insert([policyValues]);
 
   if (insertError) {
     console.error('Failed to create policy from extraction:', insertError);
@@ -3747,4 +3773,44 @@ export function summarizeUsage(rows: ApiUsageRow[]): UsageSummary {
     firstAt: dates[0] ?? null,
     lastAt: dates[dates.length - 1] ?? null,
   };
+}
+
+// ─────────────────────────────────────────────────────────────
+// Stalled readings
+// ─────────────────────────────────────────────────────────────
+// Supabase kills an edge function at roughly 150 seconds and the process simply
+// disappears: no handler runs, no failure is written, and a staging row set to
+// 'processing' before the passes started stays that way forever. Nothing swept
+// it, so the review screen showed a spinner for a reading that died minutes ago
+// and offered no way out.
+//
+// There is no updated_at on these tables, so staleness is judged from created_at.
+// That is right for the common case — a row is created and processed in one
+// request — and conservative for a re-read, which reuses the row and makes an
+// old row look older still rather than hiding a live one.
+
+/** Comfortably past the ~150s wall clock, so a slow-but-alive read is never called dead. */
+export const STALL_AFTER_MS = 6 * 60 * 1000;
+
+export interface StallableRow {
+  processing_state?: string | null;
+  created_at?: string | null;
+}
+
+/**
+ * True when a reading claims to be in flight but cannot be. Callers should treat
+ * it exactly as a failure — it is one, just an unreported one.
+ */
+export function isStalled(row: StallableRow, now = Date.now()): boolean {
+  const state = row.processing_state ?? '';
+  if (state !== 'processing' && state !== 'queued' && state !== 'uploaded') return false;
+  if (!row.created_at) return false;
+  const started = new Date(row.created_at).getTime();
+  if (!Number.isFinite(started)) return false;
+  return now - started > STALL_AFTER_MS;
+}
+
+/** What to show: the recorded state, or 'failed' once it cannot still be running. */
+export function effectiveProcessingState(row: StallableRow, now = Date.now()): string {
+  return isStalled(row, now) ? 'failed' : (row.processing_state ?? 'uploaded');
 }

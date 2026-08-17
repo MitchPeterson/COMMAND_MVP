@@ -71,6 +71,7 @@ export function FinancesView() {
       <MonthlySpending
         transactions={data?.creditTransactions ?? []}
         cards={data?.creditCards ?? []}
+        statements={data?.creditStatements ?? []}
         budget={data?.budgetSummary ?? null}
       />
 

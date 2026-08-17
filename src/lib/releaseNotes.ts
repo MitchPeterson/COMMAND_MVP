@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.35.1',
+    date: '2026-08-17',
+    title: 'Unconfirmed readings stop counting, and a dead one says so',
+    items: [
+      'A reading cut off by the server now shows as failed with a prompt to run it again, instead of sitting silently forever',
+      'Re-reading an insurance document and confirming it again updates the policy rather than adding a second copy',
+      'The Legal grade and the spending breakdown no longer count readings you have not confirmed',
+    ],
+  },
+  {
     version: '0.35.0',
     date: '2026-08-17',
     title: 'Usable on a phone',

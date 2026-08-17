@@ -7,12 +7,14 @@
 
 import React, { useMemo, useState } from 'react';
 import { PieChart, ChevronLeft, ChevronRight } from 'lucide-react';
-import type { BudgetSummary, CreditCard, CreditTransaction } from '../lib/supabase';
+import type { BudgetSummary, CreditCard, CreditStatement, CreditTransaction } from '../lib/supabase';
 import { monthlySpending, coverageAgainstBudget } from '../lib/spending';
 
 interface Props {
   transactions: CreditTransaction[];
   cards: CreditCard[];
+  /** Used to drop transactions from statements not yet accepted onto a card. */
+  statements?: CreditStatement[];
   budget?: BudgetSummary | null;
 }
 
@@ -26,8 +28,11 @@ const TONES = [
   'bg-cmd-gold/25', 'bg-white/20', 'bg-white/15', 'bg-white/10',
 ];
 
-export function MonthlySpending({ transactions, cards, budget }: Props) {
-  const coverage = useMemo(() => monthlySpending(transactions, cards), [transactions, cards]);
+export function MonthlySpending({ transactions, cards, statements = [], budget }: Props) {
+  const coverage = useMemo(
+    () => monthlySpending(transactions, cards, statements),
+    [transactions, cards, statements],
+  );
   const [index, setIndex] = useState(0);
   const month = coverage.months[index] ?? null;
   const against = coverageAgainstBudget(month, budget?.monthly_expenses);

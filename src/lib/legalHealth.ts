@@ -201,7 +201,7 @@ export function computeLegalHealth(
 
   // ── Business ───────────────────────────────────────────────────────────────
   if (businessAssets.length > 0) {
-    const hasBusinessDocs = live.some((e) => legalType(typeOf(e))?.category === 'business');
+    const hasBusinessDocs = confirmed.some((e) => legalType(typeOf(e))?.category === 'business');
     if (!hasBusinessDocs) {
       findings.push({
         severity: 'attention',
@@ -240,7 +240,10 @@ export function computeLegalHealth(
   }
 
   // ── Drafts ─────────────────────────────────────────────────────────────────
-  const drafts = live.filter((e) => e.document_status === 'draft');
+  // Confirmed only. A finding moves the grade, and a draft flag on a reading the
+  // user has not agreed to is Command's opinion, not a fact about the household.
+  // Unconfirmed readings are already acknowledged separately below.
+  const drafts = confirmed.filter((e) => e.document_status === 'draft');
   if (drafts.length > 0) {
     findings.push({
       severity: 'attention',

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useHousehold } from '../useHousehold';
 import {
   getDocumentUrl, invokeDocumentExtraction, deleteDocument, getDocumentImpact,
-  FORCEABLE_TYPES, type ForceableType,
+  isStalled, FORCEABLE_TYPES, type ForceableType, type StallableRow,
 } from '../lib/supabase';
 import { Folder, FileText, ExternalLink, RefreshCw, AlertCircle, CheckCircle2, Clock, Trash2, CornerDownRight, Shuffle } from 'lucide-react';
 import { usesOf } from '../lib/documentLinks';
@@ -153,6 +153,18 @@ export function DocumentsView({ onNavigate, focusId = null }: DocumentsViewProps
             // What this file is actually responsible for. Nothing is a real
             // answer: the file is here and no part of the app depends on it,
             // which is exactly the state a user cannot otherwise see.
+            // The document's own status and its staging row's processing_state are
+            // set independently and can disagree — a document can read 'processed'
+            // while the statement it produced is stuck mid-read. The staging row is
+            // the one that knows, so it wins where there is one.
+            const staging: StallableRow[] = [
+              ...(data?.creditStatements ?? []).filter((r) => r.document_id === doc.id),
+              ...(data?.mortgageStatements ?? []).filter((r) => r.document_id === doc.id),
+              ...(data?.legalExtractions ?? []).filter((r) => r.document_id === doc.id),
+              ...(data?.insuranceExtractions ?? []).filter((r) => r.document_id === doc.id),
+            ];
+            const stalled = staging.some((r) => isStalled(r));
+
             const uses = usesOf(doc.id, {
               legalDocuments: data?.legalDocuments, legalExtractions: data?.legalExtractions,
               insurancePolicies: data?.insurancePolicies, insuranceExtractions: data?.insuranceExtractions,
@@ -178,7 +190,7 @@ export function DocumentsView({ onNavigate, focusId = null }: DocumentsViewProps
                         {doc.category ?? 'General document'} · {doc.mime_type ?? 'Unknown format'}
                       </p>
                       <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <StatusBadge status={doc.status} />
+                        <StatusBadge status={stalled ? 'error' : doc.status} />
                         {extraction && (
                           <span className="inline-flex items-center gap-1.5 rounded-full border border-cmd-gold/25 bg-cmd-gold/10 px-3 py-1 text-xs text-cmd-gold">
                             {extraction.detected_type.replace(/_/g, ' ')} · {extraction.confidence} confidence
@@ -200,7 +212,13 @@ export function DocumentsView({ onNavigate, focusId = null }: DocumentsViewProps
                     the vault and a section's inventory, and it was invisible
                     from both sides. */}
                 <div className="mt-4 border-t border-cmd-border pt-4">
-                  {uses.length === 0 ? (
+                  {stalled ? (
+                    <p className="flex items-start gap-2 text-xs text-amber-200">
+                      <CornerDownRight className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      This reading never finished — it was cut off by the server rather than failing,
+                      so nothing was saved and nothing said so. Read it again.
+                    </p>
+                  ) : uses.length === 0 ? (
                     <p className="flex items-center gap-2 text-xs text-cmd-muted">
                       <CornerDownRight className="h-3.5 w-3.5 shrink-0" />
                       {doc.status === 'processed'

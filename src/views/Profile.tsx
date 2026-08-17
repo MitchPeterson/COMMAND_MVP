@@ -5,6 +5,7 @@ import { HouseholdHistory } from '../components/HouseholdHistory';
 import { PeopleEditor } from '../components/PeopleEditor';
 import { VersionHistory } from '../components/VersionHistory';
 import { ApiUsageReport } from '../components/ApiUsageReport';
+import { YourData } from '../components/YourData';
 import { UserCircle2, ArrowLeftRight, MapPin, Shield, Sparkles } from 'lucide-react';
 
 function formatCurrency(value: number | null | undefined) {
@@ -234,6 +235,8 @@ export function ProfileView() {
 
       {/* Collapsed by default and last on the page: a tool for whoever pays the
           bill, not part of what Command is for. */}
+      <YourData />
+
       <ApiUsageReport />
 
     </div>

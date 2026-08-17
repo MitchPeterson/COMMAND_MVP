@@ -25,6 +25,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.36.0',
+    date: '2026-08-17',
+    title: 'Command shows what it found, before you go looking',
+    items: [
+      'A new household is shown its strongest cross-pillar finding on the Dashboard as soon as the first document is read, rather than having to open a section to discover it',
+    ],
+  },
+  {
     version: '0.35.1',
     date: '2026-08-17',
     title: 'Unconfirmed readings stop counting, and a dead one says so',

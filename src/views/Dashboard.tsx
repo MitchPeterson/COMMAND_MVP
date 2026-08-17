@@ -10,6 +10,11 @@ import { computeHomeHealth } from '../lib/homeHealth';
 import { computeFamilyHealth } from '../lib/familyHealth';
 import { computeTaxHealth } from '../lib/taxHealth';
 import { computeFinancesHealth } from '../lib/financesHealth';
+import {
+  selectFirstInsight, insightSources, shouldShowFirstInsight,
+  isInsightDismissed, dismissInsight,
+} from '../lib/firstInsight';
+import { FirstInsight } from '../components/FirstInsight';
 import { buildPriorityActions, type RankedAction, type RankedSeverity } from '../lib/priorityActions';
 import {
   Shield,
@@ -181,6 +186,21 @@ export function DashboardView({ onNavigate }: DashboardProps) {
     [data?.financeAccounts, data?.loans, data?.creditCards, data?.mortgage,
       data?.assets, data?.budgetSummary, data?.profile, data?.creditTransactions],
   );
+
+  // Selected from findings the scorers above already produced — no second
+  // analysis, just the one worth leading with while a household is new.
+  const [insightDismissed, setInsightDismissed] = useState(false);
+  const firstInsight = useMemo(() => {
+    const documentCount = (data?.documents ?? []).length;
+    const confirmedRecords =
+      (data?.insurancePolicies ?? []).length + (data?.legalDocuments ?? []).length +
+      (data?.creditCards ?? []).length + (data?.financeAccounts ?? []).length;
+    if (!shouldShowFirstInsight(documentCount, confirmedRecords)) return null;
+    const pick = selectFirstInsight(insightSources({ coverage, finances, family, legal }));
+    if (!pick || isInsightDismissed(pick.title)) return null;
+    return pick;
+  }, [data?.documents, data?.insurancePolicies, data?.legalDocuments, data?.creditCards,
+    data?.financeAccounts, coverage, finances, family, legal]);
 
   // Any section with a live score overrides its stored row. The stored rows were
   // written once at onboarding and never recalculated, so without this an upload
@@ -389,6 +409,16 @@ export function DashboardView({ onNavigate }: DashboardProps) {
 
   return (
     <div className="space-y-6">
+      {/* Above the grid, full width, and the only loud thing on the page while it
+          is here. A callout competing with three other cards is not a callout. */}
+      {firstInsight && !insightDismissed && (
+        <FirstInsight
+          insight={firstInsight}
+          onOpen={(section) => onNavigate?.(section)}
+          onDismiss={() => { dismissInsight(firstInsight.title); setInsightDismissed(true); }}
+        />
+      )}
+
       {/* min-w-0 on both tracks: a grid child defaults to min-width:auto, so a
           single long document title stretched the left column past its fraction
           and pushed Priority Actions off the side of the page. */}

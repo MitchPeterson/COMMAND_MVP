@@ -14,6 +14,7 @@ import { CreditView } from './views/Credit';
 import { DocumentsView } from './views/Documents';
 import { ProfileView } from './views/Profile';
 import { signOut } from './lib/supabase';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { WhatsNew } from './components/WhatsNew';
 
 function App() {
@@ -147,7 +148,17 @@ function App() {
         userName={data?.profile?.primary_name ?? data?.profile?.primary_first_name ?? data?.household?.name ?? 'Your account'}
         userLocation={data?.profile ? `${data.profile.city}, ${data.profile.state}` : 'Household'}
       />
-      <main className="min-w-0 flex-1 overflow-x-hidden bg-cmd-charcoal/90 p-6">{renderView()}</main>
+      {/* Inside <main>, so a view that throws does not take the sidebar with it
+          and you can navigate out rather than reloading.
+
+          key={activeView} is what makes it usable rather than a trap. An error
+          boundary holds its error until something resets it, so without a key
+          per view the first crash would follow you into every other section. */}
+      <main className="min-w-0 flex-1 overflow-x-hidden bg-cmd-charcoal/90 p-6">
+        <ErrorBoundary key={activeView} viewName={activeView} onReset={() => navigate('dashboard')}>
+          {renderView()}
+        </ErrorBoundary>
+      </main>
     </div>
   );
 }

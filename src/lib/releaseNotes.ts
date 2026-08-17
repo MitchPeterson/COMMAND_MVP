@@ -25,6 +25,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.33.0',
+    date: '2026-08-17',
+    title: 'One section crashing no longer takes the app with it',
+    items: [
+      'A view that throws now shows a recoverable message with the error detail, and the sidebar keeps working so you can navigate out instead of reloading',
+    ],
+  },
+  {
     version: '0.32.1',
     date: '2026-08-17',
     title: 'The Legal section no longer blanks on a document with no observations',

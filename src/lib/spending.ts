@@ -11,7 +11,7 @@
 // cards on file explain a third of the monthly outgoings, saying so is more
 // useful than a confident pie chart of the third.
 
-import type { CreditCard, CreditTransaction } from './supabase';
+import type { CreditCard, CreditStatement, CreditTransaction } from './supabase';
 
 export interface CategorySpend {
   category: string;
@@ -98,8 +98,23 @@ const MONTH_LABEL = (month: string) => {
 export function monthlySpending(
   transactions: CreditTransaction[],
   cards: CreditCard[] = [],
+  statements: CreditStatement[] = [],
 ): SpendingCoverage {
-  const spending = transactions.filter((t) => t.transaction_date && !isCardPayment(t));
+  // Only statements the user has accepted onto a card count. rewardsStrategy has
+  // always filtered this way; this did not, so the same transactions counted as
+  // spending here and did not count as spending there — on the same screen.
+  //
+  // Passing no statements keeps every transaction, which is what the callers that
+  // have not been given them expect.
+  const accepted = statements.length > 0
+    ? new Set(statements
+      .filter((st) => st.review_status === 'confirmed' || st.review_status === 'partially_confirmed')
+      .map((st) => st.id))
+    : null;
+
+  const spending = transactions.filter(
+    (t) => t.transaction_date && !isCardPayment(t) && (!accepted || accepted.has(t.statement_id)),
+  );
 
   const byMonth = new Map<string, CreditTransaction[]>();
   for (const t of spending) {

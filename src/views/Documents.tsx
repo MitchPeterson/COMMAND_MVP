@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useHousehold } from '../useHousehold';
 import {
   getDocumentUrl, invokeDocumentExtraction, deleteDocument, getDocumentImpact,
@@ -41,9 +41,11 @@ function StatusBadge({ status }: { status: string | null | undefined }) {
 
 interface DocumentsViewProps {
   onNavigate?: (view: string) => void;
+  /** A document to scroll to and mark, when arrived at from search. */
+  focusId?: string | null;
 }
 
-export function DocumentsView({ onNavigate }: DocumentsViewProps = {}) {
+export function DocumentsView({ onNavigate, focusId = null }: DocumentsViewProps = {}) {
   const { data, refresh } = useHousehold();
   const documents = data?.documents ?? [];
   const extractions = data?.documentExtractions ?? [];
@@ -58,6 +60,19 @@ export function DocumentsView({ onNavigate }: DocumentsViewProps = {}) {
   const [retypingId, setRetypingId] = useState<string | null>(null);
   const [impact, setImpact] = useState<{ policies: number; accounts: number; cards: number; taxDocs: number } | null>(null);
   const [removeImported, setRemoveImported] = useState(true);
+
+  // Landing on the vault from a search should land on the file, not the top of a
+  // list of forty. The ring fades on its own so it does not become permanent.
+  const [highlighted, setHighlighted] = useState<string | null>(focusId);
+  useEffect(() => {
+    if (!focusId) return;
+    setHighlighted(focusId);
+    const scroll = window.setTimeout(() => {
+      document.getElementById(`doc-${focusId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
+    const fade = window.setTimeout(() => setHighlighted(null), 2600);
+    return () => { window.clearTimeout(scroll); window.clearTimeout(fade); };
+  }, [focusId]);
 
   const openDocument = async (filePath: string | null, id: string) => {
     if (!filePath) return;
@@ -147,7 +162,13 @@ export function DocumentsView({ onNavigate }: DocumentsViewProps = {}) {
             });
 
             return (
-              <div key={doc.id} className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-5">
+              <div
+                key={doc.id}
+                id={`doc-${doc.id}`}
+                className={`rounded-3xl border bg-cmd-black/40 p-5 transition ${
+                  highlighted === doc.id ? 'border-cmd-gold ring-1 ring-cmd-gold/40' : 'border-cmd-border'
+                }`}
+              >
                 <div className="sm:flex sm:items-start sm:justify-between">
                   <div className="flex items-start gap-3">
                     <FileText className="mt-0.5 h-5 w-5 shrink-0 text-cmd-gold" />

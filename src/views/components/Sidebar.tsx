@@ -12,7 +12,10 @@ import {
 } from 'lucide-react';
 import { HubMark } from './HubMark';
 
-const navItems = [
+// Exported so the header's search matches the same sections the sidebar shows.
+// Two lists would drift, and a search that cannot find a section the nav has is
+// worse than no search.
+export const navItems = [
   { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
   { id: 'insurance', label: 'Insurance', Icon: Shield },
   { id: 'legal', label: 'Legal', Icon: FileText },

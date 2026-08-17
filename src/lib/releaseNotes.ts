@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.43.0',
+    date: '2026-08-17',
+    title: 'Take your data, or delete all of it',
+    items: [
+      'Download everything Command holds as one file, or remove all of it permanently — including the uploaded documents themselves',
+      'Profile now states plainly how your documents are read and what is stripped before anything is stored',
+    ],
+  },
+  {
     version: '0.42.1',
     date: '2026-08-17',
     title: 'Identifiers cannot be stored, at three levels',

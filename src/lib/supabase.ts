@@ -3963,3 +3963,81 @@ export async function deleteFinanceAccount(id: string): Promise<boolean> {
   if (error) throw new Error(`Could not remove that: ${error.message}`);
   return true;
 }
+
+// ─────────────────────────────────────────────────────────────
+// Taking your data, and leaving
+// ─────────────────────────────────────────────────────────────
+// A household hands Command its insurance, its will, its tax return and its
+// balances. "I can take all of it and go" is the least a product holding that
+// should offer, and neither half existed.
+
+/** Every table a household owns, leaf-first so deletion respects its own keys. */
+const HOUSEHOLD_TABLES = [
+  'tax_return_fields', 'tax_returns', 'deduction_log', 'tax_documents', 'tax_recommendations',
+  'credit_transactions', 'credit_apr_terms', 'credit_statement_fields', 'credit_statements',
+  'card_offer_candidates', 'card_offer_research', 'credit_cards',
+  'insurance_coverages', 'insurance_deductibles', 'insurance_exclusions', 'insurance_endorsements',
+  'insurance_insured_parties', 'insurance_insured_assets', 'insurance_beneficiaries',
+  'insurance_underlying_requirements', 'insurance_policy_extractions', 'insurance_policies',
+  'legal_issue_flags', 'legal_document_extractions', 'legal_documents',
+  'home_system_documents', 'appliance_extractions', 'home_systems',
+  'mortgage_statement_fields', 'mortgage_statements', 'mortgage_accounts',
+  'family_milestones', 'family_members', 'maintenance_records', 'assets', 'loans',
+  'finance_accounts', 'budget_summary', 'priority_actions', 'timeline_events', 'section_scores',
+  'document_extractions', 'documents', 'household_profile',
+  'extraction_response_cache', 'api_usage_log', 'record_history',
+];
+
+/**
+ * Everything Command holds about a household, as one JSON file.
+ *
+ * Read through the user's own session, so it can only ever return what that user
+ * is entitled to see — the export is bounded by the same RLS as the app.
+ */
+export async function exportHouseholdData(): Promise<Record<string, unknown>> {
+  const out: Record<string, unknown> = {
+    exported_at: new Date().toISOString(),
+    note: 'Everything Command holds for this household. Uploaded files are listed by name and '
+      + 'path; download them from the Document Vault, which is the only place they exist.',
+  };
+  for (const table of ['households', ...HOUSEHOLD_TABLES]) {
+    const { data, error } = await supabase.from(table).select('*');
+    // A table that does not exist in this project should not sink the export.
+    if (error) continue;
+    if (data && data.length > 0) out[table] = data;
+  }
+  return out;
+}
+
+export interface DeletionResult {
+  tablesCleared: number;
+  filesRemoved: number;
+}
+
+/**
+ * Removes everything, permanently.
+ *
+ * Storage first, because a file whose row is gone is unreachable and therefore
+ * unfindable — the opposite order leaves orphans nobody can see to clean up.
+ * Then the rows, leaf-first. The auth user itself cannot be deleted from the
+ * client without a service role, so the caller is told to expect that.
+ */
+export async function deleteAllHouseholdData(): Promise<DeletionResult> {
+  let filesRemoved = 0;
+  const { data: documents } = await supabase.from('documents').select('file_path');
+  const paths = (documents ?? []).map((d) => d.file_path).filter((p): p is string => Boolean(p));
+  if (paths.length > 0) {
+    const { error } = await supabase.storage.from(storageBucket).remove(paths);
+    if (error) throw new Error(`Could not remove your files, so nothing was deleted: ${error.message}`);
+    filesRemoved = paths.length;
+  }
+
+  let tablesCleared = 0;
+  for (const table of HOUSEHOLD_TABLES) {
+    const { error } = await supabase.from(table).delete().not('id', 'is', null);
+    if (!error) tablesCleared += 1;
+  }
+  // Last, because everything above cascades from it.
+  await supabase.from('households').delete().not('id', 'is', null);
+  return { tablesCleared, filesRemoved };
+}

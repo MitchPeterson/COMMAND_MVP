@@ -30,15 +30,18 @@ export function FamilyView({ focusId = null }: { focusId?: string | null } = {})
   const [answer, setAnswer] = useState<'deciding' | 'adding' | 'settled'>('deciding');
   useEffect(() => { setAnswer('deciding'); }, [focusId]);
 
-  const askedParty = useMemo(() => {
-    if (!focusId) return null;
+  // Every row naming this person across every policy — one named insured has a
+  // row under each, and answering about one of them has to answer for all.
+  const askedParties = useMemo(() => {
+    if (!focusId) return [];
     const key = nameWords(focusId).sort().join(' ');
+    const found = [];
     for (const extraction of data?.insuranceExtractions ?? []) {
       for (const party of extraction.insurance_insured_parties ?? []) {
-        if (party.name && nameWords(party.name).sort().join(' ') === key) return party;
+        if (party.name && nameWords(party.name).sort().join(' ') === key) found.push(party);
       }
     }
-    return null;
+    return found;
   }, [focusId, data?.insuranceExtractions]);
 
   // Derived from the data, never from the local flag above.
@@ -47,9 +50,9 @@ export function FamilyView({ focusId = null }: { focusId?: string | null } = {})
   // the spinner, and this view is unmounted and remounted — which reset the flag
   // to 'deciding' and asked the question again the instant it was answered. The
   // record itself is the only thing that survives that.
-  const matchedTo = askedParty?.matched_family_member_id
-    ? members.find((m) => m.id === askedParty.matched_family_member_id) ?? null
-    : null;
+  const matchedTo = members.find(
+    (m) => askedParties.some((p) => p.matched_family_member_id === m.id),
+  ) ?? null;
 
   const familiarity = familiarityState((data?.familyMembers ?? []).length);
   // The uploader stays on the page; the intro's action takes you to it.
@@ -92,10 +95,10 @@ export function FamilyView({ focusId = null }: { focusId?: string | null } = {})
       {/* The name a document raised, before anything is created from it.
           Matching needs the extracted row to record against; without one there
           is nothing to retire, so adding is the only thing on offer. */}
-      {focusId && !matchedTo && askedParty && answer === 'deciding' && (
+      {focusId && !matchedTo && askedParties.length > 0 && answer === 'deciding' && (
         <MatchPerson
           documentName={focusId}
-          partyId={askedParty?.id ?? null}
+          partyIds={askedParties.map((p) => p.id)}
           members={members}
           onAddNew={() => setAnswer('adding')}
           onDone={async () => { setAnswer('settled'); await refresh(); }}
@@ -112,7 +115,9 @@ export function FamilyView({ focusId = null }: { focusId?: string | null } = {})
             members={data?.familyMembers ?? []}
             profile={data?.profile ?? null}
             prefillName={
-              focusId && !matchedTo && (answer === 'adding' || !askedParty) ? focusId : null
+              focusId && !matchedTo && (answer === 'adding' || askedParties.length === 0)
+                ? focusId
+                : null
             }
             onSaved={refresh}
           />

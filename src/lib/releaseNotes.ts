@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.44.3',
+    date: '2026-08-17',
+    title: 'Stop asking questions you already answered',
+    items: [
+      'Confirming a person on one policy now settles them on every policy that names them',
+      'One home covered by two policies is asked about once, not once per spelling of the address',
+    ],
+  },
+  {
     version: '0.44.2',
     date: '2026-08-17',
     title: 'Fix matching a person to an existing family member',

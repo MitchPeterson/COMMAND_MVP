@@ -742,9 +742,14 @@ export async function resolveLegalPartyMatch(
  * find its own names rewritten by its paperwork.
  */
 export async function resolveInsuredPartyMatch(
-  partyId: string,
+  partyIds: string | string[],
   familyMemberId: string | null,
 ): Promise<boolean> {
+  // Every row naming this person, not only the one the user clicked. A named
+  // insured appears once per policy, and settling a single row left the others
+  // asking the same question forever.
+  const ids = (Array.isArray(partyIds) ? partyIds : [partyIds]).filter(Boolean);
+  if (ids.length === 0) return false;
   const { error } = await supabase
     .from('insurance_insured_parties')
     .update({
@@ -752,7 +757,7 @@ export async function resolveInsuredPartyMatch(
       // Confirmed by a person, not inferred. Recorded as such.
       match_confidence: familyMemberId ? 1 : null,
     })
-    .eq('id', partyId);
+    .in('id', ids);
   if (error) {
     console.error('Failed to link the insured party:', error);
     throw new Error(`Could not save that match: ${error.message}`);

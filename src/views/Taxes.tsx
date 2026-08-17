@@ -92,7 +92,7 @@ export function TaxesView() {
                     <h3 className="mt-2 text-xl font-semibold text-cmd-offwhite">{item.title}</h3>
                     <p className="mt-2 text-sm leading-6 text-cmd-muted">{item.description ?? 'No description provided.'}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-left sm:text-right">
                     <p className="text-2xl font-semibold text-cmd-offwhite">
                       {item.potential_savings != null ? `$${item.potential_savings.toLocaleString()}` : '--'}
                     </p>
@@ -136,7 +136,7 @@ export function TaxesView() {
                     </div>
                   </div>
                 </div>
-                <div className="mt-4 text-right sm:mt-0">
+                <div className="mt-4 text-left sm:mt-0 sm:text-right">
                   <p className="text-sm text-cmd-muted">Status</p>
                   <p className="mt-1 font-semibold text-cmd-offwhite">{doc.status}</p>
                 </div>

@@ -100,7 +100,7 @@ export function FamilyView() {
                     <p className="mt-2 text-sm text-cmd-muted">{event.triggers_review?.join(', ') || 'No review triggers set'}</p>
                   </div>
                 </div>
-                <div className="mt-4 text-right sm:mt-0">
+                <div className="mt-4 text-left sm:mt-0 sm:text-right">
                   <p className="text-sm text-cmd-muted">Date</p>
                   <p className="mt-1 font-semibold text-cmd-offwhite">{event.event_date ?? 'TBD'}</p>
                 </div>

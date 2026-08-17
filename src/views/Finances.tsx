@@ -110,7 +110,7 @@ export function FinancesView() {
                       />
                     </div>
                   </div>
-                  <div className="mt-4 text-right sm:mt-0">
+                  <div className="mt-4 text-left sm:mt-0 sm:text-right">
                     <p className="text-2xl font-semibold text-cmd-offwhite">{money(account.balance)}</p>
                     <p className="mt-1 text-sm text-cmd-muted">
                       As of {account.as_of_date ?? 'a date not recorded'}

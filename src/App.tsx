@@ -32,6 +32,9 @@ function App() {
   // Set only when the user explicitly chooses to start onboarding. Everything
   // else about which screen shows is derived from data, never from an effect.
   const [proceedToOnboarding, setProceedToOnboarding] = useState(false);
+  // Drawer state for the nav below lg. Above it the rail is always visible and
+  // this is ignored.
+  const [navOpen, setNavOpen] = useState(false);
 
   const handleOnboardingComplete = useCallback(async () => {
     await refresh();
@@ -144,6 +147,8 @@ function App() {
           a household — a changelog is meaningless before there is an app to use. */}
       <WhatsNew />
       <Sidebar
+        open={navOpen}
+        onClose={() => setNavOpen(false)}
         activeView={activeView}
         onNavigate={setActiveView}
         userName={data?.profile?.primary_name ?? data?.profile?.primary_first_name ?? data?.household?.name ?? 'Your account'}
@@ -160,12 +165,13 @@ function App() {
           with the section it searches. */}
       <div className="flex min-w-0 flex-1 flex-col bg-cmd-charcoal/90">
         <AppHeader
+          onOpenNav={() => setNavOpen(true)}
           householdId={data?.household?.id ?? null}
           documents={data?.documents ?? []}
           onNavigate={navigate}
           onUploaded={refresh}
         />
-        <main className="min-w-0 flex-1 overflow-x-hidden p-6">
+        <main className="min-w-0 flex-1 overflow-x-hidden p-4 sm:p-6">
           <ErrorBoundary key={activeView} viewName={activeView} onReset={() => navigate('dashboard')}>
             {renderView()}
           </ErrorBoundary>

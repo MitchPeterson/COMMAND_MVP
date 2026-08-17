@@ -62,7 +62,7 @@ export function HomeHealth({ systems, profile, mortgagePrincipal }: Props) {
             </p>
           </div>
         </div>
-        <div className="shrink-0 text-right">
+        <div className="shrink-0 text-left sm:text-right">
           <p className="text-sm text-cmd-muted">Likely replacement spend</p>
           <p className="text-3xl font-semibold text-cmd-offwhite">{money(fiveYearExposure)}</p>
           <p className="mt-1 text-xs text-cmd-muted">over the next five years, at typical prices</p>

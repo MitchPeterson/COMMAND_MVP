@@ -189,7 +189,7 @@ export function DocumentsView({ onNavigate, focusId = null }: DocumentsViewProps
                     </div>
                   </div>
 
-                  <div className="mt-4 shrink-0 text-right sm:mt-0">
+                  <div className="mt-4 shrink-0 text-left sm:mt-0 sm:text-right">
                     <p className="text-sm text-cmd-muted">Uploaded</p>
                     <p className="mt-1 font-semibold text-cmd-offwhite">{formatDate(doc.uploaded_at)}</p>
                   </div>

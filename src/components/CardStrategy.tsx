@@ -280,7 +280,7 @@ export function CardStrategy({
                     </p>
                   </div>
                   {offer.estimated_annual_value != null && (
-                    <div className="shrink-0 text-right">
+                    <div className="shrink-0 text-left sm:text-right">
                       <p className="text-lg font-semibold text-emerald-300">
                         {offer.estimated_annual_value >= 0 ? '+' : ''}{money(offer.estimated_annual_value)}/yr
                       </p>

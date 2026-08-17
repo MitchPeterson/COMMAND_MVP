@@ -88,7 +88,7 @@ export function FinancesHealth(props: Props) {
           </div>
         </div>
 
-        <div className="shrink-0 space-y-3 text-right">
+        <div className="shrink-0 space-y-3 text-left sm:text-right">
           <div>
             <p className="text-sm text-cmd-muted">Cash covers</p>
             <p className="text-2xl font-semibold text-cmd-offwhite">

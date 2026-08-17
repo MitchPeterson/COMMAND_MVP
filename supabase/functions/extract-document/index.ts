@@ -722,6 +722,7 @@ const PROVISION_GUIDES: Record<string, string> = {
 };
 
 const LEGAL_EXTRACTION_RULES = `
+0. Never output a Social Security number, taxpayer ID, driver's licence number, or bank or card account number — not as a value and not inside evidence. A will or a trust can carry all of them. Truncate the excerpt rather than quoting a line that contains one.
 Ground rules, in priority order:
 
 1. Never infer that a signature, notarization, witness, attachment or clause exists.
@@ -1081,6 +1082,7 @@ const APPLIANCE_SCHEMA = {
 };
 
 const APPLIANCE_RULES = `
+0. Never output a Social Security number, taxpayer ID, driver's licence number, or bank or card account number — not as a value and not inside evidence. Truncate the excerpt rather than quoting a line that contains one.
 Ground rules, in priority order:
 
 1. suggested_category is one of these codes, whichever fits: ${HOME_CATEGORY_CODES}.
@@ -1125,6 +1127,7 @@ const GENERIC_SCHEMA = {
 };
 
 const EXTRACTION_RULES = `
+0. Never output a Social Security number, taxpayer ID, driver's licence number, or bank or card account number — not as a value and not inside evidence. Truncate the excerpt rather than quoting a line that contains one.
 Ground rules, in priority order:
 
 1. Never invent a policy term. If something is not in the provided pages, omit it
@@ -1371,7 +1374,7 @@ async function persistLegalExtraction(
       raw_value: text(field.raw_value),
       source_page: num(field.source_page),
       source_section: text(field.source_section),
-      evidence: text(field.evidence),
+      evidence: scrubIdentifiers(text(field.evidence)),
       confidence: clamp01(field.confidence),
       value_type: VALUE_TYPES.includes(field.value_type) ? field.value_type : 'explicit',
       is_sensitive: field.is_sensitive === true || SENSITIVE_FIELDS.has(code),
@@ -1419,7 +1422,7 @@ async function persistLegalExtraction(
             ? 'A household member has a similar name. Confirm whether this is the same person.'
             : null,
           source_page: num(entry.source_page),
-          evidence: text(entry.evidence),
+          evidence: scrubIdentifiers(text(entry.evidence)),
           confidence: clamp01(entry.confidence),
           value_type: VALUE_TYPES.includes(entry.value_type) ? entry.value_type : 'explicit',
         }])
@@ -1446,7 +1449,7 @@ async function persistLegalExtraction(
         ? entry.acts_jointly
         : 'not_stated',
       source_page: num(entry.source_page),
-      evidence: text(entry.evidence),
+      evidence: scrubIdentifiers(text(entry.evidence)),
       confidence: clamp01(entry.confidence),
     }]);
     if (roleError) console.error('Failed to write legal role:', roleError.message);
@@ -1476,7 +1479,7 @@ async function persistLegalExtraction(
       is_present: provision.presence === 'present' ? true : provision.presence === 'not_present' ? false : null,
       source_page: num(provision.source_page),
       source_section: text(provision.source_section),
-      evidence: text(provision.evidence),
+      evidence: scrubIdentifiers(text(provision.evidence)),
       confidence: clamp01(provision.confidence),
       value_type: VALUE_TYPES.includes(provision.value_type) ? provision.value_type : 'explicit',
     });
@@ -1552,14 +1555,42 @@ function lastFourOnly(value: unknown): string | null {
   return digits.slice(-4);
 }
 
-/** Redacts any run of 12+ digits, so an evidence excerpt cannot carry a PAN. */
-function scrubCardNumbers(text: string | null): string | null {
+/**
+ * Redacts government and account identifiers from any text taken verbatim out of
+ * a document.
+ *
+ * This began as a card-number scrubber matching runs of 12 to 19 digits, which
+ * meant a Social Security number — nine — went straight through. So did an EIN,
+ * a bank account number and a driver's licence. Every one of those appears on
+ * documents this function reads: a 1040 carries two SSNs on the first page, an
+ * auto policy carries licence numbers for every driver.
+ *
+ * Quoted evidence is where the risk sits. Promoted fields are either truncated
+ * on purpose (last four) or are figures nobody minds; evidence is a verbatim
+ * excerpt chosen by a model, and the only previous protection was a sentence in
+ * a prompt asking it not to.
+ *
+ * Deliberately blunt. A masked policy number in one excerpt costs nothing — the
+ * policy number has its own field, untouched — and an unmasked SSN costs a great
+ * deal.
+ */
+function scrubIdentifiers(text: string | null): string | null {
   if (!text) return text;
-  return text.replace(/\b(?:\d[ -]?){12,19}\b/g, (match) => {
-    const digits = match.replace(/\D/g, '');
-    return `•••• ${digits.slice(-4)}`;
-  });
+  return text
+    // SSN and ITIN, dashed or spaced: 123-45-6789.
+    .replace(/\b\d{3}[-\s]\d{2}[-\s]\d{4}\b/g, '•••-••-••••')
+    // EIN: 12-3456789.
+    .replace(/\b\d{2}-\d{7}\b/g, '••-•••••••')
+    // Card and long account numbers, keeping the last four.
+    .replace(/\b(?:\d[ -]?){12,19}\b/g, (match) => `•••• ${match.replace(/\D/g, '').slice(-4)}`)
+    // Bare runs of 9 to 11 digits: undashed SSNs, bank accounts, phone numbers.
+    .replace(/\b\d{9,11}\b/g, (match) => `•••• ${match.slice(-4)}`)
+    // Driver's licence: one letter followed by 7 to 13 digits, the common US shape.
+    .replace(/\b[A-Za-z]\d{7,13}\b/g, '••••••••');
 }
+
+/** Kept as the old name so every existing call site is covered by the wider rule. */
+const scrubCardNumbers = scrubIdentifiers;
 
 /** Stable identity for one line on one statement. */
 async function transactionFingerprint(
@@ -2077,7 +2108,7 @@ async function callClaude(
 function provenance(row: any) {
   return {
     source_page: Number.isFinite(row?.source_page) && row.source_page > 0 ? row.source_page : null,
-    evidence: text(row?.evidence),
+    evidence: scrubIdentifiers(text(row?.evidence)),
     confidence: typeof row?.confidence === 'number' ? row.confidence : null,
     value_type: VALUE_TYPES.includes(row?.value_type) ? row.value_type : 'explicit',
   };

@@ -61,7 +61,7 @@ export function SectionIntro({ intro, onAction, icon }: Props) {
         </button>
 
         {/* What to reach for, and what else counts. Named in plain words rather
-            than form numbers, because "a declarations page" is findable and
+            than industry terms, because "any insurance policy" is findable and
             "Form ACORD 25" is not. */}
         <div className="mt-9 w-full rounded-2xl border border-cmd-border bg-cmd-black/40 p-5 text-left">
           <p className="text-xs uppercase tracking-[0.2em] text-cmd-muted">Start with</p>

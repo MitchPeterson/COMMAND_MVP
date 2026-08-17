@@ -25,6 +25,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.41.1',
+    date: '2026-08-17',
+    title: 'The industry\'s word for it, gone from the app',
+    items: [
+      'Every place Command asked for a "declarations page" now asks for an insurance policy — the section intro was only one of seven, and the rest were in the Insurance page and the coverage findings',
+    ],
+  },
+  {
     version: '0.41.0',
     date: '2026-08-17',
     title: 'Your documents raise the next questions',

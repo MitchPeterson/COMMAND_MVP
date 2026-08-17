@@ -48,7 +48,7 @@ export const SECTION_INTROS: Record<string, SectionIntroCopy> = {
     title: 'Start with your insurance policies',
     purpose: "Whether the cover you pay for actually fits what you own.",
     feeds: ["Finances", "Family", "Home"],
-    primary: { label: "Any insurance policy", why: 'The summary page at the front is the useful part — your insurer may call it a declarations page. It carries the limits, the deductible and the renewal date. The whole policy is fine too.' },
+    primary: { label: "Any insurance policy", why: 'The summary page at the front is the most useful part — it carries the limits, the deductible and the renewal date. The whole policy works just as well.' },
     also: ["Home, auto and umbrella policies", "Life insurance policies", "A renewal notice", "A certificate of insurance"],
     order: 2,
     body:

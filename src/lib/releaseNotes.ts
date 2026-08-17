@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.42.0',
+    date: '2026-08-17',
+    title: 'You can now type in what you own',
+    items: [
+      'A vehicle owned outright, or a balance you already know, can be added by hand — Finances promised that and only offered a file uploader',
+      'Answering "do you still own the 2022 Volvo XC90?" opens a form with the vehicle already in it',
+    ],
+  },
+  {
     version: '0.41.1',
     date: '2026-08-17',
     title: 'The industry\'s word for it, gone from the app',

@@ -13,7 +13,7 @@ import type { FollowUp } from '../lib/followUps';
 
 interface Props {
   followUps: FollowUp[];
-  onOpen: (section: string) => void;
+  onOpen: (section: string, prefill?: string) => void;
 }
 
 export function FollowUps({ followUps, onOpen }: Props) {
@@ -40,7 +40,7 @@ export function FollowUps({ followUps, onOpen }: Props) {
           <button
             key={item.id}
             type="button"
-            onClick={() => onOpen(item.section)}
+            onClick={() => onOpen(item.section, item.prefill?.name)}
             className="flex w-full items-start gap-4 rounded-2xl border border-cmd-border bg-cmd-black/40 p-4 text-left transition hover:border-cmd-gold/40"
           >
             <div className="min-w-0 flex-1">

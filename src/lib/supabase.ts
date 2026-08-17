@@ -2178,7 +2178,7 @@ export async function deleteInsurancePolicy(policyId: string): Promise<boolean> 
 export const FORCEABLE_TYPES = [
   { code: 'credit_card_statement', label: 'Credit card statement' },
   { code: 'mortgage_statement', label: 'Mortgage statement' },
-  { code: 'insurance_dec_page', label: 'Insurance policy or declarations page' },
+  { code: 'insurance_dec_page', label: 'Insurance policy' },
   { code: 'legal_document', label: 'Legal document' },
   { code: 'tax_return', label: 'Tax return' },
   { code: 'bank_statement', label: 'Bank statement' },

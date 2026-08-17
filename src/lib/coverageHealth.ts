@@ -209,7 +209,7 @@ export function computeCoverageHealth(
       findings.push({
         severity: 'critical',
         title: `${policy.carrier ?? 'A policy'} shows a renewal date in the past`,
-        detail: `Renewal was ${policy.renewal_date}. Either it has lapsed or a newer declarations page has not been uploaded.`,
+        detail: `Renewal was ${policy.renewal_date}. Either it has lapsed or a newer policy has not been uploaded.`,
       });
     } else if (days <= 45) {
       findings.push({
@@ -248,7 +248,7 @@ export function computeCoverageHealth(
   if (decOnly.length > 0) {
     dataFindings.push({
       severity: 'info',
-      title: `${decOnly.length} polic${decOnly.length === 1 ? 'y is' : 'ies are'} declarations pages only`,
+      title: `${decOnly.length} polic${decOnly.length === 1 ? 'y has' : 'ies have'} only the summary page on file`,
       detail: 'Limits are high confidence, but exclusions, sublimits and endorsements were not in the documents provided.',
     });
   }
@@ -275,7 +275,7 @@ export function computeCoverageHealth(
     dataFindings.push({
       severity: 'info',
       title: `${withoutDocs} polic${withoutDocs === 1 ? 'y has' : 'ies have'} no extracted document`,
-      detail: 'Coverage-level checks cannot run on policies entered without a declarations page.',
+      detail: 'Coverage-level checks cannot run on a policy entered by hand with no document behind it.',
     });
   }
 

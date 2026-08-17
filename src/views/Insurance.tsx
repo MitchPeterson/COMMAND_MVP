@@ -268,7 +268,7 @@ function PolicyDetail({ extraction }: { extraction: InsurancePolicyExtraction })
         <div className="flex gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
           <FileWarning className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
           <p className="text-sm text-amber-100/80">
-            Based on a declarations page only — exclusions and endorsements were not available in
+            Based on the summary page only — exclusions and endorsements were not available in
             the documents provided.
           </p>
         </div>
@@ -422,7 +422,7 @@ export function InsuranceView() {
 
         {policies.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-cmd-border bg-cmd-black/50 p-8 text-center text-cmd-muted">
-            No insurance policies yet. Upload a declarations page below to get started.
+            No insurance policies yet. Upload a policy below to get started.
           </div>
         ) : (
           policies.map((policy) => {
@@ -593,7 +593,7 @@ export function InsuranceView() {
       <section id="section-uploader" className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
         <UploadDropzone
           contextLabel="Add coverage"
-          buttonLabel="Upload a policy or declarations page"
+          buttonLabel="Upload an insurance policy"
           onUpload={async (file) => {
             if (!data?.household?.id) return;
             const document = await uploadDocumentAsset(data.household.id, file, 'insurance');

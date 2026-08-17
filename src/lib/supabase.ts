@@ -3888,3 +3888,78 @@ export function isStalled(row: StallableRow, now = Date.now()): boolean {
 export function effectiveProcessingState(row: StallableRow, now = Date.now()): string {
   return isStalled(row, now) ? 'failed' : (row.processing_state ?? 'uploaded');
 }
+
+// ─────────────────────────────────────────────────────────────
+// Adding what you own, by hand
+// ─────────────────────────────────────────────────────────────
+// Both of these were readable and not writable. Finances told a user to type in
+// their accounts and offered them a file uploader, and a follow-up asking "do
+// you still own the 2022 Volvo XC90?" led to a page with nowhere to say yes.
+
+export type AssetInput = FromForm<Omit<Asset, 'id' | 'household_id' | 'created_at' | 'updated_at'>>;
+
+export async function addAsset(householdId: string, input: AssetInput): Promise<Asset> {
+  if (!input.name) throw new Error('Give it a name.');
+  const money = (value: unknown) => {
+    if (value === '' || value === null || value === undefined) return null;
+    const parsed = Number(String(value).replace(/[^0-9.\-]/g, ''));
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  const { data, error } = await supabase
+    .from('assets')
+    .insert([{
+      household_id: householdId,
+      name: String(input.name).trim(),
+      type: input.type ?? 'other',
+      current_value: money(input.current_value),
+      purchase_price: money(input.purchase_price),
+      purchase_date: input.purchase_date || null,
+      notes: (String(input.notes ?? '').trim() || null),
+    }])
+    .select('*').single();
+  if (error || !data) {
+    console.error('Failed to add the asset:', error);
+    throw new Error(`Could not save that: ${error?.message ?? 'no row returned'}`);
+  }
+  return data as Asset;
+}
+
+export async function deleteAsset(id: string): Promise<boolean> {
+  const { error } = await supabase.from('assets').delete().eq('id', id);
+  if (error) throw new Error(`Could not remove that: ${error.message}`);
+  return true;
+}
+
+export type FinanceAccountInput = FromForm<Omit<FinanceAccount, 'id' | 'household_id' | 'created_at'>>;
+
+export async function addFinanceAccount(
+  householdId: string,
+  input: FinanceAccountInput,
+): Promise<FinanceAccount> {
+  if (!input.account_name) throw new Error('Give the account a name.');
+  const balance = input.balance === '' || input.balance == null
+    ? null
+    : Number(String(input.balance).replace(/[^0-9.\-]/g, ''));
+  const { data, error } = await supabase
+    .from('finance_accounts')
+    .insert([{
+      household_id: householdId,
+      account_name: String(input.account_name).trim(),
+      account_type: input.account_type ?? 'checking',
+      institution: (String(input.institution ?? '').trim() || null),
+      balance: Number.isFinite(balance as number) ? balance : null,
+      as_of_date: input.as_of_date || new Date().toISOString().slice(0, 10),
+    }])
+    .select('*').single();
+  if (error || !data) {
+    console.error('Failed to add the account:', error);
+    throw new Error(`Could not save that: ${error?.message ?? 'no row returned'}`);
+  }
+  return data as FinanceAccount;
+}
+
+export async function deleteFinanceAccount(id: string): Promise<boolean> {
+  const { error } = await supabase.from('finance_accounts').delete().eq('id', id);
+  if (error) throw new Error(`Could not remove that: ${error.message}`);
+  return true;
+}

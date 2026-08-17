@@ -134,7 +134,7 @@ function App() {
       case 'home':
         return <HomeView />;
       case 'finances':
-        return <FinancesView />;
+        return <FinancesView focusId={focusId} />;
       case 'taxes':
         return <TaxesView />;
       case 'family':

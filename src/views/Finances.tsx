@@ -6,6 +6,7 @@ import { UploadDropzone } from '../components/UploadDropzone';
 import { UnfiledDocuments } from '../components/UnfiledDocuments';
 import { FinancesHealth } from '../components/FinancesHealth';
 import { LoanList } from '../components/LoanList';
+import { OwnedThings } from '../components/OwnedThings';
 import { MonthlySpending } from '../components/MonthlySpending';
 import { DocumentLinkBadge } from '../components/DocumentLinkBadge';
 import { uploadDocumentAsset, invokeDocumentExtraction, type FinanceAccount } from '../lib/supabase';
@@ -32,7 +33,7 @@ function groupOf(account: FinanceAccount): string {
   return GROUPS.find((g) => g.match.some((m) => type.includes(m)))?.label ?? 'Other';
 }
 
-export function FinancesView() {
+export function FinancesView({ focusId = null }: { focusId?: string | null } = {}) {
   const { data, refresh } = useHousehold();
   const accounts = data?.financeAccounts ?? [];
   const documents = data?.documents ?? [];
@@ -44,8 +45,10 @@ export function FinancesView() {
 
   const familiarity = familiarityState(accounts.length, (data?.loans ?? []).length);
   // The uploader stays on the page; the intro's action takes you to it.
+  // Finances is typed in, not uploaded — the intro says so, so it must lead
+  // somewhere you can type.
   const goToUploader = () =>
-    document.getElementById('section-uploader')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('section-manual-entry')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   return (
     <div className="space-y-6">
       {/* The grade leads, and carries the balance sheet — the only place the
@@ -137,6 +140,16 @@ export function FinancesView() {
             </div>
           </section>
         ))
+      )}
+
+      {data?.household?.id && (
+        <OwnedThings
+          householdId={data.household.id}
+          accounts={accounts}
+          assets={data?.assets ?? []}
+          prefillAsset={focusId ? { name: focusId, type: focusId.match(/^\d{4}\s/) ? 'vehicle' : 'real_estate' } : null}
+          onChanged={refresh}
+        />
       )}
 
       {data?.household?.id && (

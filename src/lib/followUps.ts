@@ -21,6 +21,8 @@ import type { Asset, FamilyMember, InsurancePolicyExtraction } from './supabase'
 
 export interface FollowUp {
   id: string;
+  /** Carried to the section so the answer arrives already filled in. */
+  prefill?: { name: string; type: 'vehicle' | 'real_estate' };
   /** Where the answer gets recorded. */
   section: string;
   /** The question, in the user's terms. */
@@ -105,6 +107,7 @@ export function followUpsFromInsurance(
       out.push({
         id,
         section: 'finances',
+        prefill: { name: label, type: 'vehicle' },
         question: `Do you still own the ${label}?`,
         evidence: `${carrier} covers it, and it is not among the things Command has recorded that you own — `
           + 'so it is missing from your net worth.',
@@ -121,6 +124,7 @@ export function followUpsFromInsurance(
       out.push({
         id,
         section: 'home',
+        prefill: { name: item.address, type: 'real_estate' },
         question: 'Is this the home you live in?',
         evidence: `${carrier} covers ${item.address}, and Command has no property on file.`,
         actionLabel: 'Add your home',

@@ -508,7 +508,7 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
             onClose={closeBrief}
           />
         )}
-        <FollowUps followUps={followUps} onOpen={(section) => onNavigate?.(section)} />
+        <FollowUps followUps={followUps} onOpen={(section, prefill) => onNavigate?.(section, prefill)} />
         <GettingStarted
           steps={setupSteps}
           userName={data?.profile?.primary_first_name ?? data?.profile?.primary_name ?? null}
@@ -530,7 +530,7 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
         />
       )}
 
-      <FollowUps followUps={followUps} onOpen={(section) => onNavigate?.(section)} />
+      <FollowUps followUps={followUps} onOpen={(section, prefill) => onNavigate?.(section, prefill)} />
 
       {firstInsight && !insightDismissed && (
         <FirstInsight

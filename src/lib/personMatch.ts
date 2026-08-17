@@ -32,6 +32,41 @@ export function nameWords(value: string | null | undefined): string[] {
     .filter((w) => w.length > 1);
 }
 
+/**
+ * Short forms a household actually uses, where the short form is not simply the
+ * start of the long one. "Mitch" for "Mitchell" needs no table; "Bob" for
+ * "Robert" does.
+ */
+const SHORT_FORMS: Record<string, string> = {
+  bob: 'robert', rob: 'robert', bobby: 'robert',
+  bill: 'william', billy: 'william', liam: 'william',
+  dick: 'richard', rick: 'richard', rich: 'richard',
+  jim: 'james', jimmy: 'james', jack: 'john',
+  peggy: 'margaret', meg: 'margaret', maggie: 'margaret',
+  betty: 'elizabeth', liz: 'elizabeth', beth: 'elizabeth', eliza: 'elizabeth',
+  mike: 'michael', mick: 'michael',
+  hank: 'henry', harry: 'harold', chuck: 'charles', charlie: 'charles',
+  ted: 'edward', ned: 'edward', ed: 'edward',
+  tony: 'anthony', sandy: 'sandra', sally: 'sarah', polly: 'mary',
+  kate: 'katherine', katie: 'katherine', kathy: 'katherine',
+  nate: 'nathaniel', gus: 'august', tina: 'christina', chris: 'christopher',
+};
+
+/**
+ * Two first names that a household would treat as one person's.
+ *
+ * The prefix rule carries most of it — Mitch/Mitchell, Dan/Daniel,
+ * Sam/Samuel — and the table above covers the ones it cannot.
+ */
+export function sameFirstName(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  if (a === b) return true;
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+  if (short.length >= 3 && long.startsWith(short)) return true;
+  return SHORT_FORMS[a] === b || SHORT_FORMS[b] === a
+    || Boolean(SHORT_FORMS[a] && SHORT_FORMS[a] === SHORT_FORMS[b]);
+}
+
 /** A single letter carrying a stop: the "J" in MARCUS J WHITFIELD. */
 function initials(value: string | null | undefined): string[] {
   return (value ?? '').toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/).filter((w) => w.length === 1);
@@ -80,6 +115,18 @@ export function scoreAgainst(documentName: string, member: FamilyMember): Person
     return { member, score: 0.9, reason: 'The first and last names both match.' };
   }
 
+  // Mitch against MITCHELL. Without this, the person the document actually
+  // names ranked level with every other relative who shares the surname.
+  if (sameLast && sameFirstName(doc[0], own[0])) {
+    const [shortForm, longForm] = doc[0].length <= own[0].length ? [doc[0], own[0]] : [own[0], doc[0]];
+    const title = (w: string) => w.charAt(0).toUpperCase() + w.slice(1);
+    return {
+      member,
+      score: 0.85,
+      reason: `The last name matches, and ${title(shortForm)} is a short form of ${title(longForm)}.`,
+    };
+  }
+
   // "M WHITFIELD" against "Marcus Whitfield".
   if (sameLast && initials(documentName).some((i) => own.some((w) => w.startsWith(i)))) {
     return { member, score: 0.75, reason: 'The last name matches and the initial fits.' };
@@ -106,6 +153,14 @@ export function scoreAgainst(documentName: string, member: FamilyMember): Person
   return null;
 }
 
+/** You, then a spouse, then everyone else — the order a household reads in. */
+function relationshipRank(relationship: string): number {
+  const r = (relationship ?? '').toLowerCase();
+  if (r.includes('self')) return 0;
+  if (r.includes('spouse') || r.includes('partner')) return 1;
+  return 2;
+}
+
 /**
  * Everyone on file who could be the person a document named, likeliest first.
  * A weak candidate is still worth showing — the user knows their own family and
@@ -116,5 +171,7 @@ export function rankPeople(documentName: string, members: FamilyMember[]): Perso
   return members
     .map((m) => scoreAgainst(documentName, m))
     .filter((c): c is PersonCandidate => c !== null)
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.score - a.score
+      || relationshipRank(a.member.relationship) - relationshipRank(b.member.relationship)
+      || a.member.name.localeCompare(b.member.name));
 }

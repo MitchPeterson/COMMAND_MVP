@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.44.2',
+    date: '2026-08-17',
+    title: 'Fix matching a person to an existing family member',
+    items: [
+      'Choosing the person no longer bounces back to the same question',
+      'A shortened first name now ranks above relatives who only share the surname — Mitch is offered first for MITCHELL PETERSON',
+      'Once matched, Family says so',
+    ],
+  },
+  {
     version: '0.44.1',
     date: '2026-08-17',
     title: 'Match a document\'s name to someone you already have',

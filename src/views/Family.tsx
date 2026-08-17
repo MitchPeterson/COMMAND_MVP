@@ -9,7 +9,7 @@ import { ProtectionGap } from '../components/ProtectionGap';
 import { ageOf } from '../lib/familyTimeline';
 import { MatchPerson } from '../components/MatchPerson';
 import { nameWords } from '../lib/personMatch';
-import { Users, Gift, Heart } from 'lucide-react';
+import { Users, Gift, Heart, Check } from 'lucide-react';
 
 export function FamilyView({ focusId = null }: { focusId?: string | null } = {}) {
   const { data, refresh } = useHousehold();
@@ -41,6 +41,16 @@ export function FamilyView({ focusId = null }: { focusId?: string | null } = {})
     return null;
   }, [focusId, data?.insuranceExtractions]);
 
+  // Derived from the data, never from the local flag above.
+  //
+  // refresh() puts useHousehold back into loading, App swaps the whole tree for
+  // the spinner, and this view is unmounted and remounted — which reset the flag
+  // to 'deciding' and asked the question again the instant it was answered. The
+  // record itself is the only thing that survives that.
+  const matchedTo = askedParty?.matched_family_member_id
+    ? members.find((m) => m.id === askedParty.matched_family_member_id) ?? null
+    : null;
+
   const familiarity = familiarityState((data?.familyMembers ?? []).length);
   // The uploader stays on the page; the intro's action takes you to it.
   // Family is typed in, not uploaded, and had no target at all — the intro's
@@ -67,8 +77,22 @@ export function FamilyView({ focusId = null }: { focusId?: string | null } = {})
         />
       )}
 
-      {/* The name a document raised, before anything is created from it. */}
-      {focusId && answer === 'deciding' && (
+      {/* Answered, and said so — the panel is gone but the question was real. */}
+      {focusId && matchedTo && (
+        <div className="flex items-start gap-3 rounded-3xl border border-cmd-gold/25 bg-cmd-gold/5 p-5 text-sm leading-6 text-cmd-muted">
+          <Check className="mt-0.5 h-4 w-4 shrink-0 text-cmd-gold" />
+          <p>
+            <span className="text-cmd-offwhite">{focusId}</span> on your policy is recorded as{' '}
+            <span className="text-cmd-offwhite">{matchedTo.name}</span>. Command will not ask about
+            that name again, and your own name for them is unchanged.
+          </p>
+        </div>
+      )}
+
+      {/* The name a document raised, before anything is created from it.
+          Matching needs the extracted row to record against; without one there
+          is nothing to retire, so adding is the only thing on offer. */}
+      {focusId && !matchedTo && askedParty && answer === 'deciding' && (
         <MatchPerson
           documentName={focusId}
           partyId={askedParty?.id ?? null}
@@ -87,7 +111,9 @@ export function FamilyView({ focusId = null }: { focusId?: string | null } = {})
             householdId={data.household.id}
             members={data?.familyMembers ?? []}
             profile={data?.profile ?? null}
-            prefillName={answer === 'adding' ? focusId : null}
+            prefillName={
+              focusId && !matchedTo && (answer === 'adding' || !askedParty) ? focusId : null
+            }
             onSaved={refresh}
           />
         </div>

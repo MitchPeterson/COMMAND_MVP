@@ -8,6 +8,7 @@ import { UploadDropzone } from '../components/UploadDropzone';
 import { CreditHealth } from '../components/CreditHealth';
 import { CreditStatementReview } from '../components/CreditStatementReview';
 import { CardStrategy } from '../components/CardStrategy';
+import { RecurringCharges } from '../components/RecurringCharges';
 import { CardProfilePanel } from '../components/CardProfilePanel';
 import { analyzeStatementFit, matchProfile } from '../lib/cardFit';
 import { uploadDocumentAsset, invokeDocumentExtraction, type CreditCard as CreditCardRow } from '../lib/supabase';
@@ -134,6 +135,11 @@ export function CreditView() {
           </div>
         </section>
       )}
+
+      <RecurringCharges
+        transactions={data?.creditTransactions ?? []}
+        statements={statements}
+      />
 
       {data?.household?.id && (
         <CardStrategy

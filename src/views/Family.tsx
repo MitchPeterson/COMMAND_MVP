@@ -1,3 +1,5 @@
+import { SectionIntro } from '../components/SectionIntro';
+import { familiarityState, introFor } from '../lib/sectionIntros';
 import React from 'react';
 import { useHousehold } from '../useHousehold';
 import { FamilyHealth } from '../components/FamilyHealth';
@@ -18,16 +20,29 @@ export function FamilyView() {
     return event.event_date ? new Date(event.event_date) >= new Date() : false;
   }).slice(0, 2);
 
+
+  const familiarity = familiarityState((data?.familyMembers ?? []).length);
+  // The uploader stays on the page; the intro's action takes you to it.
+  const goToUploader = () =>
+    document.getElementById('section-uploader')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   return (
     <div className="space-y-6">
       {/* The grade leads, as on every section. */}
-      <FamilyHealth
-        members={members}
-        profile={data?.profile ?? null}
-        policies={data?.insurancePolicies ?? []}
-        mortgage={data?.mortgage ?? null}
-        legalDocuments={data?.legalDocuments ?? []}
-      />
+      {familiarity === 'unstarted' ? (
+        <SectionIntro
+          intro={introFor('family')!}
+          icon={<Users className="h-5 w-5" />}
+          onAction={goToUploader}
+        />
+      ) : (
+        <FamilyHealth
+          members={members}
+          profile={data?.profile ?? null}
+          policies={data?.insurancePolicies ?? []}
+          mortgage={data?.mortgage ?? null}
+          legalDocuments={data?.legalDocuments ?? []}
+        />
+      )}
 
       <ProtectionGap
         members={members}

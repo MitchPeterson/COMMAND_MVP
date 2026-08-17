@@ -80,6 +80,13 @@ export function AppHeader({ onOpenNav, onOpenBrief, householdId, documents, onNa
 
   useEffect(() => setCursor(0), [query]);
 
+  // Anything can ask for the upload sheet without knowing where the button is.
+  useEffect(() => {
+    const open = () => setUploading(true);
+    window.addEventListener('command:add-document', open);
+    return () => window.removeEventListener('command:add-document', open);
+  }, []);
+
   // Close on an outside click, so the results do not sit over the page.
   useEffect(() => {
     if (!open) return;

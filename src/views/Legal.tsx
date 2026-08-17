@@ -1,3 +1,5 @@
+import { SectionIntro } from '../components/SectionIntro';
+import { familiarityState, introFor } from '../lib/sectionIntros';
 import React, { useEffect, useState } from 'react';
 import { useHousehold } from '../useHousehold';
 import { UploadDropzone } from '../components/UploadDropzone';
@@ -155,17 +157,30 @@ export function LegalView({ focusId = null }: LegalViewProps) {
     items: extractions.filter((e) => (legalType(effectiveType(e))?.category ?? 'unclassified') === category.code),
   })).filter((group) => group.items.length > 0);
 
+
+  const familiarity = familiarityState(documents.length, extractions.length);
+  // The uploader stays on the page; the intro's action takes you to it.
+  const goToUploader = () =>
+    document.getElementById('section-uploader')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   return (
     <div className="space-y-6">
       {/* The grade leads, as coverage does on Insurance. The upload is a means to
           it, not the point of the page. */}
-      <LegalHealth
-        extractions={extractions}
-        documents={documents}
-        profile={data?.profile ?? null}
-        familyMembers={data?.familyMembers ?? []}
-        assets={data?.assets ?? []}
-      />
+      {familiarity === 'unstarted' ? (
+        <SectionIntro
+          intro={introFor('legal')!}
+          icon={<Gavel className="h-5 w-5" />}
+          onAction={goToUploader}
+        />
+      ) : (
+        <LegalHealth
+          extractions={extractions}
+          documents={documents}
+          profile={data?.profile ?? null}
+          familyMembers={data?.familyMembers ?? []}
+          assets={data?.assets ?? []}
+        />
+      )}
 
       {flags.length > 0 && (
         <section className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-6">
@@ -400,7 +415,7 @@ export function LegalView({ focusId = null }: LegalViewProps) {
       />
 
       {/* Demoted: still one click away, no longer the headline. */}
-      <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
+      <section id="section-uploader" className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
         <UploadDropzone
           contextLabel="Add a legal document"
           buttonLabel="Upload a will, trust, directive or deed"

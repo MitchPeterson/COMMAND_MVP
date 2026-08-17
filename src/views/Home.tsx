@@ -1,3 +1,5 @@
+import { SectionIntro } from '../components/SectionIntro';
+import { familiarityState, introFor } from '../lib/sectionIntros';
 import React from 'react';
 import { useHousehold } from '../useHousehold';
 import { UnfiledDocuments } from '../components/UnfiledDocuments';
@@ -8,21 +10,34 @@ import { MortgagePanel } from '../components/MortgagePanel';
 import { HomeDocumentReview } from '../components/HomeDocumentReview';
 import { uploadDocumentAsset, invokeDocumentExtraction } from '../lib/supabase';
 import type { HomeSystemRow } from '../lib/homeSystems';
-import { Wrench } from 'lucide-react';
+import { Wrench, Home } from 'lucide-react';
 
 export function HomeView() {
   const { data, refresh } = useHousehold();
   const systems = (data?.homeSystems ?? []) as unknown as HomeSystemRow[];
   const mortgage = data?.mortgage ?? null;
 
+
+  const familiarity = familiarityState(systems.length, mortgage ? 1 : 0, (data?.mortgageStatements ?? []).length);
+  // The uploader stays on the page; the intro's action takes you to it.
+  const goToUploader = () =>
+    document.getElementById('section-uploader')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   return (
     <div className="space-y-6">
       {/* The grade leads, as it does on every section. */}
-      <HomeHealth
-        systems={systems}
-        profile={data?.profile ?? null}
-        mortgagePrincipal={mortgage?.principal_balance ?? null}
-      />
+      {familiarity === 'unstarted' ? (
+        <SectionIntro
+          intro={introFor('home')!}
+          icon={<Home className="h-5 w-5" />}
+          onAction={goToUploader}
+        />
+      ) : (
+        <HomeHealth
+          systems={systems}
+          profile={data?.profile ?? null}
+          mortgagePrincipal={mortgage?.principal_balance ?? null}
+        />
+      )}
 
       <HomeDocumentReview
         mortgageStatements={data?.mortgageStatements ?? []}
@@ -87,7 +102,7 @@ export function HomeView() {
       />
 
       {/* Demoted: still one click away, no longer the headline. */}
-      <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
+      <section id="section-uploader" className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
         <UploadDropzone
           contextLabel="Add a home document"
           buttonLabel="Upload a mortgage statement, warranty or manual"

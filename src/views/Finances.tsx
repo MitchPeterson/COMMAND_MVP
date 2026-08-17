@@ -1,3 +1,5 @@
+import { SectionIntro } from '../components/SectionIntro';
+import { familiarityState, introFor } from '../lib/sectionIntros';
 import React from 'react';
 import { useHousehold } from '../useHousehold';
 import { UploadDropzone } from '../components/UploadDropzone';
@@ -39,21 +41,34 @@ export function FinancesView() {
     .map((label) => ({ label, items: accounts.filter((a) => groupOf(a) === label) }))
     .filter((group) => group.items.length > 0);
 
+
+  const familiarity = familiarityState(accounts.length, (data?.loans ?? []).length);
+  // The uploader stays on the page; the intro's action takes you to it.
+  const goToUploader = () =>
+    document.getElementById('section-uploader')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   return (
     <div className="space-y-6">
       {/* The grade leads, and carries the balance sheet — the only place the
           whole picture exists, since the mortgage lives in Home and the card
           balances in Credit. */}
-      <FinancesHealth
-        accounts={accounts}
-        loans={data?.loans ?? []}
-        cards={data?.creditCards ?? []}
-        mortgage={data?.mortgage ?? null}
-        assets={data?.assets ?? []}
-        budget={data?.budgetSummary ?? null}
-        profile={data?.profile ?? null}
-        transactions={data?.creditTransactions ?? []}
-      />
+      {familiarity === 'unstarted' ? (
+        <SectionIntro
+          intro={introFor('finances')!}
+          icon={<Wallet className="h-5 w-5" />}
+          onAction={goToUploader}
+        />
+      ) : (
+        <FinancesHealth
+          accounts={accounts}
+          loans={data?.loans ?? []}
+          cards={data?.creditCards ?? []}
+          mortgage={data?.mortgage ?? null}
+          assets={data?.assets ?? []}
+          budget={data?.budgetSummary ?? null}
+          profile={data?.profile ?? null}
+          transactions={data?.creditTransactions ?? []}
+        />
+      )}
 
       <UnfiledDocuments
         section="finances"
@@ -134,7 +149,7 @@ export function FinancesView() {
       )}
 
       {/* Demoted: still one click away, no longer the headline. */}
-      <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
+      <section id="section-uploader" className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
         <UploadDropzone
           contextLabel="Add a financial document"
           buttonLabel="Upload a statement or account summary"

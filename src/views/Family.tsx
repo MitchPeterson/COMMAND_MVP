@@ -1,12 +1,14 @@
 import { SectionIntro } from '../components/SectionIntro';
 import { PeopleEditor } from '../components/PeopleEditor';
 import { familiarityState, introFor } from '../lib/sectionIntros';
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useHousehold } from '../useHousehold';
 import { FamilyHealth } from '../components/FamilyHealth';
 import { FamilyTimeline } from '../components/FamilyTimeline';
 import { ProtectionGap } from '../components/ProtectionGap';
 import { ageOf } from '../lib/familyTimeline';
+import { MatchPerson } from '../components/MatchPerson';
+import { nameWords } from '../lib/personMatch';
 import { Users, Gift, Heart } from 'lucide-react';
 
 export function FamilyView({ focusId = null }: { focusId?: string | null } = {}) {
@@ -21,6 +23,23 @@ export function FamilyView({ focusId = null }: { focusId?: string | null } = {})
     return event.event_date ? new Date(event.event_date) >= new Date() : false;
   }).slice(0, 2);
 
+
+  // A question sent someone here with a name from a document. Whether that name
+  // is a new person or one already on file is the user's call, not a guess —
+  // guessing "new" is what built a second copy of an existing member.
+  const [answer, setAnswer] = useState<'deciding' | 'adding' | 'settled'>('deciding');
+  useEffect(() => { setAnswer('deciding'); }, [focusId]);
+
+  const askedParty = useMemo(() => {
+    if (!focusId) return null;
+    const key = nameWords(focusId).sort().join(' ');
+    for (const extraction of data?.insuranceExtractions ?? []) {
+      for (const party of extraction.insurance_insured_parties ?? []) {
+        if (party.name && nameWords(party.name).sort().join(' ') === key) return party;
+      }
+    }
+    return null;
+  }, [focusId, data?.insuranceExtractions]);
 
   const familiarity = familiarityState((data?.familyMembers ?? []).length);
   // The uploader stays on the page; the intro's action takes you to it.
@@ -48,6 +67,18 @@ export function FamilyView({ focusId = null }: { focusId?: string | null } = {})
         />
       )}
 
+      {/* The name a document raised, before anything is created from it. */}
+      {focusId && answer === 'deciding' && (
+        <MatchPerson
+          documentName={focusId}
+          partyId={askedParty?.id ?? null}
+          members={members}
+          onAddNew={() => setAnswer('adding')}
+          onDone={async () => { setAnswer('settled'); await refresh(); }}
+          onCancel={() => setAnswer('settled')}
+        />
+      )}
+
       {/* Adding a person lived only on Profile, so the section named after them
           had no way to do it and the intro's button pointed at nothing. */}
       {data?.household?.id && (
@@ -56,7 +87,7 @@ export function FamilyView({ focusId = null }: { focusId?: string | null } = {})
             householdId={data.household.id}
             members={data?.familyMembers ?? []}
             profile={data?.profile ?? null}
-            prefillName={focusId}
+            prefillName={answer === 'adding' ? focusId : null}
             onSaved={refresh}
           />
         </div>

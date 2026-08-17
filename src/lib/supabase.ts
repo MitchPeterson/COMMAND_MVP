@@ -732,6 +732,34 @@ export async function resolveLegalPartyMatch(
   return true;
 }
 
+/**
+ * Links a person named on an insurance policy to someone already in the
+ * household, or clears that link.
+ *
+ * Confirming records the match and nothing else. It deliberately does not
+ * rewrite the person's name from the document: a policy printing MARCUS J
+ * WHITFIELD is not evidence that "Marcus" is wrong, and a household should not
+ * find its own names rewritten by its paperwork.
+ */
+export async function resolveInsuredPartyMatch(
+  partyId: string,
+  familyMemberId: string | null,
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('insurance_insured_parties')
+    .update({
+      matched_family_member_id: familyMemberId,
+      // Confirmed by a person, not inferred. Recorded as such.
+      match_confidence: familyMemberId ? 1 : null,
+    })
+    .eq('id', partyId);
+  if (error) {
+    console.error('Failed to link the insured party:', error);
+    throw new Error(`Could not save that match: ${error.message}`);
+  }
+  return true;
+}
+
 /** Adds a named party to the household as a new person, on explicit request. */
 export async function createFamilyMemberFromParty(
   householdId: string,
@@ -1794,6 +1822,13 @@ export interface InsuranceInsuredPartyRow {
   name: string | null;
   relationship: string | null;
   confidence: number | null;
+  /**
+   * The person on file this party turned out to be. Selected all along and
+   * never read, which is why answering "yes, that is my wife" built a second
+   * copy of her instead of retiring the question.
+   */
+  matched_family_member_id: string | null;
+  match_confidence: number | null;
 }
 
 export interface InsuranceInsuredAssetRow {

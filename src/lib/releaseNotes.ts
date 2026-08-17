@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.44.1',
+    date: '2026-08-17',
+    title: 'Match a document\'s name to someone you already have',
+    items: [
+      'Answering "is this person in your household?" now offers the people already on file before offering to add a new one',
+      'Matches are recorded against the extracted record, so the question stops coming back',
+      'Command never rewrites your own names from a document',
+    ],
+  },
+  {
     version: '0.44.0',
     date: '2026-08-17',
     title: 'See what is on autopay',

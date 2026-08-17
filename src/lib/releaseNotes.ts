@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.42.1',
+    date: '2026-08-17',
+    title: 'Identifiers cannot be stored, at three levels',
+    items: [
+      'Quoted excerpts from your documents are now scrubbed of Social Security numbers, tax IDs, bank accounts and driver\'s licence numbers — the previous rule only caught card numbers',
+      'Every extraction path now tells the model not to produce them, and the database refuses to accept them regardless',
+    ],
+  },
+  {
     version: '0.42.0',
     date: '2026-08-17',
     title: 'You can now type in what you own',

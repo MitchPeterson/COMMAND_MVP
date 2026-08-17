@@ -17,6 +17,7 @@ import { signOut } from './lib/supabase';
 import { AppHeader } from './components/AppHeader';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { WhatsNew } from './components/WhatsNew';
+import { unseenReleases } from './lib/releaseNotes';
 
 function App() {
   const { data, loading, userId, refresh } = useHousehold();
@@ -35,6 +36,14 @@ function App() {
   // Drawer state for the nav below lg. Above it the rail is always visible and
   // this is ignored.
   const [navOpen, setNavOpen] = useState(false);
+  // A counter rather than a boolean: asking twice should open it twice, and the
+  // Dashboard owns whether it is showing.
+  const [briefRequest, setBriefRequest] = useState(0);
+  // Two dialogs opening on top of each other on the same login is nobody's idea
+  // of a welcome. Release notes go first — they are tied to a deploy that just
+  // happened — and the brief waits for the next visit. Asking for it explicitly
+  // still opens it.
+  const [releasesPending] = useState(() => unseenReleases().length > 0);
 
   const handleOnboardingComplete = useCallback(async () => {
     await refresh();
@@ -117,7 +126,7 @@ function App() {
   const renderView = () => {
     switch (activeView) {
       case 'dashboard':
-        return <DashboardView onNavigate={navigate} />;
+        return <DashboardView onNavigate={navigate} openBrief={briefRequest} deferAuto={releasesPending} />;
       case 'insurance':
         return <InsuranceView />;
       case 'legal':
@@ -137,7 +146,7 @@ function App() {
       case 'profile':
         return <ProfileView />;
       default:
-        return <DashboardView onNavigate={navigate} />;
+        return <DashboardView onNavigate={navigate} openBrief={briefRequest} deferAuto={releasesPending} />;
     }
   };
 
@@ -166,6 +175,7 @@ function App() {
       <div className="flex min-w-0 flex-1 flex-col bg-cmd-charcoal/90">
         <AppHeader
           onOpenNav={() => setNavOpen(true)}
+          onOpenBrief={() => { setActiveView('dashboard'); setBriefRequest((n) => n + 1); }}
           householdId={data?.household?.id ?? null}
           documents={data?.documents ?? []}
           onNavigate={navigate}

@@ -11,7 +11,7 @@
 // which is what exists to be found, and stops there.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { FileText, Menu, Plus, Search, X } from 'lucide-react';
+import { FileText, Menu, Newspaper, Plus, Search, X } from 'lucide-react';
 import { navItems } from '../views/components/Sidebar';
 import { UploadDropzone } from './UploadDropzone';
 import { uploadDocumentAsset, invokeDocumentExtraction, type Document } from '../lib/supabase';
@@ -19,6 +19,8 @@ import { uploadDocumentAsset, invokeDocumentExtraction, type Document } from '..
 interface AppHeaderProps {
   /** Opens the nav drawer. Only rendered below lg, where the rail is hidden. */
   onOpenNav?: () => void;
+  /** Opens the brief on demand, between its weekly appearances. */
+  onOpenBrief?: () => void;
   householdId?: string | null;
   documents: Document[];
   onNavigate: (view: string, focus?: string) => void;
@@ -42,7 +44,7 @@ function rank(label: string, query: string): number {
   return l.includes(query) ? 2 : -1;
 }
 
-export function AppHeader({ onOpenNav, householdId, documents, onNavigate, onUploaded }: AppHeaderProps) {
+export function AppHeader({ onOpenNav, onOpenBrief, householdId, documents, onNavigate, onUploaded }: AppHeaderProps) {
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [cursor, setCursor] = useState(0);
@@ -174,9 +176,19 @@ export function AppHeader({ onOpenNav, householdId, documents, onNavigate, onUpl
 
         <button
           type="button"
+          onClick={onOpenBrief}
+          aria-label="Open your brief"
+          title="What changed since you last looked"
+          className="ml-auto shrink-0 rounded-xl border border-cmd-border bg-cmd-black/60 p-2 text-cmd-offwhite transition hover:border-cmd-gold hover:text-cmd-gold"
+        >
+          <Newspaper className="h-4 w-4" />
+        </button>
+
+        <button
+          type="button"
           onClick={() => setUploading(true)}
           disabled={!householdId}
-          className="ml-auto inline-flex shrink-0 items-center gap-2 rounded-xl border border-cmd-gold/40 bg-cmd-gold/10 px-3 py-2 text-sm font-medium text-cmd-gold transition hover:bg-cmd-gold/20 disabled:opacity-40 sm:px-4"
+          className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-cmd-gold/40 bg-cmd-gold/10 px-3 py-2 text-sm font-medium text-cmd-gold transition hover:bg-cmd-gold/20 disabled:opacity-40 sm:px-4"
         >
           <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Add document</span>
         </button>

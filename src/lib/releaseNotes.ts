@@ -25,6 +25,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.37.0',
+    date: '2026-08-17',
+    title: 'A weekly brief of what moved',
+    items: [
+      'Opens once a week, or from the header any time, showing new gaps found, scores that changed, what resolved, and what falls due next — assembled from the assessments each section already produces',
+    ],
+  },
+  {
     version: '0.36.1',
     date: '2026-08-17',
     title: 'Only sections that exist',

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useHousehold } from '../useHousehold';
 import { UploadDropzone } from '../components/UploadDropzone';
 import { DocumentExtractionReview } from '../components/DocumentExtractionReview';
@@ -15,6 +15,9 @@ import {
   isInsightDismissed, dismissInsight,
 } from '../lib/firstInsight';
 import { FirstInsight } from '../components/FirstInsight';
+import { WeeklyBrief } from '../components/WeeklyBrief';
+import { buildDigest, readSnapshot, writeSnapshot, isDigestDue, type DigestInput } from '../lib/digest';
+import { taxDeadlines } from '../lib/taxYear';
 import { buildPriorityActions, type RankedAction, type RankedSeverity } from '../lib/priorityActions';
 import {
   Shield,
@@ -114,9 +117,13 @@ function getScoreState(score: number | null | undefined) {
 interface DashboardProps {
   /** `focusId` deep-links to one record inside the section, not just the page. */
   onNavigate?: (view: string, focusId?: string) => void;
+  /** Increments when the header asks for the brief. */
+  openBrief?: number;
+  /** Holds the weekly appearance back while another dialog is showing. */
+  deferAuto?: boolean;
 }
 
-export function DashboardView({ onNavigate }: DashboardProps) {
+export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: DashboardProps) {
   const { data, refresh } = useHousehold();
 
   // Insurance is scored live from the policies and extracted documents on file,
@@ -196,6 +203,50 @@ export function DashboardView({ onNavigate }: DashboardProps) {
     return pick;
   }, [data?.documents, data?.insurancePolicies, data?.legalDocuments, data?.creditCards,
     data?.financeAccounts, coverage, finances, family, legal]);
+
+  // ── The brief ───────────────────────────────────────────────────────────
+  // Assembled here because this is where all seven assessments already exist.
+  // Computing them again in App would be a second opinion waiting to disagree.
+  const digestSections = useMemo<DigestInput[]>(() => ([
+    { section: 'insurance', label: 'Insurance', score: coverage.score, findings: coverage.findings },
+    { section: 'legal', label: 'Legal', score: legal.score, findings: legal.findings },
+    { section: 'credit', label: 'Credit', score: credit.score, findings: credit.findings },
+    { section: 'home', label: 'Home', score: home.score, findings: home.findings },
+    { section: 'family', label: 'Family', score: family.score, findings: family.findings },
+    { section: 'taxes', label: 'Taxes', score: taxes.score, findings: taxes.findings },
+    { section: 'finances', label: 'Finances', score: finances.score, findings: finances.findings },
+  ]), [coverage, legal, credit, home, family, taxes, finances]);
+
+  const [briefOpen, setBriefOpen] = useState(false);
+  const [snapshot] = useState(() => readSnapshot());
+
+  // Opens itself once a week, and whenever the header asks.
+  useEffect(() => {
+    if (!deferAuto && isDigestDue(snapshot)) setBriefOpen(true);
+  }, [snapshot, deferAuto]);
+  useEffect(() => {
+    if (openBrief > 0) setBriefOpen(true);
+  }, [openBrief]);
+
+  const digest = useMemo(() => {
+    // Deadlines the Tax section already computes, plus anything the household's
+    // own timeline is carrying. Both are existing data; neither is recalculated.
+    const fromTax = taxDeadlines().map((d) => ({ date: d.date, label: d.label, detail: d.detail, daysAway: 0 }));
+    const fromTimeline = (data?.timelineEvents ?? [])
+      .filter((e) => !e.completed && e.event_date)
+      .map((e) => ({ date: e.event_date as string, label: e.title, detail: e.notes ?? '', daysAway: 0 }));
+    const seen = new Set<string>();
+    const deadlines = [...fromTimeline, ...fromTax].filter((d) => {
+      const key = `${d.date}|${d.label}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    return buildDigest(digestSections, deadlines, snapshot);
+  }, [digestSections, snapshot, data?.timelineEvents]);
+
+  // Reading it is what marks it read, so it does not reappear next login.
+  const closeBrief = () => { writeSnapshot(digestSections); setBriefOpen(false); };
 
   // Any section with a live score overrides its stored row. The stored rows were
   // written once at onboarding and never recalculated, so without this an upload
@@ -408,6 +459,14 @@ export function DashboardView({ onNavigate }: DashboardProps) {
     <div className="space-y-6">
       {/* Above the grid, full width, and the only loud thing on the page while it
           is here. A callout competing with three other cards is not a callout. */}
+      {briefOpen && (
+        <WeeklyBrief
+          digest={digest}
+          onOpenSection={(section) => { closeBrief(); onNavigate?.(section); }}
+          onClose={closeBrief}
+        />
+      )}
+
       {firstInsight && !insightDismissed && (
         <FirstInsight
           insight={firstInsight}

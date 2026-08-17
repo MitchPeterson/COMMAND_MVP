@@ -313,6 +313,40 @@ sections, so the findings agree with each other rather than each inventing a sto
 - Six real PDFs in the vault: two declarations pages, a will, a mortgage
   statement, a card statement and the 1040.
 
+## Before production users
+
+Deliberately deferred on Aug 17, 2026 — fine for a single developer and their own
+data, not fine once other households are on it.
+
+**Security**
+- **MFA.** Supabase supports TOTP; it is not enabled in the project's Auth
+  settings. Enrolment and challenge UI can be built once it is switched on.
+- **Account deletion.** "Delete all my data" clears every row and every file but
+  leaves the auth user, because removing it needs the service-role key and that
+  key does not belong in a browser. Needs a small Edge Function.
+- **Export does not bundle the files.** It lists them by name and path; the
+  documents themselves come from the vault. Zipping client-side is possible and
+  meaningfully more work.
+
+**From the review-pipeline audit** — see the four still open, F1, F2, F7 and F8:
+- **F1** tax returns commit themselves with `review_status: 'confirmed'`, no
+  review step. The largest remaining honesty gap.
+- **F2** W-2/1099 arrivals insert `tax_documents` rows directly.
+- **F7** confirm paths are multi-step with no transaction, so a failure between
+  steps can leave a card on file and its statement still pending.
+- **F8** `insertMany` logs and continues, so an insurance policy can be confirmed
+  with coverages silently missing.
+
+**Known incomplete**
+- **Entity matching, second half.** Follow-ups notice a mismatch and ask;
+  nothing writes `matched_family_member_id` / `matched_asset_id`, so answering a
+  question about a person does not retire it.
+- **Follow-ups read insurance only.** Wills name executors and guardians, tax
+  returns name dependants, mortgages name borrowers — all extracted, none
+  compared.
+- **Chunked extraction.** A document long enough to exceed the edge wall clock
+  degrades rather than chunking.
+
 ## Roadmap
 
 - **Recommendation layer** — `priority_actions` and `section_scores` are written once at onboarding and never recalculated. Coverage findings exist but nothing turns them into ranked actions.

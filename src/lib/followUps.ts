@@ -22,6 +22,11 @@ import type { Asset, FamilyMember, InsurancePolicyExtraction } from './supabase'
 export interface FollowUp {
   id: string;
   /**
+   * The extracted row the question came from, so answering it can be recorded
+   * against that row rather than inferred back from a name.
+   */
+  partyId?: string;
+  /**
    * Carried to the section so the answer arrives already filled in. The type is
    * only meaningful where the destination has kinds to choose between; a person
    * is just a name.
@@ -86,12 +91,16 @@ export function followUpsFromInsurance(
 
     for (const party of extraction.insurance_insured_parties ?? []) {
       if (!party.name || !HOUSEHOLD_ROLES.includes(party.role)) continue;
+      // Already settled, whether the answer was a new person or an existing one.
+      if (party.matched_family_member_id
+        && members.some((m) => m.id === party.matched_family_member_id)) continue;
       if (members.some((m) => sameName(m.name, party.name))) continue;
       const id = `party:${nameKey(party.name)}`;
       if (seen.has(id)) continue;
       seen.add(id);
       out.push({
         id,
+        partyId: party.id,
         section: 'family',
         prefill: { name: party.name },
         question: `Is ${party.name} part of your household?`,

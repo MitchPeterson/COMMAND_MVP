@@ -12,6 +12,7 @@
 
 import React from 'react';
 import { BadgeCheck, FileSignature, FileEdit, HelpCircle, ShieldAlert } from 'lucide-react';
+import { listOf } from '../lib/text';
 
 export type ObservationState = 'observed' | 'not_observed' | 'indeterminate';
 
@@ -101,7 +102,7 @@ export function summarizeExecution(
       label: 'Marked DRAFT',
       tone: 'draft',
       detail: marks.length > 0
-        ? `The document labels itself a draft, though Command did see it ${marks.join(' and ')}.`
+        ? `The document labels itself a draft, though Command did see it ${listOf(marks)}.`
         : 'The document labels itself a draft. If a signed version exists, uploading it gives Command the executed terms.',
     };
   }
@@ -130,10 +131,10 @@ export function summarizeExecution(
   }
   if (status === 'executed') {
     return {
-      label: marks.length > 0 ? `Signed · ${marks.filter((m) => m !== 'signed').join(' and ') || 'executed'}` : 'Signed',
+      label: marks.length > 0 ? `Signed · ${listOf(marks.filter((m) => m !== 'signed')) || 'executed'}` : 'Signed',
       tone: 'signed',
       detail: marks.length > 0
-        ? `Command saw it ${marks.join(' and ')} in this copy.`
+        ? `Command saw it ${listOf(marks)} in this copy.`
         : 'The document presents as executed.',
     };
   }
@@ -142,7 +143,7 @@ export function summarizeExecution(
   // will "we could not see a signature" is worth saying out loud.
   if (marks.length > 0) {
     return {
-      label: `Signature seen · ${marks.join(' and ')}`,
+      label: `Signature seen · ${listOf(marks)}`,
       tone: 'signed',
       detail: 'The document does not label its own status, but Command saw these in this copy.',
     };

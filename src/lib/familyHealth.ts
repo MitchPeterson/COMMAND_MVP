@@ -8,6 +8,7 @@
 import type { FamilyMember, HouseholdProfile, InsurancePolicy, LegalDocument, MortgageAccount } from './supabase';
 import { computeProtectionGap } from './protectionGap';
 import { ageOf, familyTimeline, minorChildren, trumpAccountStanding } from './familyTimeline';
+import { listOf } from './text';
 
 export type FamilyFindingSeverity = 'critical' | 'attention' | 'info';
 
@@ -86,7 +87,7 @@ export function computeFamilyHealth(
   if (approachingEighteen.length > 0) {
     findings.push({
       severity: 'attention',
-      title: `${approachingEighteen.map((m) => m.name.split(/\s+/)[0]).join(' and ')} turns 18 within the year`,
+      title: `${listOf(approachingEighteen.map((m) => m.name.split(/\s+/)[0]))} turns 18 within the year`,
       detail:
         'From that birthday you have no automatic right to their medical information or to act for ' +
         'them financially. A HIPAA authorization, a healthcare power of attorney and a financial ' +
@@ -129,7 +130,7 @@ export function computeFamilyHealth(
     dataFindings.push({
       severity: 'info',
       title: `${noBirthDate.length} person${noBirthDate.length === 1 ? '' : 's'} without a birth date`,
-      detail: `${noBirthDate.map((m) => m.name).join(', ')} cannot be placed on the timeline.`,
+      detail: `${listOf(noBirthDate.map((m) => m.name))} cannot be placed on the timeline.`,
     });
   }
   if (members.length === 0) {

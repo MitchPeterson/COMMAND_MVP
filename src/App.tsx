@@ -132,7 +132,7 @@ function App() {
       case 'legal':
         return <LegalView focusId={focusId} />;
       case 'home':
-        return <HomeView />;
+        return <HomeView focusId={focusId} />;
       case 'finances':
         return <FinancesView focusId={focusId} />;
       case 'taxes':

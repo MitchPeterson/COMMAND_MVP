@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.44.5',
+    date: '2026-08-19',
+    title: 'Add your home without a document, and tidy the lists',
+    items: [
+      'Home now takes an address and a rough value typed in — no mortgage statement needed, since plenty of households own outright',
+      'Answering "is this the home you live in?" fills the address in for you',
+      'Fixed a stray space before commas, and lists of three or more now take a serial comma',
+    ],
+  },
+  {
     version: '0.44.4',
     date: '2026-08-19',
     title: 'Recognize one insurer writing under two names',

@@ -19,6 +19,7 @@
 
 import type { DeductionLogEntry, FamilyMember, HouseholdProfile, TaxReturn } from './supabase';
 import { ageOf } from './familyTimeline';
+import { listOf } from './text';
 
 export type PlanningHorizon = 'act_by_dec_31' | 'act_by_april' | 'anytime' | 'watch';
 
@@ -184,7 +185,7 @@ export function computeTaxPlanning(
   });
   if (turningSeventeen.length > 0 && (priorReturn.child_tax_credit ?? 0) > 0) {
     items.push({
-      title: `${turningSeventeen.map((m) => m.name.split(/\s+/)[0]).join(' and ')} turns 17`,
+      title: `${listOf(turningSeventeen.map((m) => m.name.split(/\s+/)[0]))} turns 17`,
       finding:
         `The child tax credit turns on age at year end, so this is the last year — or the first year ` +
         `without it, depending on the birthday. You claimed ${money(priorReturn.child_tax_credit ?? 0)} ` +

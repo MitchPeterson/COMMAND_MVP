@@ -7,12 +7,13 @@ import { UploadDropzone } from '../components/UploadDropzone';
 import { HomeHealth } from '../components/HomeHealth';
 import { HomeSystemsPanel } from '../components/HomeSystemsPanel';
 import { MortgagePanel } from '../components/MortgagePanel';
+import { PropertyPanel } from '../components/PropertyPanel';
 import { HomeDocumentReview } from '../components/HomeDocumentReview';
 import { uploadDocumentAsset, invokeDocumentExtraction } from '../lib/supabase';
 import type { HomeSystemRow } from '../lib/homeSystems';
 import { Wrench, Home } from 'lucide-react';
 
-export function HomeView() {
+export function HomeView({ focusId = null }: { focusId?: string | null } = {}) {
   const { data, refresh } = useHousehold();
   const systems = (data?.homeSystems ?? []) as unknown as HomeSystemRow[];
   const mortgage = data?.mortgage ?? null;
@@ -45,6 +46,18 @@ export function HomeView() {
         systems={data?.homeSystems ?? []}
         onChanged={refresh}
       />
+
+      {/* The house before the loan against it. A follow-up asking "is this the
+          home you live in?" landed here and could only offer an uploader. */}
+      {data?.household?.id && (
+        <PropertyPanel
+          householdId={data.household.id}
+          assets={data?.assets ?? []}
+          profile={data?.profile ?? null}
+          prefillAddress={focusId}
+          onChanged={refresh}
+        />
+      )}
 
       {data?.household?.id && (
         <MortgagePanel

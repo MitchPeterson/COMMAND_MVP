@@ -2,6 +2,7 @@ import React from 'react';
 import type { FamilyMember, HouseholdProfile } from '../lib/supabase';
 import { familyTimeline, trumpAccountStanding, type EventKind } from '../lib/familyTimeline';
 import { Banknote, CalendarClock, Car, GraduationCap, HeartPulse, Scale } from 'lucide-react';
+import { listOf } from '../lib/text';
 
 interface Props {
   members: FamilyMember[];
@@ -101,7 +102,7 @@ export function FamilyTimeline({ members, profile }: Props) {
           {seedEligible.length > 0 && (
             <div className="mt-4 rounded-2xl border border-cmd-gold/25 bg-cmd-gold/5 p-4">
               <p className="text-sm font-semibold text-cmd-offwhite">
-                {seedEligible.map((t) => t.member.name.split(/\s+/)[0]).join(' and ')} qualif
+                {listOf(seedEligible.map((t) => t.member.name.split(/\s+/)[0]))} qualif
                 {seedEligible.length === 1 ? 'ies' : 'y'} for the $1,000 federal contribution
               </p>
               <p className="mt-1 text-sm text-cmd-muted">
@@ -114,13 +115,13 @@ export function FamilyTimeline({ members, profile }: Props) {
           {canHold.length > 0 && (
             <div className="mt-4 rounded-2xl border border-cmd-border bg-cmd-black/40 p-4">
               <p className="text-sm font-semibold text-cmd-offwhite">
-                {canHold.map((t) => t.member.name.split(/\s+/)[0]).join(', ')} can hold an account, but
+                {listOf(canHold.map((t) => t.member.name.split(/\s+/)[0]))} can hold an account, but
                 {canHold.length === 1 ? ' does' : ' do'} not qualify for the $1,000
               </p>
               <p className="mt-1 text-sm text-cmd-muted">
                 Any child under 18 with a Social Security number may have one. The federal contribution is
                 limited to children born from 2025 onward, and{' '}
-                {canHold.map((t) => t.member.name.split(/\s+/)[0]).join(' and ')} predate{canHold.length === 1 ? 's' : ''} that.
+                {listOf(canHold.map((t) => t.member.name.split(/\s+/)[0]))} predate{canHold.length === 1 ? 's' : ''} that.
               </p>
             </div>
           )}

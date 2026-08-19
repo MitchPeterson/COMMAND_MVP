@@ -11,6 +11,7 @@
 import React from 'react';
 import { ArrowRight, FileText, Sparkles } from 'lucide-react';
 import type { SectionIntroCopy } from '../lib/sectionIntros';
+import { listSeparator } from '../lib/text';
 
 interface Props {
   intro: SectionIntroCopy;
@@ -42,13 +43,18 @@ export function SectionIntro({ intro, onAction, icon }: Props) {
         {intro.feeds.length > 0 && (
           <p className="mt-4 inline-flex flex-wrap items-center justify-center gap-1.5 rounded-full border border-cmd-border bg-cmd-black/40 px-4 py-1.5 text-xs text-cmd-muted">
             <Sparkles className="h-3 w-3 shrink-0 text-cmd-gold" />
-            Filling this in also sharpens{' '}
-            {intro.feeds.map((f, i) => (
-              <React.Fragment key={f}>
-                {i > 0 && (i === intro.feeds.length - 1 ? ' and ' : ', ')}
-                <span className="text-cmd-offwhite">{f}</span>
-              </React.Fragment>
-            ))}
+            {/* One flex child, not one per word. The separators were flex items
+                of their own, so the container's gap opened a space in front of
+                every comma — "Finances , Home and Family". */}
+            <span>
+              Filling this in also sharpens{' '}
+              {intro.feeds.map((f, i) => (
+                <React.Fragment key={f}>
+                  {listSeparator(i, intro.feeds.length)}
+                  <span className="text-cmd-offwhite">{f}</span>
+                </React.Fragment>
+              ))}
+            </span>
           </p>
         )}
 

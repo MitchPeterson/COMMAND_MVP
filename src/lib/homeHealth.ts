@@ -10,6 +10,7 @@
 
 import type { HouseholdProfile } from './supabase';
 import { outlookFor, replacementTimeline, computeEquity, type HomeSystemRow } from './homeSystems';
+import { listOf } from './text';
 
 export type HomeFindingSeverity = 'critical' | 'attention' | 'info';
 
@@ -58,7 +59,7 @@ export function computeHomeHealth(
       severity: past.length >= 3 || total >= 20000 ? 'critical' : 'attention',
       title: `${past.length} system${past.length === 1 ? ' is' : 's are'} past typical service life`,
       detail:
-        `${past.map((o) => o.system.name).join(', ')}. Together they would cost roughly ${money(total)} ` +
+        `${listOf(past.map((o) => o.system.name))}. Together they would cost roughly ${money(total)} ` +
         `to replace at typical prices. Past its life does not mean about to fail — it means the money ` +
         `should be a known number rather than a surprise.`,
     });
@@ -71,7 +72,7 @@ export function computeHomeHealth(
     findings.push({
       severity: 'attention',
       title: `${soon.length} system${soon.length === 1 ? '' : 's'} within two years of replacement`,
-      detail: `${soon.map((o) => o.system.name).join(', ')} — roughly ${money(total)} at typical prices.`,
+      detail: `${listOf(soon.map((o) => o.system.name))} — roughly ${money(total)} at typical prices.`,
     });
   }
 
@@ -98,7 +99,7 @@ export function computeHomeHealth(
     findings.push({
       severity: 'info',
       title: `${expiredWarranty.length} warrant${expiredWarranty.length === 1 ? 'y has' : 'ies have'} expired`,
-      detail: `${expiredWarranty.map((o) => o.system.name).join(', ')} — repairs are now out of pocket.`,
+      detail: `${listOf(expiredWarranty.map((o) => o.system.name))} — repairs are now out of pocket.`,
     });
   }
 
@@ -121,7 +122,7 @@ export function computeHomeHealth(
       severity: 'info',
       title: `${unknownAge.length} system${unknownAge.length === 1 ? '' : 's'} without an age`,
       detail:
-        `${unknownAge.map((o) => o.system.name).join(', ')} cannot be placed on the timeline. An ` +
+        `${listOf(unknownAge.map((o) => o.system.name))} cannot be placed on the timeline. An ` +
         `approximate age is enough.`,
     });
   }

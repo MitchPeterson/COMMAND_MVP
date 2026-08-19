@@ -17,6 +17,7 @@ import { AddPolicyForm } from '../components/AddPolicyForm';
 import { EditPolicyPanel } from '../components/EditPolicyPanel';
 import { RecordHistory } from '../components/RecordHistory';
 import { ChevronDown, ChevronRight, FileWarning, History, Pencil, Shield, Trash2 } from 'lucide-react';
+import { carrierGroup } from '../lib/carriers';
 
 
 
@@ -452,6 +453,16 @@ export function InsuranceView() {
                       <h3 className="mt-2 text-xl font-semibold text-cmd-offwhite">
                         {policy.carrier ?? 'Unknown carrier'}
                       </h3>
+                      {/* Large insurers write through member companies whose
+                          names never appear in their advertising, which reads
+                          as two insurers when it is one. The document's own
+                          wording stays; this only says who is behind it. */}
+                      {(() => {
+                        const group = carrierGroup(policy.carrier);
+                        return group.known && group.label !== (policy.carrier ?? '').trim() ? (
+                          <p className="mt-1 text-xs text-cmd-muted">Part of {group.label}</p>
+                        ) : null;
+                      })()}
                       <p className="mt-1 text-sm text-cmd-muted">
                         Policy #{policy.policy_number ?? 'N/A'}
                         {policy.coverage_amount ? ` · ${currency(policy.coverage_amount)} limit` : ''}

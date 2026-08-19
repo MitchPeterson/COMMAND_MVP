@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.44.4',
+    date: '2026-08-19',
+    title: 'Recognize one insurer writing under two names',
+    items: [
+      'Owners and Auto-Owners are read as one carrier, as are State Farm, Travelers, USAA and other groups that underwrite through member companies',
+      'A policy card says which group a member company belongs to, without changing what the document printed',
+      'Duplicate detection compares carriers by group, so one policy read twice under two names is caught',
+    ],
+  },
+  {
     version: '0.44.3',
     date: '2026-08-17',
     title: 'Stop asking questions you already answered',

@@ -12,6 +12,7 @@
 // rather than a black-box number.
 
 import type { HouseholdProfile, InsurancePolicy, InsurancePolicyExtraction } from './supabase';
+import { carrierGroup } from './carriers';
 
 export type FindingSeverity = 'critical' | 'attention' | 'info';
 
@@ -224,11 +225,14 @@ export function computeCoverageHealth(
   // A policy number is required to call something a duplicate. Two genuinely
   // different policies with the same carrier — a life policy each for two
   // spouses — share everything else, so matching on carrier alone is wrong.
+  // The carrier is compared as a group: one policy read from a declarations
+  // page and again from the policy itself can carry two member companies'
+  // names, and matching the raw strings missed it as a duplicate.
   const seen = new Map<string, { count: number; carrier: string; number: string }>();
   for (const p of policies) {
     const number = (p.policy_number ?? '').trim();
     if (!number) continue;
-    const key = `${(p.carrier ?? '').trim().toLowerCase()}|${number.toLowerCase()}`;
+    const key = `${carrierGroup(p.carrier).key}|${number.toLowerCase()}`;
     const entry = seen.get(key);
     seen.set(key, { count: (entry?.count ?? 0) + 1, carrier: p.carrier ?? 'Unknown carrier', number });
   }

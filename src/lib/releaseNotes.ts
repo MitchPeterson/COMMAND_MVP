@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.46.0',
+    date: '2026-08-20',
+    title: 'Take a snapshot to a meeting',
+    items: [
+      'A new Reports section builds a PDF for a financial planner, a tax preparer or an insurance agent',
+      'Each report carries only what that professional will ask for, labels whether a figure was read from a document or entered by hand, and ends with what Command could not see',
+      'Saved through your browser\'s print dialog, branded and set for paper',
+    ],
+  },
+  {
     version: '0.45.1',
     date: '2026-08-20',
     title: 'Fix a form that reopened after saving',

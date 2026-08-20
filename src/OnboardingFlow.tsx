@@ -11,6 +11,7 @@ import {
   CheckCircle,
   Circle,
 } from 'lucide-react';
+import { Logo } from './components/Logo';
 
 // ─────────────────────────────────────────────
 // Types
@@ -1058,7 +1059,7 @@ export const OnboardingFlow: React.FC<OnboardingFlowProps> = ({ userId, onComple
         <div className="relative z-10 text-center max-w-sm w-full">
           {/* Logo */}
           <div className="mb-10">
-            <img src="/Command_Logo.png" alt="Command" className="h-24 mx-auto" />
+            <Logo className="h-24 mx-auto" />
           </div>
 
           {/* Headline */}

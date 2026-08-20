@@ -18,6 +18,7 @@ import React, { useMemo, useState } from 'react';
 import { FileDown, Printer, Check } from 'lucide-react';
 import { useHousehold } from '../useHousehold';
 import { AUDIENCES, buildReport, type Audience, type ReportSection } from '../lib/reportPack';
+import { Logo } from '../components/Logo';
 
 function SectionBlock({ section }: { section: ReportSection }) {
   const hasRows = (section.rows?.length ?? 0) > 0;
@@ -170,7 +171,7 @@ export function ReportsView() {
             </p>
             <p className="mt-0.5 text-[11px] text-neutral-500">Prepared {report.generatedOn}</p>
           </div>
-          <img src="/Command_Logo.png" alt="Command" className="h-9 w-auto shrink-0 object-contain" />
+          <Logo tone="light" className="h-9 w-auto shrink-0 object-contain" />
         </header>
 
         <p className="mt-5 text-[11px] leading-5 text-neutral-500">

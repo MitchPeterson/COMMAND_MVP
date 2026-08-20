@@ -561,15 +561,22 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
 
       <FollowUps followUps={followUps} onOpen={(section, prefill) => onNavigate?.(section, prefill)} />
 
-      {/* The guide used to return instead of the dashboard, so a household with
-          two sections filled in saw none of what it had already put in. It sits
-          above the summary now, and every card below hides itself when it has
-          nothing to say — the complexity builds up rather than switching on. */}
+      {/* While a household is still filling things in, the guide is the page.
+          Not because the summary would be empty — there is usually a document
+          and a date by now — but because the loudest thing on it would be a
+          grade, and a grade built on two of seven sections measures how much
+          has been uploaded rather than how the household is doing. Command
+          does not tell someone they are "at risk" for not having finished
+          onboarding.
+
+          The cards below still gate themselves individually, which is what
+          keeps the first real dashboard from arriving full of zeroes. */}
       {stillSettingUp && (
         <GettingStarted
           steps={setupSteps}
           userName={data?.profile?.primary_first_name ?? data?.profile?.primary_name ?? null}
           onOpen={(section) => onNavigate?.(section)}
+          summaryAt={3}
         />
       )}
 
@@ -583,7 +590,7 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
 
       {/* The summary layer: counts, then position, what is due and how the
           policies stand. Checked rather than read, so it leads. */}
-      {hasSomethingToSummarize && (
+      {!stillSettingUp && hasSomethingToSummarize && (
       <HouseholdOverview
         onOpen={(section) => onNavigate?.(section)}
         stats={[
@@ -608,7 +615,7 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
       />
       )}
 
-      {(position.assets > 0 || timelineEvents.length > 0 || spotlight.length > 0) && (
+      {!stillSettingUp && (position.assets > 0 || timelineEvents.length > 0 || spotlight.length > 0) && (
       <div className="grid min-w-0 gap-6 xl:grid-cols-3">
         {position.assets > 0 && <PositionCard position={position} onOpen={() => onNavigate?.('finances')} />}
         {timelineEvents.length > 0 && <UpcomingTasks events={timelineEvents} onOpen={() => onNavigate?.('family')} />}
@@ -621,7 +628,7 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
       </div>
       )}
 
-      {(data?.documents ?? []).length > 0 && (
+      {!stillSettingUp && (data?.documents ?? []).length > 0 && (
         <RecentDocuments documents={data?.documents ?? []} onOpen={() => onNavigate?.('documents')} />
       )}
 

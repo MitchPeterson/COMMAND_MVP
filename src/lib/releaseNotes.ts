@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.50.2',
+    date: '2026-08-20',
+    title: 'Hold the summary until it means something',
+    items: [
+      'While you are still adding areas, the dashboard stays a guide — and now says what it is waiting for and why',
+      'A score built on two of seven areas would mostly reflect what has not been added yet',
+    ],
+  },
+  {
     version: '0.50.1',
     date: '2026-08-20',
     title: 'Show what you have while you are still adding to it',

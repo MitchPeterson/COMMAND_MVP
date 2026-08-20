@@ -36,6 +36,10 @@ import {
   AlertTriangle,
   ArrowRight,
 } from 'lucide-react';
+import {
+  HouseholdOverview, PositionCard, UpcomingTasks, PolicyReview, RecentDocuments,
+  positionOf, overviewIcons, dashboardMoney,
+} from '../components/DashboardPanels';
 
 const severityOrder = ['critical', 'high', 'medium', 'low'] as const;
 const severityLabels = {
@@ -292,6 +296,35 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
   // Any section with a live score overrides its stored row. The stored rows were
   // written once at onboarding and never recalculated, so without this an upload
   // changes the section page and leaves the dashboard telling the old story.
+  // The summary layer the new layout leads with. All of it is data the page
+  // already loads; none of it is a new query.
+  const position = useMemo(() => positionOf({
+    accounts: data?.financeAccounts ?? [],
+    assets: data?.assets ?? [],
+    loans: data?.loans ?? [],
+    cards: data?.creditCards ?? [],
+    mortgage: data?.mortgage ?? null,
+    statedNetWorth: data?.profile?.net_worth ?? null,
+  }), [data?.financeAccounts, data?.assets, data?.loans, data?.creditCards, data?.mortgage, data?.profile?.net_worth]);
+
+  const policyStanding = useMemo(() => {
+    const policies = data?.insurancePolicies ?? [];
+    const soon = new Date();
+    soon.setDate(soon.getDate() + 60);
+    let upToDate = 0;
+    let expiringSoon = 0;
+    for (const policy of policies) {
+      const renews = policy.renewal_date ? new Date(`${policy.renewal_date}T00:00:00Z`) : null;
+      if (renews && renews <= soon) expiringSoon += 1;
+      else upToDate += 1;
+    }
+    // A reading the household has not accepted is not yet a policy, so it is
+    // counted as waiting rather than folded in with the ones in force.
+    const needsReview = (data?.insuranceExtractions ?? [])
+      .filter((e) => e.review_status === 'pending_review').length;
+    return { upToDate, expiringSoon, needsReview };
+  }, [data?.insurancePolicies, data?.insuranceExtractions]);
+
   const liveScores = useMemo(() => {
     const live: Record<string, { score: number; status: string; summary: string }> = {};
     if (coverage.score !== null) {
@@ -539,6 +572,38 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
           onDismiss={() => { dismissInsight(firstInsight.title); setInsightDismissed(true); }}
         />
       )}
+
+      {/* The summary layer: counts, then position, what is due and how the
+          policies stand. Checked rather than read, so it leads. */}
+      <HouseholdOverview
+        onOpen={(section) => onNavigate?.(section)}
+        stats={[
+          {
+            label: 'Policies in force', value: String((data?.insurancePolicies ?? []).length),
+            icon: overviewIcons.policies, section: 'insurance',
+          },
+          {
+            label: 'Net worth on file', value: dashboardMoney(position.net, true),
+            icon: overviewIcons.worth, section: 'finances', linkLabel: 'View details',
+          },
+          {
+            label: 'Dated in the next 90 days', value: String(timelineEvents.length),
+            icon: overviewIcons.tasks, section: 'family', linkLabel: 'View dates',
+          },
+          {
+            label: 'Documents read', value: String((data?.documents ?? []).length),
+            icon: overviewIcons.documents, section: 'documents',
+          },
+        ]}
+      />
+
+      <div className="grid min-w-0 gap-6 xl:grid-cols-3">
+        <PositionCard position={position} onOpen={() => onNavigate?.('finances')} />
+        <UpcomingTasks events={timelineEvents} onOpen={() => onNavigate?.('family')} />
+        <PolicyReview standing={policyStanding} onOpen={() => onNavigate?.('insurance')} />
+      </div>
+
+      <RecentDocuments documents={data?.documents ?? []} onOpen={() => onNavigate?.('documents')} />
 
       {/* min-w-0 on both tracks: a grid child defaults to min-width:auto, so a
           single long document title stretched the left column past its fraction

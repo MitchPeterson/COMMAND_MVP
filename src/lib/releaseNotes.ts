@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.48.0',
+    date: '2026-08-20',
+    title: 'A summary layer on the dashboard',
+    items: [
+      'The dashboard now opens with a strip of counts, then your position, what is dated next, and how your policies stand',
+      'Policies are shown as a ring: in force, renewing within 60 days, and readings still waiting on you',
+    ],
+  },
+  {
     version: '0.47.0',
     date: '2026-08-20',
     title: 'The new logo, throughout',

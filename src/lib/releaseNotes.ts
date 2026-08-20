@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.50.1',
+    date: '2026-08-20',
+    title: 'Show what you have while you are still adding to it',
+    items: [
+      'The getting-started guide no longer replaces the dashboard — it sits above whatever you have already put in',
+      'Each summary card appears once it has something to show, rather than all of them switching on at once',
+    ],
+  },
+  {
     version: '0.50.0',
     date: '2026-08-20',
     title: 'One section in the spotlight, and the score back on top',

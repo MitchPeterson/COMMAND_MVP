@@ -320,7 +320,11 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
   ].map((s) => ({
     id: s.id, label: s.label, score: s.score, grade: s.grade, status: s.status,
     findings: s.findings as SpotlightSection['findings'],
-  }))), [coverage, legal, finances, credit, home, taxes, family]);
+  }))
+    // An empty section has no grade worth rotating to, and a household still
+    // filling things in should not page through five cards saying "ungraded".
+    .filter((s) => s.score != null || s.findings.length > 0)),
+  [coverage, legal, finances, credit, home, taxes, family]);
 
   // A different section leads each visit. Stored rather than random so a
   // reload does not reshuffle the page under someone mid-read.
@@ -535,27 +539,13 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
   const scoreState = getScoreState(healthScore);
   const openPriorityCount = rankedActions.length;
 
-  if (stillSettingUp) {
-    return (
-      <div className="space-y-6">
-        {/* The brief still opens over the guide: a deadline is worth knowing
-            about whether or not setup is finished. */}
-        {briefOpen && (
-          <WeeklyBrief
-            digest={digest}
-            onOpenSection={(section) => { closeBrief(); onNavigate?.(section); }}
-            onClose={closeBrief}
-          />
-        )}
-        <FollowUps followUps={followUps} onOpen={(section, prefill) => onNavigate?.(section, prefill)} />
-        <GettingStarted
-          steps={setupSteps}
-          userName={data?.profile?.primary_first_name ?? data?.profile?.primary_name ?? null}
-          onOpen={(section) => onNavigate?.(section)}
-        />
-      </div>
-    );
-  }
+  // Zeroes across the board are discouraging rather than informative, so the
+  // strip waits until at least one of its four numbers means something.
+  const hasSomethingToSummarize =
+    (data?.documents ?? []).length > 0
+    || position.assets > 0
+    || timelineEvents.length > 0
+    || healthScore != null;
 
   return (
     <div className="space-y-6">
@@ -571,7 +561,19 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
 
       <FollowUps followUps={followUps} onOpen={(section, prefill) => onNavigate?.(section, prefill)} />
 
-      {firstInsight && !insightDismissed && (
+      {/* The guide used to return instead of the dashboard, so a household with
+          two sections filled in saw none of what it had already put in. It sits
+          above the summary now, and every card below hides itself when it has
+          nothing to say — the complexity builds up rather than switching on. */}
+      {stillSettingUp && (
+        <GettingStarted
+          steps={setupSteps}
+          userName={data?.profile?.primary_first_name ?? data?.profile?.primary_name ?? null}
+          onOpen={(section) => onNavigate?.(section)}
+        />
+      )}
+
+      {!stillSettingUp && firstInsight && !insightDismissed && (
         <FirstInsight
           insight={firstInsight}
           onOpen={(section) => onNavigate?.(section)}
@@ -581,6 +583,7 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
 
       {/* The summary layer: counts, then position, what is due and how the
           policies stand. Checked rather than read, so it leads. */}
+      {hasSomethingToSummarize && (
       <HouseholdOverview
         onOpen={(section) => onNavigate?.(section)}
         stats={[
@@ -603,10 +606,12 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
           },
         ]}
       />
+      )}
 
+      {(position.assets > 0 || timelineEvents.length > 0 || spotlight.length > 0) && (
       <div className="grid min-w-0 gap-6 xl:grid-cols-3">
-        <PositionCard position={position} onOpen={() => onNavigate?.('finances')} />
-        <UpcomingTasks events={timelineEvents} onOpen={() => onNavigate?.('family')} />
+        {position.assets > 0 && <PositionCard position={position} onOpen={() => onNavigate?.('finances')} />}
+        {timelineEvents.length > 0 && <UpcomingTasks events={timelineEvents} onOpen={() => onNavigate?.('family')} />}
         <SectionSpotlight
           sections={spotlight}
           index={spotlightIndex}
@@ -614,9 +619,14 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
           onOpen={(section) => onNavigate?.(section)}
         />
       </div>
+      )}
 
-      <RecentDocuments documents={data?.documents ?? []} onOpen={() => onNavigate?.('documents')} />
+      {(data?.documents ?? []).length > 0 && (
+        <RecentDocuments documents={data?.documents ?? []} onOpen={() => onNavigate?.('documents')} />
+      )}
 
+      {!stillSettingUp && (
+      <>
       {/* min-w-0 on both tracks: a grid child defaults to min-width:auto, so a
           single long document title stretched the left column past its fraction
           and pushed Priority Actions off the side of the page. */}
@@ -941,6 +951,8 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
               not two features. */}
         </div>
       </div>
+      </>
+      )}
 
       {/* Demoted, as on every section page: uploading is a means to the summary
           above, not the thing a dashboard is for. */}

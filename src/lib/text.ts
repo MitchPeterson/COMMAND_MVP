@@ -26,3 +26,12 @@ export function listSeparator(index: number, total: number, conjunction: 'and' |
   if (index < total - 1) return ', ';
   return total === 2 ? ` ${conjunction} ` : `, ${conjunction} `;
 }
+
+/**
+ * A label reduced to what identifies it, for deciding whether two entries are
+ * the same thing. "4218 Sunnyside Road, Edina MN" and "4218 SUNNYSIDE ROAD
+ * EDINA MN" are one house.
+ */
+export function normalizeLabel(value: string | null | undefined): string {
+  return (value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}

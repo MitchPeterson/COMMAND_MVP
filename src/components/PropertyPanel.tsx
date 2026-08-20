@@ -10,12 +10,13 @@
 // here, and the property is what the follow-up was asking about, so answering it
 // retires the question.
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Home, Plus, Trash2 } from 'lucide-react';
 import {
   addAsset, deleteAsset, updateHouseholdProfile,
   type Asset, type HouseholdProfile,
 } from '../lib/supabase';
+import { normalizeLabel } from '../lib/text';
 
 interface Props {
   householdId: string;
@@ -34,7 +35,9 @@ const money = (value: number | null) =>
   value == null ? 'Value not recorded' : `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
 export function PropertyPanel({ householdId, assets, profile, prefillAddress, onChanged }: Props) {
-  const [open, setOpen] = useState(false);
+  // null means "follow the question that sent us here"; true/false is a choice
+  // the user has made since.
+  const [manual, setManual] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', current_value: '', notes: '' });
@@ -42,19 +45,40 @@ export function PropertyPanel({ householdId, assets, profile, prefillAddress, on
 
   const properties = assets.filter((a) => a.type === 'real_estate');
 
-  // Arriving from the question that named the address opens the form holding
-  // it. Being asked about a house and then handed an empty form is the moment
-  // someone gives up.
+  // Whether the address the question named is already on file — derived from
+  // the data, never from a flag.
+  //
+  // Saving calls refresh(), which puts useHousehold back into loading; App
+  // swaps the whole tree for the spinner and this panel is unmounted and
+  // remounted. A useState/useEffect pair reopened the prefilled form every
+  // time, so the save looked like it had failed and a second click made a
+  // second house. Only the record survives that.
+  const alreadyRecorded = useMemo(() => {
+    const wanted = normalizeLabel(prefillAddress);
+    return wanted.length > 0 && properties.some((p) => normalizeLabel(p.name) === wanted);
+  }, [prefillAddress, properties]);
+
+  const shouldPrompt = Boolean(prefillAddress) && !alreadyRecorded;
+  const open = manual === null ? shouldPrompt : manual;
+
+  // Being asked about a house and then handed an empty form is the moment
+  // someone gives up, so the answer arrives with the question already in it.
   useEffect(() => {
-    if (!prefillAddress) return;
-    setForm((prev) => ({ ...prev, name: prefillAddress }));
-    setOpen(true);
+    if (!shouldPrompt) return;
+    setForm((prev) => (prev.name ? prev : { ...prev, name: prefillAddress ?? '' }));
     anchor.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-  }, [prefillAddress]);
+  }, [shouldPrompt, prefillAddress]);
 
   const save = async () => {
     if (!form.name.trim()) {
       setError('An address is needed, even a rough one.');
+      return;
+    }
+    // Second layer. The reopening form made duplicates easy to create, and a
+    // house recorded twice quietly doubles a net worth.
+    const wanted = normalizeLabel(form.name);
+    if (properties.some((p) => normalizeLabel(p.name) === wanted)) {
+      setError('That address is already on file. Edit or remove the one above if it needs changing.');
       return;
     }
     setBusy(true);
@@ -74,7 +98,7 @@ export function PropertyPanel({ householdId, assets, profile, prefillAddress, on
         await updateHouseholdProfile(householdId, { home_value: entered });
       }
       setForm({ name: '', current_value: '', notes: '' });
-      setOpen(false);
+      setManual(false);
       await onChanged();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not save that.');
@@ -136,7 +160,7 @@ export function PropertyPanel({ householdId, assets, profile, prefillAddress, on
       {!open ? (
         <button
           type="button"
-          onClick={() => { setError(null); setOpen(true); }}
+          onClick={() => { setError(null); setManual(true); }}
           className="mt-6 inline-flex items-center gap-2 rounded-full border border-cmd-border px-4 py-2 text-sm text-cmd-offwhite transition hover:border-cmd-gold hover:text-cmd-gold"
         >
           <Plus className="h-4 w-4" />
@@ -144,7 +168,7 @@ export function PropertyPanel({ householdId, assets, profile, prefillAddress, on
         </button>
       ) : (
         <div className="mt-5 rounded-3xl border border-cmd-gold/30 bg-cmd-charcoal p-5">
-          {prefillAddress && (
+          {prefillAddress && !alreadyRecorded && (
             <p className="mb-4 rounded-xl border border-cmd-gold/25 bg-cmd-gold/5 px-3 py-2 text-sm text-cmd-muted">
               Filled in from your insurance policy. Change anything that is not right, and add its
               value if you know it.
@@ -155,7 +179,7 @@ export function PropertyPanel({ householdId, assets, profile, prefillAddress, on
               Address
               <input
                 value={form.name}
-                placeholder="4218 Sunnyside Road, Edina MN"
+                placeholder="123 Main Street, Springfield MN"
                 className={field}
                 onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
               />
@@ -165,7 +189,7 @@ export function PropertyPanel({ householdId, assets, profile, prefillAddress, on
               <input
                 value={form.current_value}
                 inputMode="decimal"
-                placeholder="985000"
+                placeholder="450000"
                 className={field}
                 onChange={(e) => setForm((p) => ({ ...p, current_value: e.target.value }))}
               />
@@ -186,7 +210,7 @@ export function PropertyPanel({ householdId, assets, profile, prefillAddress, on
             </button>
             <button
               type="button"
-              onClick={() => { setOpen(false); setError(null); }}
+              onClick={() => { setManual(false); setError(null); }}
               className="rounded-full border border-cmd-border px-5 py-2 text-sm text-cmd-muted transition hover:text-cmd-offwhite"
             >
               Cancel

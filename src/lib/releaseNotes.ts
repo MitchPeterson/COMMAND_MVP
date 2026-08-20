@@ -25,6 +25,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.46.1',
+    date: '2026-08-20',
+    title: 'Use the light logo where the background is light',
+    items: [
+      'The printed report takes a light-background logo instead of the dark one, which landed as a black rectangle on a white page',
+    ],
+  },
+  {
     version: '0.46.0',
     date: '2026-08-20',
     title: 'Take a snapshot to a meeting',

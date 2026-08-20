@@ -37,8 +37,8 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import {
-  HouseholdOverview, PositionCard, UpcomingTasks, SectionSpotlight, RecentDocuments,
-  positionOf, overviewIcons, dashboardMoney, type SpotlightSection,
+  HouseholdOverview, PositionCard, UpcomingTasks, SectionSpotlight,
+  positionOf, overviewIcons, type SpotlightSection,
 } from '../components/DashboardPanels';
 
 const severityOrder = ['critical', 'high', 'medium', 'low'] as const;
@@ -538,6 +538,19 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
 
   const scoreState = getScoreState(healthScore);
   const openPriorityCount = rankedActions.length;
+  const criticalCount = rankedActions.filter((a) => a.severity === 'critical').length;
+
+  // Completeness measured the same way the setup guide measures it — areas with
+  // something in them — so the two never disagree about how far along a
+  // household is. The link says "areas started" rather than implying every
+  // field within them is filled.
+  const profileComplete = {
+    done: setupSteps.filter((s) => s.done).length,
+    total: setupSteps.length,
+    percent: setupSteps.length === 0
+      ? 0
+      : Math.round((setupSteps.filter((s) => s.done).length / setupSteps.length) * 100),
+  };
 
   // Zeroes across the board are discouraging rather than informative, so the
   // strip waits until at least one of its four numbers means something.
@@ -595,21 +608,35 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
         onOpen={(section) => onNavigate?.(section)}
         stats={[
           {
-            label: healthScore == null ? 'Not enough on file to grade' : `Household score · ${scoreState.label}`,
+            label: 'Household score',
             value: healthScore == null ? '--' : String(healthScore),
-            icon: overviewIcons.score, section: undefined,
+            state: healthScore == null ? undefined : scoreState.label,
+            valueClassName: scoreState.className,
+            icon: overviewIcons.score,
+            scrollTo: 'dashboard-score',
+            linkLabel: 'See what drives it',
           },
           {
-            label: 'Net worth on file', value: dashboardMoney(position.net, true),
-            icon: overviewIcons.worth, section: 'finances', linkLabel: 'View details',
+            label: 'Profile complete',
+            value: `${profileComplete.percent}%`,
+            icon: overviewIcons.complete,
+            section: 'profile',
+            linkLabel: `${profileComplete.done} of ${profileComplete.total} areas started`,
           },
           {
-            label: 'Dated in the next 90 days', value: String(timelineEvents.length),
-            icon: overviewIcons.tasks, section: 'family', linkLabel: 'View dates',
+            label: criticalCount === 1 ? 'Critical action' : 'Critical actions',
+            value: String(criticalCount),
+            valueClassName: criticalCount > 0 ? 'text-red-400' : 'text-cmd-offwhite',
+            icon: overviewIcons.critical,
+            scrollTo: 'dashboard-actions',
+            linkLabel: criticalCount > 0 ? 'See what needs doing' : 'Nothing critical',
           },
           {
-            label: 'Documents read', value: String((data?.documents ?? []).length),
-            icon: overviewIcons.documents, section: 'documents',
+            label: 'Documents read',
+            value: String((data?.documents ?? []).length),
+            icon: overviewIcons.documents,
+            section: 'documents',
+            linkLabel: 'Open the vault',
           },
         ]}
       />
@@ -628,9 +655,6 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
       </div>
       )}
 
-      {!stillSettingUp && (data?.documents ?? []).length > 0 && (
-        <RecentDocuments documents={data?.documents ?? []} onOpen={() => onNavigate?.('documents')} />
-      )}
 
       {!stillSettingUp && (
       <>
@@ -639,7 +663,7 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
           and pushed Priority Actions off the side of the page. */}
       <div className="grid min-w-0 gap-6 xl:grid-cols-[1.4fr_minmax(0,1fr)]">
         <div className="min-w-0 space-y-6">
-          <section className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-8 shadow-sm shadow-black/10">
+          <section id="dashboard-score" className="scroll-mt-24 rounded-3xl border border-cmd-border bg-cmd-charcoal p-8 shadow-sm shadow-black/10">
             <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <div className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Household Health Score</div>
@@ -882,7 +906,7 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
         </div>
 
         <div className="min-w-0 space-y-6">
-          <section className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-6">
+          <section id="dashboard-actions" className="scroll-mt-24 rounded-3xl border border-cmd-border bg-cmd-charcoal p-6">
             <div className="mb-6 flex items-center justify-between gap-4">
               <div className="min-w-0">
                 <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Priority actions</p>

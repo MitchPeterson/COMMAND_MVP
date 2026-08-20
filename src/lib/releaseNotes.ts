@@ -25,6 +25,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.46.2',
+    date: '2026-08-20',
+    title: 'Prepare the logo to sit on any surface',
+    items: [
+      'The logo now loads a transparent-background asset chosen for the surface behind it, falling back to the existing one until those assets are in place',
+    ],
+  },
+  {
     version: '0.46.1',
     date: '2026-08-20',
     title: 'Use the light logo where the background is light',

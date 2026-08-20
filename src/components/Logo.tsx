@@ -11,7 +11,7 @@
 // neutral wordmark is recolored for the surface. Replacing the artwork means
 // replacing that one file and regenerating.
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 
 /** Gold mark, off-white wordmark. For Command Black and charcoal. */
 const ON_DARK = '/Command_Logo_OnDark.png';
@@ -24,10 +24,23 @@ interface Props {
   className?: string;
 }
 
-export function Logo({ tone = 'dark', className }: Props) {
+export function Logo({ tone, className }: Props) {
+  // With no tone given, follow the page. The light preview turned the sidebar
+  // white and left an off-white wordmark on it, which is nearly invisible.
+  const [pageIsLight, setPageIsLight] = useState(false);
+  useEffect(() => {
+    const read = () => setPageIsLight(document.documentElement.classList.contains('theme-light'));
+    read();
+    const observer = new MutationObserver(read);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const light = tone ? tone === 'light' : pageIsLight;
+
   return (
     <img
-      src={tone === 'light' ? ON_LIGHT : ON_DARK}
+      src={light ? ON_LIGHT : ON_DARK}
       alt="Command"
       className={className}
     />

@@ -18,6 +18,7 @@ import { AppHeader } from './components/AppHeader';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { WhatsNew } from './components/WhatsNew';
 import { unseenReleases } from './lib/releaseNotes';
+import { ReportsView } from './views/Reports';
 
 function App() {
   const { data, loading, userId, refresh } = useHousehold();
@@ -141,6 +142,8 @@ function App() {
         return <FamilyView focusId={focusId} />;
       case 'credit':
         return <CreditView />;
+      case 'reports':
+        return <ReportsView />;
       case 'documents':
         return <DocumentsView onNavigate={navigate} focusId={focusId} />;
       case 'profile':

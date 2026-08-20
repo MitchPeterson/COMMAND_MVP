@@ -1,15 +1,5 @@
 import React from 'react';
-import {
-  LayoutDashboard,
-  Shield,
-  FileText,
-  Home,
-  Wallet,
-  Receipt,
-  Users,
-  CreditCard,
-  Folder,
-} from 'lucide-react';
+import { CreditCard, FileDown, FileText, Folder, Home, LayoutDashboard, Receipt, Shield, Users, Wallet } from 'lucide-react';
 import { HubMark } from './HubMark';
 
 // Exported so the header's search matches the same sections the sidebar shows.
@@ -25,6 +15,7 @@ export const navItems = [
   { id: 'taxes', label: 'Taxes', Icon: Receipt },
   { id: 'family', label: 'Family', Icon: Users },
   { id: 'documents', label: 'Documents', Icon: Folder },
+  { id: 'reports', label: 'Reports', Icon: FileDown },
 ];
 
 interface SidebarProps {

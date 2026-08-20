@@ -13,3 +13,46 @@ body {
 html {
   scroll-behavior: smooth;
 }
+
+/* ── The printed report ────────────────────────────────────────────────────
+   A snapshot leaves the household and is read by a professional, often on
+   paper. It is set light-on-white regardless of the app's own theme, and
+   everything outside the report — sidebar, header, the picker that produced
+   it — is hidden rather than restyled. */
+@media print {
+  html, body {
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+  body * {
+    visibility: hidden;
+  }
+  .print-report, .print-report * {
+    visibility: visible;
+  }
+  .print-report {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    padding: 0;
+    margin: 0;
+    background: #ffffff !important;
+    color: #111111 !important;
+  }
+  .print-hide {
+    display: none !important;
+  }
+  /* A section should not be split across a page break mid-table. */
+  .print-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  .print-break {
+    break-before: page;
+    page-break-before: always;
+  }
+  @page {
+    margin: 16mm 14mm;
+  }
+}

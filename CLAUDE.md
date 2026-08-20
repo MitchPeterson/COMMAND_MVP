@@ -316,7 +316,24 @@ sections, so the findings agree with each other rather than each inventing a sto
 ## Before production users
 
 Deliberately deferred on Aug 17, 2026 — fine for a single developer and their own
-data, not fine once other households are on it.
+data, not fine once other households are on it. **Closing these is the stated
+prerequisite for production use** (Aug 20, 2026), not a backlog to pick from.
+
+**`src/lib/securityPosture.ts` is the forcing function.** It is the statement
+shown at sign-up, on every uploader and on Profile, and it holds only claims that
+are true today — each with the mechanism that makes it true. Two rules:
+
+- **Describe a mechanism, never an outcome.** "Links expire in minutes" is
+  checkable; "your files are safe" quietly stops being true.
+- **Never widen a claim to cover a path that does not do the thing.** The review
+  claim enumerates insurance, legal, credit and home precisely because tax does
+  not gate — see F1/F2 below. Closing a gap below is what earns the wider
+  sentence, in the same commit.
+
+Verified Aug 20, 2026: RLS on all 45 tables; `record_history` grants `SELECT`
+only; signed URLs 300s client / 120s extraction; `raw-uploads` refuses an
+unauthenticated read, an anon key with no session, and another signed-in
+household.
 
 **Security**
 - **MFA.** Supabase supports TOTP; it is not enabled in the project's Auth

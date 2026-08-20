@@ -1,17 +1,26 @@
 // The logo, in the version that suits what is behind it.
 //
-// Command_Logo.png carries an opaque near-black background, which is right on
-// the app's own surfaces and wrong on the printed report — where it landed as a
-// black rectangle in the corner of a white page.
+// The original asset carries an opaque near-black background. That is the black
+// rectangle that shows up on the printed report, and the reason the mark never
+// looks like it belongs to the surface it sits on — a logo with its own
+// background sits on top of a page rather than on it.
 //
-// The light artwork lives at /Command_Logo_Light.png. Until that file exists the
-// dark one is used instead, so a missing asset degrades to the old appearance
-// rather than a broken image.
+// Two assets replace it, both with transparent backgrounds:
+//
+//   Command_Logo_Light.png   gold mark, near-black wordmark — for white
+//   Command_Logo_OnDark.png  gold mark, off-white wordmark — for the app
+//
+// The second is derived from the first by knocking out the page and recoloring
+// the wordmark, so only one piece of artwork is ever maintained.
+//
+// Until an asset exists the original is used instead, so a missing file
+// degrades to the previous appearance rather than a broken image.
 
 import React, { useState } from 'react';
 
-const DARK = '/Command_Logo.png';
-const LIGHT = '/Command_Logo_Light.png';
+const ORIGINAL = '/Command_Logo.png';
+const ON_DARK = '/Command_Logo_OnDark.png';
+const ON_LIGHT = '/Command_Logo_Light.png';
 
 interface Props {
   /** The background it sits on, not the color of the artwork. */
@@ -20,15 +29,15 @@ interface Props {
 }
 
 export function Logo({ tone = 'dark', className }: Props) {
-  const [src, setSrc] = useState(tone === 'light' ? LIGHT : DARK);
+  const [src, setSrc] = useState(tone === 'light' ? ON_LIGHT : ON_DARK);
 
   return (
     <img
       src={src}
       alt="Command"
       className={className}
-      // Falls back once, and only from the light variant.
-      onError={() => { if (src !== DARK) setSrc(DARK); }}
+      // One step back, to the asset that has always been there.
+      onError={() => { if (src !== ORIGINAL) setSrc(ORIGINAL); }}
     />
   );
 }

@@ -19,11 +19,13 @@ export interface SetupStep extends SectionIntroCopy {
 
 interface Props {
   steps: SetupStep[];
+  /** How many areas it takes before the dashboard starts summarizing. */
+  summaryAt?: number;
   userName?: string | null;
   onOpen: (section: string) => void;
 }
 
-export function GettingStarted({ steps, userName, onOpen }: Props) {
+export function GettingStarted({ steps, userName, onOpen, summaryAt }: Props) {
   const done = steps.filter((s) => s.done);
   const remaining = steps.filter((s) => !s.done);
   // Three at a time. A list of seven things to do is a list nobody starts.
@@ -58,6 +60,16 @@ export function GettingStarted({ steps, userName, onOpen }: Props) {
             {done.length} of {steps.length} started
           </span>
         </div>
+
+        {/* Said plainly, because a page that is deliberately holding something
+            back should say so rather than look broken. */}
+        {summaryAt != null && done.length < summaryAt && (
+          <p className="mt-5 text-sm leading-6 text-cmd-muted">
+            Once {summaryAt} areas have something in them, this page turns into a summary of your
+            household — what you own and owe, what is coming up, and how each area is doing. Until
+            then a score would mostly reflect what has not been added yet.
+          </p>
+        )}
       </section>
 
       <section className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">

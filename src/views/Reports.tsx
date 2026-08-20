@@ -171,7 +171,7 @@ export function ReportsView() {
             </p>
             <p className="mt-0.5 text-[11px] text-neutral-500">Prepared {report.generatedOn}</p>
           </div>
-          <Logo tone="light" className="h-9 w-auto shrink-0 object-contain" />
+          <Logo tone="light" className="h-16 w-auto shrink-0 object-contain" />
         </header>
 
         <p className="mt-5 text-[11px] leading-5 text-neutral-500">

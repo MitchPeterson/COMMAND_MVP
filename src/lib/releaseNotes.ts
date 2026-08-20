@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.47.0',
+    date: '2026-08-20',
+    title: 'The new logo, throughout',
+    items: [
+      'The updated mark now appears on the app, on sign-in and on every report, on a transparent background so it sits on the surface rather than in a box',
+      'The browser tab icon is the mark alone, which is legible at 16px in a way the full logo never was',
+    ],
+  },
+  {
     version: '0.46.2',
     date: '2026-08-20',
     title: 'Prepare the logo to sit on any surface',

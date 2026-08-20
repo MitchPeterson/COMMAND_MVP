@@ -99,7 +99,7 @@ export function PositionCard({ position, onOpen }: {
   const gap = position.stated != null ? position.stated - position.net : null;
 
   return (
-    <section className="flex flex-col rounded-3xl border border-cmd-border bg-cmd-black p-6">
+    <section className="anchor-card flex flex-col rounded-3xl border border-cmd-border bg-cmd-black p-6">
       <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">On file</p>
       <p className="mt-3 text-4xl font-semibold leading-none text-cmd-offwhite">{money(position.net)}</p>
       <p className="mt-2 text-sm text-cmd-muted">

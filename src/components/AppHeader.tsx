@@ -11,7 +11,8 @@
 // which is what exists to be found, and stops there.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, Check, FileText, Menu, Newspaper, Plus, Search, X } from 'lucide-react';
+import { ArrowRight, Check, FileText, Menu, Moon, Newspaper, Plus, Search, Sun, X } from 'lucide-react';
+import { applyTheme, readTheme, type ThemeName } from '../lib/themePreview';
 import { navItems } from '../views/components/Sidebar';
 import { UploadDropzone } from './UploadDropzone';
 import {
@@ -48,6 +49,8 @@ function rank(label: string, query: string): number {
 }
 
 export function AppHeader({ onOpenNav, onOpenBrief, householdId, documents, onNavigate, onUploaded }: AppHeaderProps) {
+  const [theme, setTheme] = useState<ThemeName>(() => readTheme());
+  useEffect(() => { applyTheme(theme); }, []);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
   const [cursor, setCursor] = useState(0);
@@ -186,12 +189,25 @@ export function AppHeader({ onOpenNav, onOpenBrief, householdId, documents, onNa
           )}
         </div>
 
+        {/* A preview of the light direction, not a setting. Sits beside the
+            brief because it is a way of looking at the page, not a household
+            fact. */}
+        <button
+          type="button"
+          onClick={() => { const next = theme === 'dark' ? 'light' : 'dark'; setTheme(next); applyTheme(next); }}
+          aria-label={theme === 'dark' ? 'Preview the light theme' : 'Back to the dark theme'}
+          title={theme === 'dark' ? 'Preview the light theme' : 'Back to the dark theme'}
+          className="ml-auto shrink-0 rounded-xl border border-cmd-border bg-cmd-black/60 p-2 text-cmd-offwhite transition hover:border-cmd-gold hover:text-cmd-gold"
+        >
+          {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
+
         <button
           type="button"
           onClick={onOpenBrief}
           aria-label="Open your brief"
           title="What changed since you last looked"
-          className="ml-auto shrink-0 rounded-xl border border-cmd-border bg-cmd-black/60 p-2 text-cmd-offwhite transition hover:border-cmd-gold hover:text-cmd-gold"
+          className="shrink-0 rounded-xl border border-cmd-border bg-cmd-black/60 p-2 text-cmd-offwhite transition hover:border-cmd-gold hover:text-cmd-gold"
         >
           <Newspaper className="h-4 w-4" />
         </button>

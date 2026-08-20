@@ -1,3 +1,50 @@
+
+/* ── The palette ───────────────────────────────────────────────────────────
+   Every cmd-* token resolves to one of these. Changing a theme means changing
+   these numbers, not the 2,000 places that use them.
+
+   Values are space-separated RGB channels rather than hex, which is what lets
+   Tailwind apply an opacity modifier — bg-cmd-black/40 and the like. */
+:root {
+  --cmd-black: 15 15 16;
+  --cmd-charcoal: 26 27 31;
+  --cmd-border: 46 47 52;
+  --cmd-border-hi: 72 73 80;
+  --cmd-dim: 96 96 104;
+  --cmd-muted: 154 154 164;
+  --cmd-offwhite: 240 240 238;
+  --cmd-gold: 201 162 77;
+  --cmd-gold-hover: 212 174 90;
+}
+
+/* A preview of the light direction, applied to the whole document.
+   The names below still read as their dark meanings, which is exactly the
+   thing a role-renaming pass would fix: here "black" is the page and it is
+   nearly white, and "offwhite" is the text and it is nearly black. */
+/* The one card that is meant to invert against the page. Under a dark palette
+   it already does, because the page is dark and the card is darker. Under the
+   light preview it has to be stated, or the accent disappears into the page. */
+.theme-light .anchor-card {
+  --cmd-black: 24 24 26;
+  --cmd-charcoal: 34 34 38;
+  --cmd-border: 58 58 62;
+  --cmd-muted: 154 154 164;
+  --cmd-offwhite: 240 240 238;
+  --cmd-gold: 212 174 90;
+  background-color: rgb(var(--cmd-black));
+}
+
+.theme-light {
+  --cmd-black: 247 247 245;
+  --cmd-charcoal: 255 255 255;
+  --cmd-border: 226 226 222;
+  --cmd-border-hi: 200 200 195;
+  --cmd-dim: 140 140 145;
+  --cmd-muted: 106 106 112;
+  --cmd-offwhite: 24 24 26;
+  --cmd-gold: 191 149 58;
+  --cmd-gold-hover: 168 130 48;
+}
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

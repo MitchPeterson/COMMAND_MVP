@@ -6,16 +6,23 @@ export default {
   ],
   theme: {
     extend: {
+      // Read from CSS variables rather than fixed hex, so a palette can be
+      // swapped by redefining eight values instead of editing 70 files. The
+      // rgb(... / <alpha-value>) form is what keeps bg-cmd-black/40 working.
+      //
+      // The names still describe the dark palette they were born in. They are
+      // really roles: cmd-black is the page, cmd-charcoal a raised card,
+      // cmd-offwhite the primary text. Renaming them is a separate pass.
       colors: {
-        'cmd-black': '#0F0F10',
-        'cmd-charcoal': '#1A1B1F',
-        'cmd-border': '#2E2F34',
-        'cmd-border-hi': '#484950',
-        'cmd-dim': '#606068',
-        'cmd-muted': '#9A9AA4',
-        'cmd-offwhite': '#F0F0EE',
-        'cmd-gold': '#C9A24D',
-        'cmd-gold-hover': '#D4AE5A',
+        'cmd-black': 'rgb(var(--cmd-black) / <alpha-value>)',
+        'cmd-charcoal': 'rgb(var(--cmd-charcoal) / <alpha-value>)',
+        'cmd-border': 'rgb(var(--cmd-border) / <alpha-value>)',
+        'cmd-border-hi': 'rgb(var(--cmd-border-hi) / <alpha-value>)',
+        'cmd-dim': 'rgb(var(--cmd-dim) / <alpha-value>)',
+        'cmd-muted': 'rgb(var(--cmd-muted) / <alpha-value>)',
+        'cmd-offwhite': 'rgb(var(--cmd-offwhite) / <alpha-value>)',
+        'cmd-gold': 'rgb(var(--cmd-gold) / <alpha-value>)',
+        'cmd-gold-hover': 'rgb(var(--cmd-gold-hover) / <alpha-value>)',
       },
       fontFamily: {
         sans: ['IBM Plex Sans', 'sans-serif'],

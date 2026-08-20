@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.49.0',
+    date: '2026-08-20',
+    title: 'A light theme to look at',
+    items: [
+      'The palette now lives in CSS variables, so a theme is eight values rather than an edit to every file',
+      'A control in the header previews the light direction across the whole app',
+    ],
+  },
+  {
     version: '0.48.0',
     date: '2026-08-20',
     title: 'A summary layer on the dashboard',

@@ -37,8 +37,8 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import {
-  HouseholdOverview, PositionCard, UpcomingTasks, PolicyReview, RecentDocuments,
-  positionOf, overviewIcons, dashboardMoney,
+  HouseholdOverview, PositionCard, UpcomingTasks, SectionSpotlight, RecentDocuments,
+  positionOf, overviewIcons, dashboardMoney, type SpotlightSection,
 } from '../components/DashboardPanels';
 
 const severityOrder = ['critical', 'high', 'medium', 'low'] as const;
@@ -307,23 +307,29 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
     statedNetWorth: data?.profile?.net_worth ?? null,
   }), [data?.financeAccounts, data?.assets, data?.loans, data?.creditCards, data?.mortgage, data?.profile?.net_worth]);
 
-  const policyStanding = useMemo(() => {
-    const policies = data?.insurancePolicies ?? [];
-    const soon = new Date();
-    soon.setDate(soon.getDate() + 60);
-    let upToDate = 0;
-    let expiringSoon = 0;
-    for (const policy of policies) {
-      const renews = policy.renewal_date ? new Date(`${policy.renewal_date}T00:00:00Z`) : null;
-      if (renews && renews <= soon) expiringSoon += 1;
-      else upToDate += 1;
-    }
-    // A reading the household has not accepted is not yet a policy, so it is
-    // counted as waiting rather than folded in with the ones in force.
-    const needsReview = (data?.insuranceExtractions ?? [])
-      .filter((e) => e.review_status === 'pending_review').length;
-    return { upToDate, expiringSoon, needsReview };
-  }, [data?.insurancePolicies, data?.insuranceExtractions]);
+  // Every section returns the same result type, which is what lets one card
+  // stand in for any of them.
+  const spotlight = useMemo<SpotlightSection[]>(() => ([
+    { id: 'insurance', label: 'Insurance', ...coverage },
+    { id: 'legal', label: 'Legal', ...legal },
+    { id: 'finances', label: 'Finances', ...finances },
+    { id: 'credit', label: 'Credit', ...credit },
+    { id: 'home', label: 'Home', ...home },
+    { id: 'taxes', label: 'Taxes', ...taxes },
+    { id: 'family', label: 'Family', ...family },
+  ].map((s) => ({
+    id: s.id, label: s.label, score: s.score, grade: s.grade, status: s.status,
+    findings: s.findings as SpotlightSection['findings'],
+  }))), [coverage, legal, finances, credit, home, taxes, family]);
+
+  // A different section leads each visit. Stored rather than random so a
+  // reload does not reshuffle the page under someone mid-read.
+  const [spotlightIndex, setSpotlightIndex] = useState(() => {
+    const seen = Number(localStorage.getItem('command:spotlight') ?? '0');
+    const next = Number.isFinite(seen) ? (seen + 1) % 7 : 0;
+    localStorage.setItem('command:spotlight', String(next));
+    return next;
+  });
 
   const liveScores = useMemo(() => {
     const live: Record<string, { score: number; status: string; summary: string }> = {};
@@ -579,8 +585,9 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
         onOpen={(section) => onNavigate?.(section)}
         stats={[
           {
-            label: 'Policies in force', value: String((data?.insurancePolicies ?? []).length),
-            icon: overviewIcons.policies, section: 'insurance',
+            label: healthScore == null ? 'Not enough on file to grade' : `Household score · ${scoreState.label}`,
+            value: healthScore == null ? '--' : String(healthScore),
+            icon: overviewIcons.score, section: undefined,
           },
           {
             label: 'Net worth on file', value: dashboardMoney(position.net, true),
@@ -600,7 +607,12 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
       <div className="grid min-w-0 gap-6 xl:grid-cols-3">
         <PositionCard position={position} onOpen={() => onNavigate?.('finances')} />
         <UpcomingTasks events={timelineEvents} onOpen={() => onNavigate?.('family')} />
-        <PolicyReview standing={policyStanding} onOpen={() => onNavigate?.('insurance')} />
+        <SectionSpotlight
+          sections={spotlight}
+          index={spotlightIndex}
+          onIndex={setSpotlightIndex}
+          onOpen={(section) => onNavigate?.(section)}
+        />
       </div>
 
       <RecentDocuments documents={data?.documents ?? []} onOpen={() => onNavigate?.('documents')} />
@@ -924,41 +936,9 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
             )}
           </section>
 
-          <section className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-6">
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Timeline</p>
-                <h2 className="mt-3 text-2xl font-semibold text-cmd-offwhite">Next 90 days</h2>
-              </div>
-              <div className="rounded-full border border-cmd-border bg-cmd-black/60 px-3 py-1 text-xs uppercase tracking-[0.16em] text-cmd-muted">
-                {timelineEvents.length} events
-              </div>
-            </div>
-            {timelineEvents.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-cmd-border bg-cmd-black/50 p-8 text-center text-cmd-muted">
-                No upcoming events in the next 90 days.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {timelineEvents.map((event) => {
-                  const date = formatTimelineDate(event.event_date);
-                  const isUrgent = event.event_type === 'deadline' || event.event_type === 'renewal';
-                  return (
-                    <div key={event.id} className="flex items-start justify-between gap-4 rounded-3xl border border-cmd-border bg-cmd-black/40 p-4">
-                      <div className="min-w-[72px] text-sm font-mono text-cmd-gold">{date}</div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-cmd-offwhite">{event.title}</p>
-                        <p className="mt-1 text-sm text-cmd-muted">{event.category ?? 'General'}</p>
-                      </div>
-                      <div className={`rounded-full px-3 py-1 text-[11px] uppercase tracking-[0.18em] ${
-                        isUrgent ? 'bg-cmd-gold text-cmd-black' : 'bg-cmd-border text-cmd-muted'
-                      }`}>{event.event_type.replace('_', ' ')}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </section>
+          {/* The timeline that used to live here rendered the same events as
+              Upcoming above, from the same array. Two copies of one list is
+              not two features. */}
         </div>
       </div>
 

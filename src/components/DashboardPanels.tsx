@@ -12,10 +12,10 @@
 
 import React from 'react';
 import {
-  ChevronRight, CreditCard, FileText, Folder, Home, Landmark,
+  ChevronLeft, ChevronRight, CreditCard, FileText, Folder, Home, Landmark,
   Receipt, Scale, Shield, Users, Wallet,
 } from 'lucide-react';
-import type { Asset, CreditCard as CreditCardRow, FinanceAccount, InsurancePolicy, Loan, MortgageAccount, Document as StoredDocument, TimelineEvent } from '../lib/supabase';
+import type { Asset, CreditCard as CreditCardRow, FinanceAccount, Loan, MortgageAccount, Document as StoredDocument, TimelineEvent } from '../lib/supabase';
 
 const money = (value: number | null | undefined, compact = false): string =>
   value == null
@@ -201,104 +201,156 @@ export function UpcomingTasks({ events, onOpen }: {
   );
 }
 
-// ── How the policies stand ────────────────────────────────────────────────────
+// ── One section at a time ─────────────────────────────────────────────────────
+//
+// Nine sections, one dashboard: only one of them can have real estate here. So
+// the slot rotates. A different section leads on each visit, and the arrows
+// move through the rest on demand, which surfaces breadth over time instead of
+// showing insurance forever because it happened to be built first.
+//
+// The ring is the section's score rather than a count, so the same shape means
+// the same thing everywhere — which is the point of every section returning the
+// same result type.
 
-export interface PolicyStanding {
-  upToDate: number;
-  expiringSoon: number;
-  needsReview: number;
+export interface SpotlightSection {
+  id: string;
+  label: string;
+  score: number | null;
+  grade: string;
+  status: 'good' | 'review' | 'action_needed' | 'unknown';
+  findings: Array<{ severity: string; title: string; detail: string }>;
 }
 
-/** Hand-drawn rather than charted: one ring is not worth a charting library. */
-function Donut({ standing, total }: { standing: PolicyStanding; total: number }) {
+/**
+ * The headline, derived from the findings shown beneath it rather than from the
+ * status alone.
+ *
+ * A section can score well and still carry a finding — Legal graded B and said
+ * "No action needed" directly above "No trust found in Command", which reads
+ * as the card contradicting itself.
+ */
+function headlineFor(section: SpotlightSection): string {
+  if (section.status === 'unknown') return 'Not enough on file to grade';
+  const critical = section.findings.filter((f) => f.severity === 'critical').length;
+  const attention = section.findings.filter((f) => f.severity === 'attention').length;
+  if (critical > 0) return 'Needs attention';
+  if (attention > 0) return 'Worth a look';
+  if (section.findings.length > 0) return 'Nothing urgent';
+  return 'No action needed';
+}
+
+/** The score as an arc. Hand-drawn: one ring is not worth a charting library. */
+function ScoreRing({ score, grade }: { score: number | null; grade: string }) {
   const r = 54;
   const circumference = 2 * Math.PI * r;
-  const segments = [
-    { value: standing.upToDate, className: 'text-cmd-gold' },
-    { value: standing.expiringSoon, className: 'text-cmd-gold/45' },
-    { value: standing.needsReview, className: 'text-cmd-border' },
-  ];
+  const filled = ((score ?? 0) / 100) * circumference;
 
-  let offset = 0;
   return (
     <div className="relative h-36 w-36 shrink-0">
       <svg viewBox="0 0 140 140" className="h-full w-full -rotate-90">
-        <circle cx="70" cy="70" r={r} fill="none" strokeWidth="16" className="stroke-cmd-black" />
-        {total > 0 && segments.map((segment, i) => {
-          const length = (segment.value / total) * circumference;
-          const dash = `${length} ${circumference - length}`;
-          const node = (
-            <circle
-              key={i}
-              cx="70" cy="70" r={r} fill="none" strokeWidth="16"
-              strokeDasharray={dash}
-              strokeDashoffset={-offset}
-              className={`stroke-current ${segment.className}`}
-            />
-          );
-          offset += length;
-          return node;
-        })}
+        <circle cx="70" cy="70" r={r} fill="none" strokeWidth="14" className="stroke-cmd-black" />
+        {score != null && (
+          <circle
+            cx="70" cy="70" r={r} fill="none" strokeWidth="14" strokeLinecap="round"
+            strokeDasharray={`${filled} ${circumference - filled}`}
+            className="stroke-cmd-gold"
+          />
+        )}
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center">
-        <span className="text-2xl font-semibold text-cmd-offwhite">{total}</span>
-        <span className="text-[10px] uppercase tracking-[0.16em] text-cmd-muted">Policies</span>
+        <span className="text-3xl font-semibold leading-none text-cmd-offwhite">{grade}</span>
+        <span className="mt-1 text-[10px] uppercase tracking-[0.16em] text-cmd-muted">
+          {score == null ? 'Ungraded' : `${score} / 100`}
+        </span>
       </div>
     </div>
   );
 }
 
-export function PolicyReview({ standing, onOpen }: {
-  standing: PolicyStanding;
-  onOpen?: () => void;
+export function SectionSpotlight({ sections, index, onIndex, onOpen }: {
+  sections: SpotlightSection[];
+  index: number;
+  onIndex: (next: number) => void;
+  onOpen?: (section: string) => void;
 }) {
-  const total = standing.upToDate + standing.expiringSoon + standing.needsReview;
-  const legend = [
-    { label: 'Up to date', value: standing.upToDate, dot: 'bg-cmd-gold' },
-    { label: 'Renewing soon', value: standing.expiringSoon, dot: 'bg-cmd-gold/45' },
-    { label: 'Waiting on review', value: standing.needsReview, dot: 'bg-cmd-border' },
-  ];
+  if (sections.length === 0) return null;
+  const current = sections[Math.min(index, sections.length - 1)];
+  const counts = {
+    critical: current.findings.filter((f) => f.severity === 'critical').length,
+    attention: current.findings.filter((f) => f.severity === 'attention').length,
+  };
+  const lead = current.findings.find((f) => f.severity === 'critical')
+    ?? current.findings.find((f) => f.severity === 'attention')
+    ?? current.findings[0]
+    ?? null;
+
+  const step = (delta: number) =>
+    onIndex((index + delta + sections.length) % sections.length);
 
   return (
     <section className="flex flex-col rounded-3xl border border-cmd-border bg-cmd-charcoal p-6">
       <div className="flex items-center justify-between gap-4">
-        <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Policies</p>
-        {onOpen && (
-          <button type="button" onClick={onOpen} className="text-xs font-medium text-cmd-gold transition hover:opacity-80">
-            View all
+        <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">{current.label}</p>
+        <div className="flex items-center gap-1">
+          <button
+            type="button" onClick={() => step(-1)} aria-label="Previous section"
+            className="rounded-lg border border-cmd-border p-1 text-cmd-muted transition hover:border-cmd-gold hover:text-cmd-gold"
+          >
+            <ChevronLeft className="h-3.5 w-3.5" />
           </button>
-        )}
+          <button
+            type="button" onClick={() => step(1)} aria-label="Next section"
+            className="rounded-lg border border-cmd-border p-1 text-cmd-muted transition hover:border-cmd-gold hover:text-cmd-gold"
+          >
+            <ChevronRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
       </div>
 
-      {total === 0 ? (
-        <p className="mt-6 rounded-2xl border border-dashed border-cmd-border p-6 text-center text-sm text-cmd-muted">
-          No policies on file yet.
-        </p>
-      ) : (
-        <>
-          <div className="mt-5 flex items-center gap-6">
-            <Donut standing={standing} total={total} />
-            <ul className="min-w-0 flex-1 space-y-2.5">
-              {legend.map((row) => (
-                <li key={row.label} className="flex items-center gap-2.5 text-sm">
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${row.dot}`} />
-                  <span className="min-w-0 flex-1 truncate text-cmd-muted">{row.label}</span>
-                  <span className="font-mono text-cmd-offwhite">{row.value}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          {onOpen && (
-            <button
-              type="button"
-              onClick={onOpen}
-              className="mt-6 w-full rounded-xl bg-cmd-gold px-4 py-2.5 text-sm font-semibold text-cmd-black transition hover:bg-cmd-gold-hover"
-            >
-              Review policies
-            </button>
+      <div className="mt-5 flex items-center gap-6">
+        <ScoreRing score={current.score} grade={current.grade} />
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-semibold text-cmd-offwhite">{headlineFor(current)}</p>
+          {lead ? (
+            <p className="mt-2 text-sm leading-6 text-cmd-muted line-clamp-4">{lead.title}</p>
+          ) : (
+            <p className="mt-2 text-sm leading-6 text-cmd-muted">Nothing flagged in this section.</p>
           )}
-        </>
+          {(counts.critical > 0 || counts.attention > 0) && (
+            <p className="mt-3 text-xs text-cmd-muted">
+              {[
+                counts.critical > 0 ? `${counts.critical} critical` : null,
+                counts.attention > 0 ? `${counts.attention} to look at` : null,
+              ].filter(Boolean).join(' · ')}
+            </p>
+          )}
+        </div>
+      </div>
+
+      {onOpen && (
+        <button
+          type="button"
+          onClick={() => onOpen(current.id)}
+          className="mt-6 w-full rounded-xl bg-cmd-gold px-4 py-2.5 text-sm font-semibold text-cmd-black transition hover:bg-cmd-gold-hover"
+        >
+          Open {current.label}
+        </button>
       )}
+
+      {/* On demand, without hunting for the arrows. */}
+      <div className="mt-4 flex items-center justify-center gap-1.5">
+        {sections.map((section, i) => (
+          <button
+            key={section.id}
+            type="button"
+            onClick={() => onIndex(i)}
+            aria-label={`Show ${section.label}`}
+            className={`h-1.5 rounded-full transition-all ${
+              i === index ? 'w-5 bg-cmd-gold' : 'w-1.5 bg-cmd-border hover:bg-cmd-border-hi'
+            }`}
+          />
+        ))}
+      </div>
     </section>
   );
 }
@@ -368,6 +420,7 @@ export function RecentDocuments({ documents, onOpen }: {
 }
 
 export const overviewIcons = {
+  score: <Scale className="h-5 w-5" />,
   policies: <Shield className="h-5 w-5" />,
   worth: <Wallet className="h-5 w-5" />,
   tasks: <Receipt className="h-5 w-5" />,

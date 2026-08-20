@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.50.0',
+    date: '2026-08-20',
+    title: 'One section in the spotlight, and the score back on top',
+    items: [
+      'The dashboard\'s third card now rotates through all seven graded sections — a different one leads each visit, with arrows and dots to move through the rest',
+      'Your household score leads the overview strip again',
+      'Removed a timeline that showed the same events as Upcoming directly above it',
+    ],
+  },
+  {
     version: '0.49.0',
     date: '2026-08-20',
     title: 'A light theme to look at',

@@ -25,6 +25,18 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.51.0',
+    date: '2026-08-20',
+    title: 'A dashboard strip you can act on',
+    items: [
+      'The household score now carries its color and state — 77 On track, in green',
+      'Net worth gave way to how complete your profile is, since the position card already says what you are worth',
+      'Dated items gave way to critical actions, in red when there are any',
+      'Every tile is clickable and goes where the detail lives',
+      'Removed Recently read — the vault is where you look for a document',
+    ],
+  },
+  {
     version: '0.50.2',
     date: '2026-08-20',
     title: 'Hold the summary until it means something',

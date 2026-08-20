@@ -11,10 +11,7 @@
 // place to put one.
 
 import React from 'react';
-import {
-  ChevronLeft, ChevronRight, CreditCard, FileText, Folder, Home, Landmark,
-  Receipt, Scale, Shield, Users, Wallet,
-} from 'lucide-react';
+import { AlertTriangle, ChevronLeft, ChevronRight, CircleDashed, Folder, Gauge } from 'lucide-react';
 import type { Asset, CreditCard as CreditCardRow, FinanceAccount, Loan, MortgageAccount, Document as StoredDocument, TimelineEvent } from '../lib/supabase';
 
 const money = (value: number | null | undefined, compact = false): string =>
@@ -31,7 +28,13 @@ export interface OverviewStat {
   label: string;
   value: string;
   icon: React.ReactNode;
+  /** Colors the figure, for the ones that carry a state. */
+  valueClassName?: string;
+  /** The state in a word, beside the figure — "On track", "At risk". */
+  state?: string;
+  /** Where the detail lives: another section, or a card further down. */
   section?: string;
+  scrollTo?: string;
   linkLabel?: string;
 }
 
@@ -39,33 +42,55 @@ export function HouseholdOverview({ stats, onOpen }: {
   stats: OverviewStat[];
   onOpen?: (section: string) => void;
 }) {
+  // The whole tile is the target, not a link under it. A number someone is
+  // already looking at is the thing they will click.
+  const go = (stat: OverviewStat) => {
+    if (stat.section && onOpen) { onOpen(stat.section); return; }
+    if (stat.scrollTo) {
+      document.getElementById(stat.scrollTo)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   return (
     <section className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-6">
       <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Household overview</p>
-      <div className="mt-5 grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
-        {stats.map((stat, i) => (
-          <div
-            key={stat.label}
-            className={`flex items-start gap-4 ${i > 0 ? 'xl:border-l xl:border-cmd-border xl:pl-6' : ''}`}
-          >
-            <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-cmd-gold/40 text-cmd-gold">
-              {stat.icon}
-            </span>
-            <div className="min-w-0">
-              <p className="text-2xl font-semibold leading-none text-cmd-offwhite">{stat.value}</p>
-              <p className="mt-1.5 text-sm text-cmd-muted">{stat.label}</p>
-              {stat.section && onOpen && (
-                <button
-                  type="button"
-                  onClick={() => onOpen(stat.section!)}
-                  className="mt-1 text-xs font-medium text-cmd-gold transition hover:opacity-80"
-                >
-                  {stat.linkLabel ?? 'View all'}
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
+      <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+        {stats.map((stat, i) => {
+          const clickable = Boolean((stat.section && onOpen) || stat.scrollTo);
+          return (
+            <button
+              key={stat.label}
+              type="button"
+              onClick={() => go(stat)}
+              disabled={!clickable}
+              className={`flex items-start gap-4 rounded-2xl p-3 text-left transition ${
+                clickable ? 'hover:bg-cmd-black/40' : 'cursor-default'
+              } ${i > 0 ? 'xl:rounded-l-none xl:border-l xl:border-cmd-border' : ''}`}
+            >
+              <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-cmd-gold/40 text-cmd-gold">
+                {stat.icon}
+              </span>
+              <div className="min-w-0">
+                <p className="flex flex-wrap items-baseline gap-x-2">
+                  <span className={`text-2xl font-semibold leading-none ${stat.valueClassName ?? 'text-cmd-offwhite'}`}>
+                    {stat.value}
+                  </span>
+                  {stat.state && (
+                    <span className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${stat.valueClassName ?? 'text-cmd-muted'}`}>
+                      {stat.state}
+                    </span>
+                  )}
+                </p>
+                <p className="mt-1.5 text-sm text-cmd-muted">{stat.label}</p>
+                {clickable && (
+                  <span className="mt-1 inline-block text-xs font-medium text-cmd-gold">
+                    {stat.linkLabel ?? 'View all'}
+                  </span>
+                )}
+              </div>
+            </button>
+          );
+        })}
       </div>
     </section>
   );
@@ -355,75 +380,10 @@ export function SectionSpotlight({ sections, index, onIndex, onOpen }: {
   );
 }
 
-// ── What has come in ──────────────────────────────────────────────────────────
-
-const CATEGORY_ICON: Record<string, React.ReactNode> = {
-  insurance: <Shield className="h-4 w-4" />,
-  legal: <Scale className="h-4 w-4" />,
-  credit: <CreditCard className="h-4 w-4" />,
-  finance: <Wallet className="h-4 w-4" />,
-  tax: <Receipt className="h-4 w-4" />,
-  home: <Home className="h-4 w-4" />,
-  family: <Users className="h-4 w-4" />,
-  mortgage: <Landmark className="h-4 w-4" />,
-};
-
-export function RecentDocuments({ documents, onOpen }: {
-  documents: StoredDocument[];
-  onOpen?: () => void;
-}) {
-  const rows = [...documents]
-    .sort((a, b) => (b.uploaded_at ?? '').localeCompare(a.uploaded_at ?? ''))
-    .slice(0, 4);
-
-  return (
-    <section className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-6">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Recently read</p>
-        {onOpen && (
-          <button type="button" onClick={onOpen} className="text-xs font-medium text-cmd-gold transition hover:opacity-80">
-            View all
-          </button>
-        )}
-      </div>
-
-      {rows.length === 0 ? (
-        <p className="mt-6 rounded-2xl border border-dashed border-cmd-border p-6 text-center text-sm text-cmd-muted">
-          Nothing uploaded yet.
-        </p>
-      ) : (
-        <ul className="mt-4 divide-y divide-cmd-border">
-          {rows.map((doc) => (
-            <li key={doc.id} className="flex items-center gap-4 py-3">
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-cmd-border bg-cmd-black/60 text-cmd-gold">
-                {CATEGORY_ICON[doc.category ?? ''] ?? <FileText className="h-4 w-4" />}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-cmd-offwhite">{doc.name}</p>
-                <p className="text-xs text-cmd-muted">
-                  {doc.uploaded_at
-                    ? `Read ${new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date(doc.uploaded_at))}`
-                    : 'Date not recorded'}
-                </p>
-              </div>
-              {doc.category && (
-                <span className="hidden shrink-0 rounded-full border border-cmd-border bg-cmd-black/60 px-2.5 py-1 text-[11px] capitalize text-cmd-muted sm:inline">
-                  {doc.category}
-                </span>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
-}
-
 export const overviewIcons = {
-  score: <Scale className="h-5 w-5" />,
-  policies: <Shield className="h-5 w-5" />,
-  worth: <Wallet className="h-5 w-5" />,
-  tasks: <Receipt className="h-5 w-5" />,
+  score: <Gauge className="h-5 w-5" />,
+  complete: <CircleDashed className="h-5 w-5" />,
+  critical: <AlertTriangle className="h-5 w-5" />,
   documents: <Folder className="h-5 w-5" />,
 };
 

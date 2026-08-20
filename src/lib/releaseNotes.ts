@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.45.1',
+    date: '2026-08-20',
+    title: 'Fix a form that reopened after saving',
+    items: [
+      'Adding a house or a vehicle from a follow-up no longer leaves the form open, which made the save look like it had failed and created duplicates',
+      'Recording the same address or vehicle twice is now refused outright',
+    ],
+  },
+  {
     version: '0.45.0',
     date: '2026-08-20',
     title: 'Say how your data is handled',

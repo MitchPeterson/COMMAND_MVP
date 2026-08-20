@@ -10,12 +10,13 @@
 // already named the vehicle and being handed an empty form is the moment someone
 // gives up, so the answer comes with the question already in it.
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Car, Landmark, Plus, Trash2 } from 'lucide-react';
 import {
   addAsset, deleteAsset, addFinanceAccount, deleteFinanceAccount,
   type Asset, type AssetType, type FinanceAccount,
 } from '../lib/supabase';
+import { normalizeLabel } from '../lib/text';
 
 interface Props {
   householdId: string;
@@ -48,23 +49,43 @@ const field =
 const label = 'text-xs uppercase tracking-[0.16em] text-cmd-muted';
 
 export function OwnedThings({ householdId, accounts, assets, prefillAsset, onChanged }: Props) {
-  const [mode, setMode] = useState<'none' | 'account' | 'asset'>('none');
+  // null means "follow the question that sent us here". Saving refreshes, which
+  // unmounts and remounts this panel, so a plain flag was reset and the
+  // prefilled form reopened — the same click that looked like it had failed
+  // added a second vehicle. Derived from the data instead.
+  const [mode, setMode] = useState<'none' | 'account' | 'asset' | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [account, setAccount] = useState({ account_name: '', account_type: 'checking', institution: '', balance: '' });
   const [asset, setAsset] = useState({ name: '', type: 'vehicle' as AssetType, current_value: '', notes: '' });
 
+  const alreadyRecorded = useMemo(() => {
+    const wanted = normalizeLabel(prefillAsset?.name);
+    return wanted.length > 0 && assets.some((a) => normalizeLabel(a.name) === wanted);
+  }, [prefillAsset, assets]);
+
+  const shouldPrompt = Boolean(prefillAsset) && !alreadyRecorded;
+  const activeMode = mode === null ? (shouldPrompt ? 'asset' : 'none') : mode;
+
   // A question that named something opens the form holding it.
   useEffect(() => {
-    if (!prefillAsset) return;
-    setAsset((prev) => ({ ...prev, name: prefillAsset.name, type: prefillAsset.type }));
-    setMode('asset');
-  }, [prefillAsset]);
+    if (!shouldPrompt || !prefillAsset) return;
+    setAsset((prev) => (prev.name ? prev : { ...prev, name: prefillAsset.name, type: prefillAsset.type }));
+  }, [shouldPrompt, prefillAsset]);
 
   const save = async (what: 'account' | 'asset') => {
     setError(null);
     setBusy(true);
     try {
+      if (what === 'asset') {
+        // A vehicle recorded twice quietly doubles a net worth.
+        const wanted = normalizeLabel(asset.name);
+        if (assets.some((a) => normalizeLabel(a.name) === wanted)) {
+          setError('That is already on file. Edit or remove the one above if it needs changing.');
+          setBusy(false);
+          return;
+        }
+      }
       if (what === 'account') {
         await addFinanceAccount(householdId, account);
         setAccount({ account_name: '', account_type: 'checking', institution: '', balance: '' });
@@ -128,21 +149,21 @@ export function OwnedThings({ householdId, accounts, assets, prefillAsset, onCha
       <div className="mt-6 flex flex-wrap gap-3 border-t border-cmd-border pt-6">
         <button
           type="button"
-          onClick={() => setMode(mode === 'account' ? 'none' : 'account')}
+          onClick={() => setMode(activeMode === 'account' ? 'none' : 'account')}
           className="inline-flex items-center gap-2 rounded-full border border-cmd-border px-4 py-2 text-sm text-cmd-offwhite transition hover:border-cmd-gold hover:text-cmd-gold"
         >
           <Landmark className="h-4 w-4" /> Add an account
         </button>
         <button
           type="button"
-          onClick={() => setMode(mode === 'asset' ? 'none' : 'asset')}
+          onClick={() => setMode(activeMode === 'asset' ? 'none' : 'asset')}
           className="inline-flex items-center gap-2 rounded-full border border-cmd-border px-4 py-2 text-sm text-cmd-offwhite transition hover:border-cmd-gold hover:text-cmd-gold"
         >
           <Plus className="h-4 w-4" /> Add a vehicle or something else you own
         </button>
       </div>
 
-      {mode === 'account' && (
+      {activeMode === 'account' && (
         <div className="mt-4 rounded-3xl border border-cmd-border bg-cmd-charcoal p-5">
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <label className={label}>
@@ -181,9 +202,9 @@ export function OwnedThings({ householdId, accounts, assets, prefillAsset, onCha
         </div>
       )}
 
-      {mode === 'asset' && (
+      {activeMode === 'asset' && (
         <div className="mt-4 rounded-3xl border border-cmd-gold/30 bg-cmd-charcoal p-5">
-          {prefillAsset && (
+          {prefillAsset && !alreadyRecorded && (
             <p className="mb-4 rounded-xl border border-cmd-gold/25 bg-cmd-gold/5 px-3 py-2 text-sm text-cmd-muted">
               Filled in from your insurance policy. Change anything that is not right, and add its
               value if you know it.

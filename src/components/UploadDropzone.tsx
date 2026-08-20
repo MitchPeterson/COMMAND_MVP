@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Camera, FilePlus, Loader2, UploadCloud } from 'lucide-react';
+import { Camera, FilePlus, Loader2, Lock, UploadCloud } from 'lucide-react';
+import { SECURITY_ONE_LINER } from '../lib/securityPosture';
 
 interface UploadDropzoneProps {
   contextLabel?: string;
@@ -166,6 +167,15 @@ export function UploadDropzone({
             </div>
           </div>
         </div>
+      )}
+
+      {/* The anxious moment is the one before the file goes, not the Profile
+          page a week later. One line, at the point of the decision. */}
+      {status === 'idle' && (
+        <p className="mt-3 flex items-start gap-2 text-xs leading-5 text-cmd-muted/80">
+          <Lock className="mt-0.5 h-3 w-3 shrink-0 text-cmd-muted" />
+          {SECURITY_ONE_LINER}
+        </p>
       )}
 
       {status !== 'idle' ? (

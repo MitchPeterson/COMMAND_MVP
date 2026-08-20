@@ -7,6 +7,7 @@ import { VersionHistory } from '../components/VersionHistory';
 import { ApiUsageReport } from '../components/ApiUsageReport';
 import { YourData } from '../components/YourData';
 import { UserCircle2, ArrowLeftRight, MapPin, Shield, Sparkles } from 'lucide-react';
+import { SecurityPosture } from '../components/SecurityPosture';
 
 function formatCurrency(value: number | null | undefined) {
   return value == null ? '--' : `$${value.toLocaleString()}`;
@@ -235,6 +236,10 @@ export function ProfileView() {
 
       {/* Collapsed by default and last on the page: a tool for whoever pays the
           bill, not part of what Command is for. */}
+      {/* The statement sits beside the controls it describes, one click from
+          the page rather than nested inside another panel. */}
+      <SecurityPosture />
+
       <YourData />
 
       <ApiUsageReport />

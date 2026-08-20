@@ -148,29 +148,6 @@ export function YourData() {
             )}
           </div>
 
-          {/* Said plainly rather than left to be inferred. */}
-          <div className="rounded-2xl border border-cmd-border bg-cmd-black/30 p-5">
-            <p className="text-sm font-semibold text-cmd-offwhite">How your documents are read</p>
-            <ul className="mt-3 space-y-2 text-sm leading-6 text-cmd-muted">
-              <li>
-                Your files are stored privately. They are reachable only through your own account,
-                using links that expire within minutes.
-              </li>
-              <li>
-                To read a document, Command sends it to Anthropic&rsquo;s API. That is the only third
-                party involved, and it is how the reading is done at all.
-              </li>
-              <li>
-                Social Security and tax ID numbers, bank and card account numbers and driver&rsquo;s
-                licence numbers are stripped from everything Command records, and the database
-                refuses to store them. The original file keeps whatever it always had.
-              </li>
-              <li>
-                Nothing extracted reaches your profile until you confirm it, and no reading is shared
-                with anyone.
-              </li>
-            </ul>
-          </div>
         </div>
       )}
     </section>

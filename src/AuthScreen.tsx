@@ -4,6 +4,7 @@
 
 import React, { useState } from 'react';
 import { supabase } from './lib/supabase';
+import { SecurityNote } from './components/SecurityPosture';
 
 type AuthMode = 'choose' | 'signin' | 'signup';
 
@@ -180,6 +181,13 @@ export const AuthScreen: React.FC = () => {
             isSignUp ? 'Create account' : 'Sign in'
           )}
         </button>
+
+        {/* The moment someone decides whether to hand over their paperwork. */}
+        {isSignUp && (
+          <div className="mt-6">
+            <SecurityNote palette="auth" />
+          </div>
+        )}
 
         {/* Toggle mode */}
         <p className="text-center text-[#808084] text-sm mt-6">

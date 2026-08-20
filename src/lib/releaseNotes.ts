@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.45.0',
+    date: '2026-08-20',
+    title: 'Say how your data is handled',
+    items: [
+      'A statement of the controls in place, on the Profile page, at sign-up and on every uploader',
+      'Each line describes a mechanism rather than a standard, and is dated',
+    ],
+  },
+  {
     version: '0.44.5',
     date: '2026-08-19',
     title: 'Add your home without a document, and tidy the lists',
@@ -105,7 +114,7 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     date: '2026-08-17',
     title: 'Identifiers cannot be stored, at three levels',
     items: [
-      'Quoted excerpts from your documents are now scrubbed of Social Security numbers, tax IDs, bank accounts and driver\'s licence numbers — the previous rule only caught card numbers',
+      'Quoted excerpts from your documents are now scrubbed of Social Security numbers, tax IDs, bank accounts and driver\'s license numbers — the previous rule only caught card numbers',
       'Every extraction path now tells the model not to produce them, and the database refuses to accept them regardless',
     ],
   },

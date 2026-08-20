@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.52.0',
+    date: '2026-08-20',
+    title: 'Whether your insurance is worth shopping',
+    items: [
+      'Insurance now shows what you pay a year and every reason your own paperwork gives for getting quotes — a premium that rose at renewal, home and auto split across carriers, renewals inside 60 days',
+      'A list of carriers to ask, with whoever writes your policies now left off',
+      'One button builds the shopping report with every limit, deductible and premium already assembled',
+    ],
+  },
+  {
     version: '0.51.0',
     date: '2026-08-20',
     title: 'A dashboard strip you can act on',

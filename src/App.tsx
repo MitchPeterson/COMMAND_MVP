@@ -129,7 +129,7 @@ function App() {
       case 'dashboard':
         return <DashboardView onNavigate={navigate} openBrief={briefRequest} deferAuto={releasesPending} />;
       case 'insurance':
-        return <InsuranceView />;
+        return <InsuranceView onNavigate={navigate} />;
       case 'legal':
         return <LegalView focusId={focusId} />;
       case 'home':
@@ -143,7 +143,8 @@ function App() {
       case 'credit':
         return <CreditView />;
       case 'reports':
-        return <ReportsView />;
+        // focusId carries which report to open, set by the link that sent us.
+        return <ReportsView startWith={focusId === 'insurance' ? 'insurance' : undefined} />;
       case 'documents':
         return <DocumentsView onNavigate={navigate} focusId={focusId} />;
       case 'profile':

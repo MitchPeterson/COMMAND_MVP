@@ -92,9 +92,10 @@ function SectionBlock({ section }: { section: ReportSection }) {
   );
 }
 
-export function ReportsView() {
+export function ReportsView({ startWith }: { startWith?: Audience } = {}) {
   const { data } = useHousehold();
-  const [audience, setAudience] = useState<Audience>('planner');
+  // Arriving from Insurance means the insurance report, not the planner one.
+  const [audience, setAudience] = useState<Audience>(startWith ?? 'planner');
 
   const report = useMemo(
     () => (data ? buildReport(audience, data) : null),

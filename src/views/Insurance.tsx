@@ -13,6 +13,7 @@ import {
 } from '../lib/supabase';
 import { InsurancePolicyReview, CoverageRow, currency, titleCase } from '../components/InsurancePolicyReview';
 import { CoverageHealth } from '../components/CoverageHealth';
+import { PremiumReview } from '../components/PremiumReview';
 import { AddPolicyForm } from '../components/AddPolicyForm';
 import { EditPolicyPanel } from '../components/EditPolicyPanel';
 import { RecordHistory } from '../components/RecordHistory';
@@ -358,7 +359,7 @@ function PolicyDetail({ extraction }: { extraction: InsurancePolicyExtraction })
   );
 }
 
-export function InsuranceView() {
+export function InsuranceView({ onNavigate }: { onNavigate?: (view: string, focusId?: string) => void } = {}) {
   const { data, refresh } = useHousehold();
   const policies = data?.insurancePolicies ?? [];
   const insuranceExtractions = data?.insuranceExtractions ?? [];
@@ -403,6 +404,14 @@ export function InsuranceView() {
       ) : (
         <CoverageHealth policies={policies} extractions={insuranceExtractions} profile={data?.profile} />
       )}
+
+      {/* The grade says whether the cover fits. This says whether it is worth
+          shopping, which is a different question and the one people act on. */}
+      <PremiumReview
+        policies={policies}
+        extractions={insuranceExtractions}
+        onOpenReport={() => onNavigate?.('reports', 'insurance')}
+      />
 
       <InsurancePolicyReview extractions={insuranceExtractions} onChange={refresh} />
 

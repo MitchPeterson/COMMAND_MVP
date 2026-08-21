@@ -1,6 +1,6 @@
 import { SectionIntro } from '../components/SectionIntro';
 import { familiarityState, introFor } from '../lib/sectionIntros';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useHousehold } from '../useHousehold';
 import { UploadDropzone } from '../components/UploadDropzone';
 import { UnfiledDocuments } from '../components/UnfiledDocuments';
@@ -8,6 +8,10 @@ import { FinancesHealth } from '../components/FinancesHealth';
 import { LoanList } from '../components/LoanList';
 import { OwnedThings } from '../components/OwnedThings';
 import { MonthlySpending } from '../components/MonthlySpending';
+import { RecurringCharges } from '../components/RecurringCharges';
+import { SegmentedTabs } from '../components/SegmentedTabs';
+import { InvestmentsPanel } from './Investments';
+import { isInvested } from '../lib/investments';
 import { DocumentLinkBadge } from '../components/DocumentLinkBadge';
 import { uploadDocumentAsset, invokeDocumentExtraction, type FinanceAccount } from '../lib/supabase';
 import { Wallet } from 'lucide-react';
@@ -23,9 +27,6 @@ const money = (value: number | null | undefined) =>
  */
 const GROUPS: Array<{ label: string; match: string[] }> = [
   { label: 'Cash and savings', match: ['checking', 'savings', 'money market', 'cash', 'cd', 'certificate'] },
-  { label: 'Retirement', match: ['retirement', '401', '403', '457', 'ira', 'roth', 'pension', 'annuity'] },
-  { label: 'Taxable investments', match: ['brokerage', 'investment', 'taxable', 'crypto'] },
-  { label: 'Education and health', match: ['education', '529', 'hsa'] },
 ];
 
 function groupOf(account: FinanceAccount): string {
@@ -38,9 +39,31 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
   const accounts = data?.financeAccounts ?? [];
   const documents = data?.documents ?? [];
 
+  // Anything invested belongs to the Investments tab, so the two never report
+  // the same balance twice.
+  const cashAccounts = accounts.filter((a) => !isInvested(a));
+  const investedCount = accounts.filter(isInvested).length;
+
   const grouped = [...GROUPS.map((g) => g.label), 'Other']
-    .map((label) => ({ label, items: accounts.filter((a) => groupOf(a) === label) }))
+    .map((label) => ({ label, items: cashAccounts.filter((a) => groupOf(a) === label) }))
     .filter((group) => group.items.length > 0);
+
+  const activeLoans = (data?.loans ?? []).filter((l) => l.status === 'active');
+  const cardsWithBalance = (data?.creditCards ?? []).filter((c) => (c.current_balance ?? 0) > 0);
+  const transactions = data?.creditTransactions ?? [];
+
+  // A question that named an asset lands on the tab where things get typed in.
+  const [tab, setTab] = useState<string>(focusId ? 'accounts' : 'accounts');
+  useEffect(() => { if (focusId) setTab('accounts'); }, [focusId]);
+
+  const tabs = [
+    { id: 'accounts', label: 'Accounts', count: cashAccounts.length + (data?.assets ?? []).length },
+    { id: 'debt', label: 'Debt', count: activeLoans.length + cardsWithBalance.length },
+    { id: 'spending', label: 'Spending', count: transactions.length },
+    { id: 'investments', label: 'Investments', count: investedCount },
+  // Accounts always shows, because manual entry lives there and a household
+  // with nothing on file still needs somewhere to put the first thing.
+  ].filter((t) => t.id === 'accounts' || (t.count ?? 0) > 0);
 
 
   const familiarity = familiarityState(accounts.length, (data?.loans ?? []).length);
@@ -86,73 +109,73 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
         onChanged={refresh}
       />
 
-      <MonthlySpending
-        transactions={data?.creditTransactions ?? []}
-        cards={data?.creditCards ?? []}
-        statements={data?.creditStatements ?? []}
-        budget={data?.budgetSummary ?? null}
-      />
+      <SegmentedTabs tabs={tabs} active={tab} onChange={setTab} ariaLabel="Finances views" />
 
-      <div className="flex items-center gap-2 px-1">
-        <Wallet className="h-4 w-4 text-cmd-gold" />
-        <h2 className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Your accounts</h2>
-      </div>
+      {tab === 'accounts' && (
+        <>
+          <div className="flex items-center gap-2 px-1">
+            <Wallet className="h-4 w-4 text-cmd-gold" />
+            <h2 className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Cash and savings</h2>
+          </div>
 
-      {accounts.length === 0 ? (
-        <section className="rounded-3xl border border-dashed border-cmd-border bg-cmd-black/50 p-8 text-center text-cmd-muted">
-          No accounts on file yet. Balances drive the net worth and the emergency fund reading above.
-        </section>
-      ) : (
-        grouped.map((group) => (
-          <section key={group.label} className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
-            <div className="mb-5 flex items-center justify-between gap-4">
-              <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">{group.label}</p>
-              <span className="shrink-0 font-mono text-sm text-cmd-offwhite">
-                {money(group.items.reduce((sum, a) => sum + (a.balance ?? 0), 0))}
-              </span>
-            </div>
-            <div className="space-y-4">
-              {group.items.map((account) => (
-                <div key={account.id} className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-5 sm:flex sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">
-                      {account.account_type}
-                    </p>
-                    <h3 className="mt-2 text-xl font-semibold text-cmd-offwhite">{account.account_name}</h3>
-                    <p className="mt-1 text-sm text-cmd-muted">
-                      {account.institution ?? 'Institution not recorded'}
-                    </p>
-                    <div className="mt-3">
-                      <DocumentLinkBadge
-                        sourceDocumentId={account.source_document_id}
-                        documents={documents}
-                      />
-                    </div>
-                  </div>
-                  <div className="mt-4 text-left sm:mt-0 sm:text-right">
-                    <p className="text-2xl font-semibold text-cmd-offwhite">{money(account.balance)}</p>
-                    <p className="mt-1 text-sm text-cmd-muted">
-                      As of {account.as_of_date ?? 'a date not recorded'}
-                    </p>
-                  </div>
+          {cashAccounts.length === 0 ? (
+            <section className="rounded-3xl border border-dashed border-cmd-border bg-cmd-black/50 p-8 text-center text-cmd-muted">
+              No cash accounts on file yet. Balances drive the net worth and the emergency fund
+              reading above.
+            </section>
+          ) : (
+            grouped.map((group) => (
+              <section key={group.label} className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
+                <div className="mb-5 flex items-center justify-between gap-4">
+                  <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">{group.label}</p>
+                  <span className="shrink-0 font-mono text-sm text-cmd-offwhite">
+                    {money(group.items.reduce((sum, a) => sum + (a.balance ?? 0), 0))}
+                  </span>
                 </div>
-              ))}
-            </div>
-          </section>
-        ))
+                <div className="space-y-4">
+                  {group.items.map((account) => (
+                    <div key={account.id} className="rounded-3xl border border-cmd-border bg-cmd-charcoal p-5 sm:flex sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">
+                          {account.account_type}
+                        </p>
+                        <h3 className="mt-2 text-xl font-semibold text-cmd-offwhite">{account.account_name}</h3>
+                        <p className="mt-1 text-sm text-cmd-muted">
+                          {account.institution ?? 'Institution not recorded'}
+                        </p>
+                        <div className="mt-3">
+                          <DocumentLinkBadge
+                            sourceDocumentId={account.source_document_id}
+                            documents={documents}
+                          />
+                        </div>
+                      </div>
+                      <div className="mt-4 text-left sm:mt-0 sm:text-right">
+                        <p className="text-2xl font-semibold text-cmd-offwhite">{money(account.balance)}</p>
+                        <p className="mt-1 text-sm text-cmd-muted">
+                          As of {account.as_of_date ?? 'a date not recorded'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ))
+          )}
+
+          {data?.household?.id && (
+            <OwnedThings
+              householdId={data.household.id}
+              accounts={accounts}
+              assets={data?.assets ?? []}
+              prefillAsset={focusId ? { name: focusId, type: focusId.match(/^\d{4}\s/) ? 'vehicle' : 'real_estate' } : null}
+              onChanged={refresh}
+            />
+          )}
+        </>
       )}
 
-      {data?.household?.id && (
-        <OwnedThings
-          householdId={data.household.id}
-          accounts={accounts}
-          assets={data?.assets ?? []}
-          prefillAsset={focusId ? { name: focusId, type: focusId.match(/^\d{4}\s/) ? 'vehicle' : 'real_estate' } : null}
-          onChanged={refresh}
-        />
-      )}
-
-      {data?.household?.id && (
+      {tab === 'debt' && data?.household?.id && (
         <LoanList
           householdId={data.household.id}
           loans={data?.loans ?? []}
@@ -160,6 +183,25 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
           onChanged={refresh}
         />
       )}
+
+      {tab === 'spending' && (
+        <>
+          <MonthlySpending
+            transactions={transactions}
+            cards={data?.creditCards ?? []}
+            statements={data?.creditStatements ?? []}
+            budget={data?.budgetSummary ?? null}
+          />
+          {/* Moved out of Credit Cards. A household has one set of spending,
+              not card spending and account spending. */}
+          <RecurringCharges
+            transactions={transactions}
+            statements={data?.creditStatements ?? []}
+          />
+        </>
+      )}
+
+      {tab === 'investments' && <InvestmentsPanel />}
 
       {/* Demoted: still one click away, no longer the headline. */}
       <section id="section-uploader" className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">

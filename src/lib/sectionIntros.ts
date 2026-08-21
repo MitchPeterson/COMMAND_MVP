@@ -75,7 +75,7 @@ export const SECTION_INTROS: Record<string, SectionIntroCopy> = {
   credit: {
     section: 'credit',
     title: 'Start with a recent card statement',
-    purpose: "Whether your spending is on the right card, and what the wrong one costs.",
+    purpose: "Whether you are carrying the right cards, and what the wrong ones cost.",
     feeds: ["Finances"],
     primary: { label: "A recent card statement", why: "One per card. It carries the balance, the limit, the interest rates and what you earned." },
     also: ["A statement from every other card you hold"],

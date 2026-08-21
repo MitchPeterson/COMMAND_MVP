@@ -1827,6 +1827,33 @@ export interface InsuranceEndorsementRow {
  * Public market data: how much of a line of business a carrier group actually
  * writes. Not household data — the same rows for every account.
  */
+export interface InvestmentHoldingRow {
+  id: string;
+  account_id: string;
+  symbol: string | null;
+  name: string;
+  asset_class: 'us_equity' | 'intl_equity' | 'bonds' | 'cash' | 'real_assets' | 'crypto' | 'other';
+  is_single_security: boolean;
+  value: number | null;
+  cost_basis: number | null;
+  as_of: string | null;
+}
+
+export async function getInvestmentHoldings(householdId: string): Promise<InvestmentHoldingRow[]> {
+  const { data, error } = await supabase
+    .from('investment_holdings')
+    .select('id, account_id, symbol, name, asset_class, is_single_security, value, cost_basis, as_of')
+    .eq('household_id', householdId)
+    .order('value', { ascending: false });
+  if (error) {
+    // No holdings means no allocation, which the view says plainly. It must not
+    // mean a blank page.
+    console.warn('Could not load holdings:', error.message);
+    return [];
+  }
+  return (data ?? []) as InvestmentHoldingRow[];
+}
+
 export interface DismissedFindingRow {
   fingerprint: string;
   section: string;

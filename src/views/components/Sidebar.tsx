@@ -1,5 +1,5 @@
 import React from 'react';
-import { CreditCard, FileDown, FileText, Folder, Home, LayoutDashboard, Receipt, Shield, Users, Wallet } from 'lucide-react';
+import { CreditCard, FileDown, FileText, Folder, Home, LayoutDashboard, PieChart, Receipt, Shield, Users, Wallet } from 'lucide-react';
 import { HubMark } from './HubMark';
 
 // Exported so the header's search matches the same sections the sidebar shows.
@@ -9,7 +9,7 @@ export const navItems = [
   { id: 'dashboard', label: 'Dashboard', Icon: LayoutDashboard },
   { id: 'insurance', label: 'Insurance', Icon: Shield },
   { id: 'legal', label: 'Legal', Icon: FileText },
-  { id: 'credit', label: 'Credit', Icon: CreditCard },
+  { id: 'credit', label: 'Credit Cards', Icon: CreditCard },
   { id: 'home', label: 'Home', Icon: Home },
   { id: 'finances', label: 'Finances', Icon: Wallet },
   { id: 'taxes', label: 'Taxes', Icon: Receipt },

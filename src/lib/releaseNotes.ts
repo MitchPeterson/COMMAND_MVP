@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.58.0',
+    date: '2026-08-21',
+    title: 'Finances, in four views',
+    items: [
+      'Accounts, Debt, Spending and Investments are now tabs rather than one long scroll, with the grade pinned above them',
+      'Daily spending and recurring charges moved out of Credit Cards and into Finances, where a household has one set of spending rather than two',
+      'Credit is now Credit Cards, and is about the cards themselves',
+    ],
+  },
+  {
     version: '0.57.0',
     date: '2026-08-21',
     title: 'See your coverage at a glance',

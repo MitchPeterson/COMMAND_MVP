@@ -1949,7 +1949,7 @@ export async function refineFeedback(input: {
   });
   if (error) {
     console.error('Refinement failed:', error);
-    throw new Error('Command could not tidy that up just now. Your text is unchanged.');
+    throw new Error('Command could not refine that just now. Your text is unchanged.');
   }
   const parsed = (typeof data === 'string' ? JSON.parse(data) : data) as RefinedFeedback & { error?: string };
   if (parsed?.error) throw new Error(parsed.error);

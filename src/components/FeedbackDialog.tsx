@@ -2,7 +2,7 @@
 //
 // Two things make a report actionable that a person should not have to supply:
 // where they were when it happened, and a title that reads well in a backlog.
-// The first is captured silently. The second is what the refine button is for —
+// The first is captured silently. The second is what Refine with AI is for —
 // it rewrites the report and categorizes it, and keeps what the person actually
 // typed, because the rewrite is Command's words and the original is theirs.
 //
@@ -82,7 +82,7 @@ export function FeedbackDialog({ householdId, view, onClose }: Props) {
       setMeta({ category: result.category, severity: result.severity });
       setQuestion(result.clarifying_question?.trim() || null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not tidy that up.');
+      setError(err instanceof Error ? err.message : 'Could not refine that.');
     } finally {
       setBusy(null);
     }
@@ -274,8 +274,8 @@ export function FeedbackDialog({ householdId, view, onClose }: Props) {
                   className="inline-flex items-center gap-2 rounded-xl border border-cmd-gold/40 bg-cmd-gold/10 px-4 py-2.5 text-sm font-medium text-cmd-gold transition hover:bg-cmd-gold/20 disabled:opacity-40"
                 >
                   {busy === 'refining'
-                    ? <><Loader2 className="h-4 w-4 animate-spin" /> Tidying…</>
-                    : <><Sparkles className="h-4 w-4" /> Tidy this up</>}
+                    ? <><Loader2 className="h-4 w-4 animate-spin" /> Refining…</>
+                    : <><Sparkles className="h-4 w-4" /> Refine with AI</>}
                 </button>
               )}
 

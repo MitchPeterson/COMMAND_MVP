@@ -7,6 +7,7 @@ import { createClient } from '@supabase/supabase-js';
 import { currentReadings } from './readings';
 import type { ExecutionObservation } from '../components/ExecutionStatus';
 import { carrierGroup } from './carriers';
+import { APP_VERSION } from './releaseNotes';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
@@ -1826,6 +1827,135 @@ export interface InsuranceEndorsementRow {
  * Public market data: how much of a line of business a carrier group actually
  * writes. Not household data — the same rows for every account.
  */
+export type FeedbackKind = 'idea' | 'defect' | 'question';
+
+export interface FeedbackTicket {
+  id: string;
+  household_id: string;
+  kind: FeedbackKind;
+  title: string;
+  body: string;
+  category: string | null;
+  severity: 'low' | 'medium' | 'high' | 'critical' | null;
+  refined_title: string | null;
+  refined_body: string | null;
+  refined_at: string | null;
+  original_title: string | null;
+  original_body: string | null;
+  screenshot_path: string | null;
+  app_version: string | null;
+  app_view: string | null;
+  status: string;
+  created_at: string;
+}
+
+export interface FeedbackDraft {
+  kind: FeedbackKind;
+  title: string;
+  body: string;
+  category?: string | null;
+  severity?: FeedbackTicket['severity'];
+  /** What the person typed, kept whatever refinement does to it. */
+  originalTitle?: string | null;
+  originalBody?: string | null;
+  refinedAt?: string | null;
+  screenshotPath?: string | null;
+  appView?: string | null;
+}
+
+/**
+ * A pasted screenshot, stored under the household's own path prefix so the
+ * policies already on raw-uploads cover it and no new bucket is needed.
+ */
+export async function uploadFeedbackScreenshot(householdId: string, file: File): Promise<string> {
+  const extension = (file.type.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '');
+  const path = `${householdId}/feedback/${Date.now()}.${extension}`;
+  const { error } = await supabase.storage.from(storageBucket).upload(path, file, {
+    contentType: file.type || 'image/png',
+    upsert: false,
+  });
+  if (error) {
+    console.error('Failed to attach the screenshot:', error);
+    throw new Error(`Could not attach that image: ${error.message}`);
+  }
+  return path;
+}
+
+export async function submitFeedback(householdId: string, draft: FeedbackDraft): Promise<FeedbackTicket> {
+  if (!draft.title.trim()) throw new Error('A title is needed.');
+  const { data, error } = await supabase
+    .from('feedback_tickets')
+    .insert([{
+      household_id: householdId,
+      kind: draft.kind,
+      title: draft.title.trim(),
+      body: draft.body.trim(),
+      category: draft.category ?? null,
+      severity: draft.severity ?? null,
+      refined_title: draft.refinedAt ? draft.title.trim() : null,
+      refined_body: draft.refinedAt ? draft.body.trim() : null,
+      refined_at: draft.refinedAt ?? null,
+      original_title: draft.originalTitle ?? draft.title.trim(),
+      original_body: draft.originalBody ?? draft.body.trim(),
+      screenshot_path: draft.screenshotPath ?? null,
+      app_version: APP_VERSION,
+      app_view: draft.appView ?? null,
+      user_agent: typeof navigator === 'undefined' ? null : navigator.userAgent.slice(0, 300),
+    }])
+    .select('*')
+    .single();
+  if (error || !data) {
+    console.error('Failed to submit feedback:', error);
+    throw new Error(`Could not send that: ${error?.message ?? 'no row returned'}`);
+  }
+  return data as FeedbackTicket;
+}
+
+/** Tickets this household has raised, newest first. */
+export async function getFeedbackTickets(householdId: string): Promise<FeedbackTicket[]> {
+  const { data, error } = await supabase
+    .from('feedback_tickets')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('created_at', { ascending: false })
+    .limit(20);
+  if (error) {
+    console.warn('Could not load your tickets:', error.message);
+    return [];
+  }
+  return (data ?? []) as FeedbackTicket[];
+}
+
+export interface RefinedFeedback {
+  kind: FeedbackKind;
+  title: string;
+  body: string;
+  category: string;
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  clarifying_question: string;
+}
+
+/**
+ * Rewrites a report for clarity and categorizes it. Throws rather than
+ * returning null: a refine button that silently does nothing is the kind of
+ * failure that gets reported as a bug through this very form.
+ */
+export async function refineFeedback(input: {
+  title: string; body: string; kind: FeedbackKind;
+  view?: string | null; hasScreenshot?: boolean;
+}): Promise<RefinedFeedback> {
+  const { data, error } = await supabase.functions.invoke('refine-feedback', {
+    body: { ...input, appVersion: APP_VERSION },
+  });
+  if (error) {
+    console.error('Refinement failed:', error);
+    throw new Error('Command could not tidy that up just now. Your text is unchanged.');
+  }
+  const parsed = (typeof data === 'string' ? JSON.parse(data) : data) as RefinedFeedback & { error?: string };
+  if (parsed?.error) throw new Error(parsed.error);
+  return parsed;
+}
+
 export interface MarketShareRow {
   naic_group_code: number;
   group_name: string;

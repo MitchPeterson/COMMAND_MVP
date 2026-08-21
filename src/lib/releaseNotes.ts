@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.54.0',
+    date: '2026-08-21',
+    title: 'Tell us what is broken, or what is missing',
+    items: [
+      'A button in the header opens a short form for an idea, a defect or a question',
+      'Paste a screenshot straight into it',
+      'One click rewrites the report for clarity and files it under an area and a severity — and keeps your own wording with the ticket',
+    ],
+  },
+  {
     version: '0.53.0',
     date: '2026-08-20',
     title: 'Carrier recommendations backed by market data',

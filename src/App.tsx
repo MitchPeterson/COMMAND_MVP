@@ -181,6 +181,7 @@ function App() {
           onOpenNav={() => setNavOpen(true)}
           onOpenBrief={() => { setActiveView('dashboard'); setBriefRequest((n) => n + 1); }}
           householdId={data?.household?.id ?? null}
+          activeView={activeView}
           documents={data?.documents ?? []}
           onNavigate={navigate}
           onUploaded={refresh}

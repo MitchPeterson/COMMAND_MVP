@@ -11,7 +11,8 @@
 // which is what exists to be found, and stops there.
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowRight, Check, FileText, Menu, Moon, Newspaper, Plus, Search, Sun, X } from 'lucide-react';
+import { ArrowRight, Check, FileText, Menu, MessageSquarePlus, Moon, Newspaper, Plus, Search, Sun, X } from 'lucide-react';
+import { FeedbackDialog } from './FeedbackDialog';
 import { applyTheme, readTheme, type ThemeName } from '../lib/themePreview';
 import { navItems } from '../views/components/Sidebar';
 import { UploadDropzone } from './UploadDropzone';
@@ -26,6 +27,8 @@ interface AppHeaderProps {
   /** Opens the brief on demand, between its weekly appearances. */
   onOpenBrief?: () => void;
   householdId?: string | null;
+  /** The screen in view, sent with a report so it needs no reproduction. */
+  activeView?: string;
   documents: Document[];
   onNavigate: (view: string, focus?: string) => void;
   onUploaded: () => Promise<void> | void;
@@ -48,8 +51,9 @@ function rank(label: string, query: string): number {
   return l.includes(query) ? 2 : -1;
 }
 
-export function AppHeader({ onOpenNav, onOpenBrief, householdId, documents, onNavigate, onUploaded }: AppHeaderProps) {
+export function AppHeader({ onOpenNav, onOpenBrief, householdId, activeView, documents, onNavigate, onUploaded }: AppHeaderProps) {
   const [theme, setTheme] = useState<ThemeName>(() => readTheme());
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   useEffect(() => { applyTheme(theme); }, []);
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
@@ -189,6 +193,18 @@ export function AppHeader({ onOpenNav, onOpenBrief, householdId, documents, onNa
           )}
         </div>
 
+        {/* Small, and always there. Something is only reported if saying so
+            costs less than living with it. */}
+        <button
+          type="button"
+          onClick={() => setFeedbackOpen(true)}
+          aria-label="Report an idea or a problem"
+          title="Report an idea or a problem"
+          className="ml-auto shrink-0 rounded-xl border border-cmd-border bg-cmd-black/60 p-2 text-cmd-offwhite transition hover:border-cmd-gold hover:text-cmd-gold"
+        >
+          <MessageSquarePlus className="h-4 w-4" />
+        </button>
+
         {/* A preview of the light direction, not a setting. Sits beside the
             brief because it is a way of looking at the page, not a household
             fact. */}
@@ -197,7 +213,7 @@ export function AppHeader({ onOpenNav, onOpenBrief, householdId, documents, onNa
           onClick={() => { const next = theme === 'dark' ? 'light' : 'dark'; setTheme(next); applyTheme(next); }}
           aria-label={theme === 'dark' ? 'Preview the light theme' : 'Back to the dark theme'}
           title={theme === 'dark' ? 'Preview the light theme' : 'Back to the dark theme'}
-          className="ml-auto shrink-0 rounded-xl border border-cmd-border bg-cmd-black/60 p-2 text-cmd-offwhite transition hover:border-cmd-gold hover:text-cmd-gold"
+          className="shrink-0 rounded-xl border border-cmd-border bg-cmd-black/60 p-2 text-cmd-offwhite transition hover:border-cmd-gold hover:text-cmd-gold"
         >
           {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
         </button>
@@ -221,6 +237,14 @@ export function AppHeader({ onOpenNav, onOpenBrief, householdId, documents, onNa
           <Plus className="h-4 w-4" /> <span className="hidden sm:inline">Add document</span>
         </button>
       </header>
+
+      {feedbackOpen && (
+        <FeedbackDialog
+          householdId={householdId ?? null}
+          view={activeView ?? 'unknown'}
+          onClose={() => setFeedbackOpen(false)}
+        />
+      )}
 
       {uploading && householdId && (
         <div

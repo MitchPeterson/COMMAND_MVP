@@ -9,6 +9,7 @@
 import React from 'react';
 import { ArrowRight, Building2, FileDown } from 'lucide-react';
 import type { InsurancePolicy, InsurancePolicyExtraction } from '../lib/supabase';
+import { DonutChart } from './DonutChart';
 import { FindingList } from './FindingList';
 import { useDismissals } from './useDismissals';
 import {
@@ -70,6 +71,31 @@ export function PremiumReview({ policies, extractions, market = [], onOpenReport
           </button>
         )}
       </div>
+
+      {/* The mix, drawn. A list of five figures separated by interpuncts was a
+          table pretending to be a sentence. */}
+      {review.mix.length >= 2 && (
+        <div className="mt-6 rounded-2xl border border-cmd-border bg-cmd-black/30 p-5">
+          <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Where your premium goes</p>
+          <div className="mt-4">
+            <DonutChart
+              segments={review.mix.map((m) => ({
+                label: m.label,
+                value: m.amount,
+                display: `${money(m.amount)} · ${m.share}%`,
+              }))}
+              centerValue={money(review.annualTotal)}
+              centerLabel="A year"
+              summary={`Annual premium of ${money(review.annualTotal)}, split as `
+                + review.mix.map((m) => `${m.label} ${m.share} percent`).join(', ')}
+            />
+          </div>
+          <p className="mt-4 text-xs text-cmd-muted/70">
+            Covers {review.priced} of {policies.length} policies on file
+            {review.unpriced > 0 ? ', the rest having no premium recorded.' : '.'}
+          </p>
+        </div>
+      )}
 
       <div className="mt-6">
         <FindingList

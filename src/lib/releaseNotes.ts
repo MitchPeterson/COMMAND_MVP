@@ -25,6 +25,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.54.1',
+    date: '2026-08-21',
+    title: 'Rename the refine button',
+    items: [
+      'The feedback form\'s AI action now reads Refine with AI',
+    ],
+  },
+  {
     version: '0.54.0',
     date: '2026-08-21',
     title: 'Tell us what is broken, or what is missing',

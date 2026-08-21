@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.57.0',
+    date: '2026-08-21',
+    title: 'See your coverage at a glance',
+    items: [
+      'A liability tower showing what each policy pays before the next one starts, and where your net worth sits against the total',
+      'What every deductible adds up to before any policy pays',
+      'How many policies were read from a document rather than typed in',
+    ],
+  },
+  {
     version: '0.56.0',
     date: '2026-08-21',
     title: 'Premium mix as a chart',

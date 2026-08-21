@@ -14,6 +14,7 @@ import {
 import { InsurancePolicyReview, CoverageRow, currency, titleCase } from '../components/InsurancePolicyReview';
 import { CoverageHealth } from '../components/CoverageHealth';
 import { PremiumReview } from '../components/PremiumReview';
+import { CoverageGlance } from '../components/CoverageGlance';
 import { AddPolicyForm } from '../components/AddPolicyForm';
 import { EditPolicyPanel } from '../components/EditPolicyPanel';
 import { RecordHistory } from '../components/RecordHistory';
@@ -404,6 +405,14 @@ export function InsuranceView({ onNavigate }: { onNavigate?: (view: string, focu
       ) : (
         <CoverageHealth policies={policies} extractions={insuranceExtractions} profile={data?.profile} />
       )}
+
+      {/* The tower, the deductible ceiling and how much is documented. Three
+          pictures before any prose. */}
+      <CoverageGlance
+        policies={policies}
+        extractions={insuranceExtractions}
+        profile={data?.profile}
+      />
 
       {/* The grade says whether the cover fits. This says whether it is worth
           shopping, which is a different question and the one people act on. */}

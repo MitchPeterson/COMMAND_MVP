@@ -234,6 +234,30 @@ Credit are the reference implementations; match them.
 5. **The uploader last**, in a plain `bg-cmd-black/40` card. It is a means to the section's content,
    not the point of the page — never put it at the top.
 
+**Draw it rather than write it.** A figure someone can see beats the same figure
+in a sentence, and it is usually cheap. "Home: $2,940 (30%) · Disability: $2,310
+(23%) · Life: $2,110 (21%)…" was a table pretending to be a sentence; it is a
+donut now and reads in a glance. Reach for a visual whenever a finding carries
+more than about three numbers, a proportion, or a relationship between figures.
+
+Charts are hand-drawn SVG, not a charting library. One ring is not worth a
+dependency, and a hand-drawn one stays on the `cmd-*` tokens — which matters
+because the palette is swappable, and a library's baked-in colors would be the
+one thing on the page that ignores the theme. `DonutChart.tsx` is the reference;
+`CoverageGlance.tsx` shows a bar tower.
+
+Three rules that keep a chart honest:
+
+- **Draw from the same source as the grade beside it.** The liability tower reads
+  the coverage rows `coverageHealth` reads, never `insurance_policies.coverage_amount`
+  — that field holds the *dwelling* limit on a home policy, and rendering it as
+  liability would put a confident lie next to a card correctly saying the
+  liability limit was never found.
+- **Render an absence, do not omit it.** A tier with no limit read is an outlined
+  bar saying so. The gap is the finding, and it is what motivates the upload.
+- **Do not total something incomplete.** A tower missing a limit shows no total.
+- **Give the shape an `aria-label`.** A screen reader cannot read a circle.
+
 The scoring module is `src/lib/<section>Health.ts` and always returns the same shape:
 `{ score, grade, status, findings, dataFindings, confidence, confidenceReason }`. Findings move the
 grade; `dataFindings` move confidence only. Weighting is shared: critical 30, attention 12, info 4.

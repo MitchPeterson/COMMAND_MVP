@@ -55,6 +55,92 @@ const LIABILITY_TARGETS: Record<
 const money = (value: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 
+export type LimitState = 'found' | 'unverifiable' | 'absent';
+
+export interface LiabilityTier {
+  key: string;
+  label: string;
+  state: LimitState;
+  limit: number | null;
+}
+
+export interface LiabilityStack {
+  tiers: LiabilityTier[];
+  umbrella: LiabilityTier;
+  /** The most any single underlying line plus the umbrella would reach. */
+  towerTop: number | null;
+  netWorth: number | null;
+  /** Net worth above the tower. Null when either figure is unknown. */
+  exposed: number | null;
+  /** True when a limit is missing, so the tower cannot be totalled honestly. */
+  incomplete: boolean;
+}
+
+/**
+ * The liability tower: what each underlying policy carries, what the umbrella
+ * adds above it, and where the household's net worth sits against the total.
+ *
+ * Deliberately reads the same coverage rows the grade reads. A chart drawn from
+ * insurance_policies.coverage_amount would disagree with the card beside it —
+ * that field holds the dwelling limit on a home policy, not the liability one,
+ * and showing $985,000 of "liability" that is really the building would be a
+ * confident lie.
+ */
+export function computeLiabilityStack(
+  policies: InsurancePolicy[],
+  extractions: InsurancePolicyExtraction[],
+  profile?: HouseholdProfile | null,
+): LiabilityStack {
+  const confirmed = extractions.filter((e) => e.review_status === 'confirmed');
+
+  const resolve = (target: (typeof LIABILITY_TARGETS)[string]): LiabilityTier => {
+    const matching = confirmed.filter((e) => target.extractionTypes.includes(e.insurance_type));
+    const limits = matching
+      .flatMap((e) => e.insurance_coverages)
+      .filter((c) => target.coverageCodes.includes(c.coverage_code) && c.limit_amount !== null)
+      .map((c) => c.limit_amount as number);
+    const label = `${target.label[0].toUpperCase()}${target.label.slice(1)}`;
+    if (limits.length > 0) {
+      return { key: target.label, label, state: 'found', limit: Math.max(...limits) };
+    }
+    const hasPolicy = matching.length > 0 || policies.some((p) => target.policyTypes.includes(p.type));
+    return { key: target.label, label, state: hasPolicy ? 'unverifiable' : 'absent', limit: null };
+  };
+
+  const tiers = [
+    resolve(LIABILITY_TARGETS.home_liability),
+    resolve(LIABILITY_TARGETS.auto_liability),
+  ].filter((t) => t.state !== 'absent');
+
+  const umbrellaExtractions = confirmed.filter((e) => e.insurance_type === 'umbrella');
+  const umbrellaLimit = umbrellaExtractions
+    .flatMap((e) => e.insurance_coverages)
+    .filter((c) => c.coverage_code === 'umbrella_liability' && c.limit_amount !== null)
+    .reduce<number | null>((max, c) => Math.max(max ?? 0, c.limit_amount as number), null);
+  const umbrellaPolicy = policies.find((p) => p.type === 'umbrella');
+  const umbrella: LiabilityTier = umbrellaLimit != null
+    ? { key: 'umbrella', label: 'Umbrella', state: 'found', limit: umbrellaLimit }
+    // An umbrella's coverage_amount is its liability limit by definition, so it
+    // is usable where a home policy's is not.
+    : umbrellaPolicy?.coverage_amount != null
+      ? { key: 'umbrella', label: 'Umbrella', state: 'found', limit: umbrellaPolicy.coverage_amount }
+      : { key: 'umbrella', label: 'Umbrella', state: umbrellaPolicy ? 'unverifiable' : 'absent', limit: null };
+
+  const known = tiers.filter((t) => t.limit != null).map((t) => t.limit as number);
+  const incomplete = tiers.some((t) => t.state === 'unverifiable') || umbrella.state === 'unverifiable';
+  const highestUnderlying = known.length > 0 ? Math.max(...known) : null;
+  const towerTop = highestUnderlying != null
+    ? highestUnderlying + (umbrella.limit ?? 0)
+    : umbrella.limit;
+
+  const netWorth = profile?.net_worth ?? null;
+  const exposed = towerTop != null && netWorth != null && !incomplete
+    ? Math.max(netWorth - towerTop, 0)
+    : null;
+
+  return { tiers, umbrella, towerTop, netWorth, exposed, incomplete };
+}
+
 export function computeCoverageHealth(
   policies: InsurancePolicy[],
   extractions: InsurancePolicyExtraction[],

@@ -66,6 +66,8 @@ import {
   type ApplianceExtraction,
   type TaxReturn,
   type Loan,
+  type MarketShareRow,
+  getMarketShare,
   type DeductionLogEntry,
 } from './lib/supabase';
 
@@ -102,6 +104,8 @@ export interface HouseholdData {
   taxReturns: TaxReturn[];
   deductionLog: DeductionLogEntry[];
   loans: Loan[];
+  /** Public market data, the same for every household. */
+  marketShare: MarketShareRow[];
 }
 
 export interface UseHouseholdReturn {
@@ -145,6 +149,7 @@ const EMPTY_DATA: HouseholdData = {
   taxReturns: [],
   deductionLog: [],
   loans: [],
+  marketShare: [],
 };
 
 /**
@@ -214,6 +219,7 @@ function useHouseholdState(): UseHouseholdReturn {
         taxReturns,
         deductionLog,
         loans,
+        marketShare,
       ] = await Promise.all([
         supabase
           .from('household_profile')
@@ -251,6 +257,8 @@ function useHouseholdState(): UseHouseholdReturn {
         getTaxReturns(hid),
         getDeductionLog(hid),
         getLoans(hid),
+        // Reference data rather than household data, so it takes no household id.
+        getMarketShare(),
       ]);
 
       setData({
@@ -286,6 +294,7 @@ function useHouseholdState(): UseHouseholdReturn {
         taxReturns,
         deductionLog,
         loans,
+        marketShare,
       });
     } catch (err) {
       console.error('Failed to load household data:', err);

@@ -410,6 +410,7 @@ export function InsuranceView({ onNavigate }: { onNavigate?: (view: string, focu
       <PremiumReview
         policies={policies}
         extractions={insuranceExtractions}
+        market={data?.marketShare ?? []}
         onOpenReport={() => onNavigate?.('reports', 'insurance')}
       />
 

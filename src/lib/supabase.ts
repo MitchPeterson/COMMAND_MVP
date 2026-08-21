@@ -6,6 +6,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { currentReadings } from './readings';
 import type { ExecutionObservation } from '../components/ExecutionStatus';
+import { carrierGroup } from './carriers';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
@@ -1821,6 +1822,50 @@ export interface InsuranceEndorsementRow {
   confidence: number | null;
 }
 
+/**
+ * Public market data: how much of a line of business a carrier group actually
+ * writes. Not household data — the same rows for every account.
+ */
+export interface MarketShareRow {
+  naic_group_code: number;
+  group_name: string;
+  line: string;
+  /** 'countrywide' today. A two-letter state once state-level data is ingested. */
+  scope: string;
+  data_year: number;
+  rank_in_scope: number | null;
+  market_share_pct: number | null;
+  source: string;
+  source_url: string | null;
+}
+
+/**
+ * Every market-share row Command holds. Around fifty, so it is fetched whole
+ * rather than filtered per household — and it is reference data, so a household
+ * with no policies still loads it without leaking anything.
+ */
+export async function getMarketShare(): Promise<MarketShareRow[]> {
+  const { data, error } = await supabase
+    .from('market_group_line_share')
+    .select('naic_group_code, line, scope, data_year, rank_in_scope, market_share_pct, source, source_url, market_carrier_groups(group_name)')
+    .order('market_share_pct', { ascending: false });
+  if (error) {
+    console.warn('Market data unavailable; recommendations fall back to what is on file:', error.message);
+    return [];
+  }
+  return (data ?? []).map((row: Record<string, unknown>) => ({
+    naic_group_code: row.naic_group_code as number,
+    group_name: ((row.market_carrier_groups as { group_name?: string } | null)?.group_name) ?? '',
+    line: row.line as string,
+    scope: row.scope as string,
+    data_year: row.data_year as number,
+    rank_in_scope: (row.rank_in_scope as number | null) ?? null,
+    market_share_pct: row.market_share_pct == null ? null : Number(row.market_share_pct),
+    source: row.source as string,
+    source_url: (row.source_url as string | null) ?? null,
+  }));
+}
+
 export interface InsuranceInsuredPartyRow {
   id: string;
   role: string;
@@ -1949,6 +1994,7 @@ export async function confirmInsuranceExtraction(extraction: InsurancePolicyExtr
       household_id: extraction.household_id,
       type: normalizePolicyType(extraction.insurance_type),
       carrier: extraction.carrier,
+      naic_group_code: carrierGroup(extraction.carrier).naicGroupCode,
       policy_number: extraction.policy_number,
       coverage_amount: headline?.limit_amount ?? null,
       annual_premium: extraction.annual_premium,
@@ -2109,6 +2155,7 @@ export async function createManualPolicy(householdId: string, input: ManualPolic
       household_id: householdId,
       type: input.type,
       carrier: input.carrier,
+      naic_group_code: carrierGroup(input.carrier).naicGroupCode,
       policy_number: input.policy_number,
       coverage_amount: parseNumber(input.coverage_amount as string | null),
       deductible: parseNumber(input.deductible as string | null),
@@ -2146,7 +2193,12 @@ export interface PolicyEdit {
 export async function updateInsurancePolicy(policyId: string, edit: PolicyEdit): Promise<boolean> {
   const patch: Record<string, unknown> = {};
   if (edit.type !== undefined) patch.type = edit.type;
-  if (edit.carrier !== undefined) patch.carrier = edit.carrier?.trim() || null;
+  if (edit.carrier !== undefined) {
+    patch.carrier = edit.carrier?.trim() || null;
+    // Correcting the carrier re-resolves the code with it. A renamed carrier
+    // pointing at the previous company's market data is a silent wrong answer.
+    patch.naic_group_code = carrierGroup(edit.carrier).naicGroupCode;
+  }
   if (edit.policy_number !== undefined) patch.policy_number = edit.policy_number?.trim() || null;
   if (edit.notes !== undefined) patch.notes = edit.notes?.trim() || null;
   if (edit.renewal_date !== undefined) patch.renewal_date = edit.renewal_date || null;

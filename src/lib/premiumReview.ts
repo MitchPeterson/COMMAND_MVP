@@ -54,6 +54,11 @@ const daysUntil = (date: string | null | undefined, now: Date): number | null =>
   return Math.round((when.getTime() - now.getTime()) / 86400000);
 };
 
+const LINE_LABEL: Record<string, string> = {
+  home: 'Home', auto: 'Auto', umbrella: 'Umbrella', life: 'Life',
+  disability: 'Disability', renters: 'Renters', other: 'Other',
+};
+
 /** home / auto / umbrella and the rest, normalized across the three vocabularies. */
 function lineOf(value: string | null | undefined): string {
   const v = (value ?? '').toLowerCase();
@@ -160,29 +165,32 @@ export function reviewPremiums(
     });
   }
 
-  // ── What each policy costs per thousand of cover ───────────────────────────
+  // ── Where the money actually goes ──────────────────────────────────────────
   //
-  // Reported, never judged. It compares a household's policies with each other,
-  // which is the only comparison the data supports.
-  const comparable = policies.filter(
-    (p) => (p.annual_premium ?? 0) > 0 && (p.coverage_amount ?? 0) > 0,
-  );
-  if (comparable.length >= 2) {
-    const rows = comparable
-      .map((p) => ({
-        label: `${p.carrier ?? 'Policy'} ${p.type}`,
-        rate: (p.annual_premium! / p.coverage_amount!) * 1000,
-      }))
-      .sort((a, b) => b.rate - a.rate);
+  // This replaced a cost-per-$1,000-of-cover comparison, which was a metric
+  // that looked analytical and was not: it invited a comparison between lines
+  // in the same sentence that admitted the lines are not comparable, and it
+  // offered no sense of what any figure should be. A share of the household's
+  // own premium needs no benchmark to be read — it answers "where is my money
+  // going", which is a question the data can actually settle.
+  if (priced.length >= 2) {
+    const byLine = new Map<string, number>();
+    for (const p of priced) {
+      const line = lineOf(p.type);
+      byLine.set(line, (byLine.get(line) ?? 0) + (p.annual_premium ?? 0));
+    }
+    const rows = [...byLine.entries()]
+      .map(([line, amount]) => ({ line, amount, share: Math.round((amount / annualTotal) * 100) }))
+      .sort((a, b) => b.amount - a.amount);
     findings.push({
-      id: 'rate-per-thousand',
+      id: 'premium-mix',
       severity: 'context',
-      title: 'What each policy costs per $1,000 of cover',
+      title: 'Where your premium goes',
       detail: rows
-        .map((r) => `${r.label}: $${r.rate.toFixed(2)}`)
+        .map((r) => `${LINE_LABEL[r.line] ?? r.line}: ${money(r.amount)} (${r.share}%)`)
         .join(' · ')
-        + '. Different lines cover different risks, so these are not directly comparable — '
-        + 'they are here because a figure that is far out of line with the others is worth asking about.',
+        + `. Covers ${priced.length} of ${policies.length} policies on file`
+        + (policies.length - priced.length > 0 ? ', the rest having no premium recorded.' : '.'),
     });
   }
 
@@ -210,42 +218,116 @@ export function reviewPremiums(
 // write these lines widely in the US, with the household's current group removed
 // so nobody wastes a call getting quoted by the company they already have.
 
-interface CarrierOption {
-  name: string;
-  lines: string[];
-  note: string;
+export interface MarketShareInput {
+  naic_group_code: number;
+  group_name: string;
+  line: string;
+  scope: string;
+  data_year: number;
+  market_share_pct: number | null;
+  source: string;
 }
-
-const CARRIERS: CarrierOption[] = [
-  { name: 'State Farm', lines: ['home', 'auto', 'umbrella', 'life'], note: 'Agent-based, writes most lines' },
-  { name: 'Auto-Owners', lines: ['home', 'auto', 'umbrella'], note: 'Independent agents only' },
-  { name: 'Travelers', lines: ['home', 'auto', 'umbrella'], note: 'Often competitive on bundled home and auto' },
-  { name: 'Erie', lines: ['home', 'auto', 'umbrella'], note: 'Regional; check availability in your state' },
-  { name: 'Amica', lines: ['home', 'auto', 'umbrella'], note: 'Direct, consistently high service ratings' },
-  { name: 'Chubb', lines: ['home', 'umbrella'], note: 'Aimed at higher-value homes' },
-  { name: 'Progressive', lines: ['home', 'auto', 'umbrella'], note: 'Direct and through agents' },
-  { name: 'Nationwide', lines: ['home', 'auto', 'umbrella', 'life'], note: 'Agent-based' },
-  { name: 'USAA', lines: ['home', 'auto', 'umbrella', 'life'], note: 'Military service required' },
-  { name: 'American Family', lines: ['home', 'auto', 'umbrella'], note: 'Agent-based, mostly central and western states' },
-];
 
 export interface ShoppingCandidate {
   name: string;
-  note: string;
+  /** The verified fact that earns it a place. Never an opinion about price. */
+  evidence: string;
+  /** Command's own note. Distinguished from evidence on purpose. */
+  note?: string;
+  marketSharePct: number | null;
+  naicGroupCode: number | null;
 }
 
+/** How Command describes a carrier it has no market data for. */
+const NOTES: Record<string, string> = {
+  'AUTO OWNERS GRP': 'Sold through independent agents',
+  'AMICA MUT GRP': 'Sold direct',
+  'CHUBB LTD GRP': 'Aimed at higher-value homes',
+  'ERIE INS GRP': 'Regional — check it writes in your state',
+  'USAA GRP': 'Military service required',
+  'UNITED SERV AUTOMOBILE ASSN GRP': 'Military service required',
+};
+
+/** What a household calls these companies, where the NAIC's name is not it. */
+const DISPLAY_NAME: Record<string, string> = {
+  'UNITED SERV AUTOMOBILE ASSN GRP': 'USAA',
+  'BERKSHIRE HATHAWAY GRP': 'GEICO (Berkshire Hathaway)',
+  'AMERICAN INTL GRP': 'AIG',
+  'CHUBB LTD GRP': 'Chubb',
+  'NATIONWIDE CORP GRP': 'Nationwide',
+  'HARTFORD FIRE & CAS GRP': 'The Hartford',
+  'AUTO OWNERS GRP': 'Auto-Owners',
+  'ALLSTATE INS GRP': 'Allstate',
+  'FARMERS INS GRP': 'Farmers',
+  'LIBERTY MUT GRP': 'Liberty Mutual',
+  'AMERICAN FAMILY INS GRP': 'American Family',
+  'ERIE INS GRP': 'Erie',
+  'AMICA MUT GRP': 'Amica',
+  'CINCINNATI FIN GRP': 'Cincinnati',
+  'TRAVELERS GRP': 'Travelers',
+  'STATE FARM GRP': 'State Farm',
+  'PROGRESSIVE GRP': 'Progressive',
+};
+
+/** How the line reads in a sentence about the market. */
+const MARKET_LABEL: Record<string, string> = {
+  home: 'homeowners', auto: 'auto', umbrella: 'umbrella',
+};
+
+const TITLE_CASE = (name: string): string => name
+  .replace(/\bGRP\b/g, '')
+  .toLowerCase()
+  .replace(/\b[a-z]/g, (c) => c.toUpperCase())
+  .replace(/\bIns\b/g, 'Insurance')
+  .replace(/\bMut\b/g, 'Mutual')
+  .replace(/\bFin\b/g, 'Financial')
+  .trim();
+
 /**
- * Carriers to ask for a quote, for the lines this household actually carries,
- * excluding whoever writes them now.
+ * Who to get quotes from, ranked by how much of the line they actually write.
+ *
+ * Market share is a verified fact about presence, not a claim about price —
+ * Command has no pricing data and a large carrier is not necessarily a cheap
+ * one. It is used for ranking because "writes a lot of this insurance" is the
+ * strongest thing public data can say about whether a carrier is worth a call.
+ *
+ * The household's own group is removed so nobody is quoted by the company they
+ * already have.
  */
-export function shoppingCandidates(policies: InsurancePolicy[], limit = 5): ShoppingCandidate[] {
+export function shoppingCandidates(
+  policies: InsurancePolicy[],
+  market: MarketShareInput[] = [],
+  limit = 4,
+): ShoppingCandidate[] {
   const lines = new Set(policies.map((p) => lineOf(p.type)));
   const held = new Set(
-    policies.map((p) => carrierGroup(p.carrier).key).filter((key) => key.length > 0),
+    policies.map((p) => carrierGroup(p.carrier).naicGroupCode).filter((c): c is number => c != null),
   );
-  return CARRIERS
-    .filter((c) => c.lines.some((line) => lines.has(line)))
-    .filter((c) => !held.has(carrierGroup(c.name).key))
+
+  // Only lines Command holds market data for. Life and disability are not in
+  // the property/casualty report, so nothing is recommended for them rather
+  // than something being invented.
+  const wanted = [...lines].filter((line) => market.some((m) => m.line === line));
+  if (wanted.length === 0) return [];
+
+  const best = new Map<number, MarketShareInput>();
+  for (const row of market) {
+    if (!wanted.includes(row.line)) continue;
+    if (held.has(row.naic_group_code)) continue;
+    const current = best.get(row.naic_group_code);
+    if (!current || (row.market_share_pct ?? 0) > (current.market_share_pct ?? 0)) {
+      best.set(row.naic_group_code, row);
+    }
+  }
+
+  return [...best.values()]
+    .sort((a, b) => (b.market_share_pct ?? 0) - (a.market_share_pct ?? 0))
     .slice(0, limit)
-    .map((c) => ({ name: c.name, note: c.note }));
+    .map((row) => ({
+      name: DISPLAY_NAME[row.group_name] ?? TITLE_CASE(row.group_name),
+      evidence: `${row.market_share_pct}% of the US ${MARKET_LABEL[row.line] ?? row.line} market, ${row.data_year}`,
+      note: NOTES[row.group_name],
+      marketSharePct: row.market_share_pct,
+      naicGroupCode: row.naic_group_code,
+    }));
 }

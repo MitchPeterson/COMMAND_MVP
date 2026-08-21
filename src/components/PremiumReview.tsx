@@ -9,11 +9,16 @@
 import React from 'react';
 import { AlertTriangle, ArrowRight, Building2, FileDown, Info, TrendingUp } from 'lucide-react';
 import type { InsurancePolicy, InsurancePolicyExtraction } from '../lib/supabase';
-import { reviewPremiums, shoppingCandidates, type PremiumSeverity } from '../lib/premiumReview';
+import {
+  reviewPremiums, shoppingCandidates,
+  type MarketShareInput, type PremiumSeverity,
+} from '../lib/premiumReview';
 
 interface Props {
   policies: InsurancePolicy[];
   extractions: InsurancePolicyExtraction[];
+  /** Public market data. Absent means no recommendation rather than a guess. */
+  market?: MarketShareInput[];
   onOpenReport?: () => void;
 }
 
@@ -38,9 +43,9 @@ const TONE: Record<PremiumSeverity, { icon: React.ReactNode; ring: string; label
   },
 };
 
-export function PremiumReview({ policies, extractions, onOpenReport }: Props) {
+export function PremiumReview({ policies, extractions, market = [], onOpenReport }: Props) {
   const review = reviewPremiums(policies, extractions);
-  const candidates = shoppingCandidates(policies);
+  const candidates = shoppingCandidates(policies, market);
 
   if (policies.length === 0) return null;
 
@@ -95,25 +100,39 @@ export function PremiumReview({ policies, extractions, onOpenReport }: Props) {
         <div className="mt-6 border-t border-cmd-border pt-6">
           <div className="flex items-center gap-2">
             <Building2 className="h-4 w-4 text-cmd-muted" />
-            <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Who to ask</p>
+            <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Who to get quotes from</p>
           </div>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-cmd-muted">
-            Carriers that write the lines you carry, with whoever writes them now left off so you do
-            not get quoted by the company you already have. This is not a ranking and it is not based
-            on price — Command has no way to know who is competitive for your household. An
-            independent agent can quote several of these in one conversation.
+            Ranked by how much of this insurance they actually write, with your own carrier left off.
+            That is a measure of presence, not price — a big carrier is not necessarily a cheap one,
+            and Command has no pricing data.
           </p>
-          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-            {candidates.map((candidate) => (
+
+          <ol className="mt-4 space-y-2">
+            {candidates.map((candidate, i) => (
               <li
-                key={candidate.name}
-                className="rounded-2xl border border-cmd-border bg-cmd-black/40 px-4 py-3"
+                key={candidate.naicGroupCode ?? candidate.name}
+                className="flex items-start gap-4 rounded-2xl border border-cmd-border bg-cmd-black/40 px-4 py-3"
               >
-                <p className="text-sm font-medium text-cmd-offwhite">{candidate.name}</p>
-                <p className="mt-0.5 text-xs leading-5 text-cmd-muted">{candidate.note}</p>
+                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-cmd-gold/40 text-xs font-semibold text-cmd-gold">
+                  {i + 1}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-cmd-offwhite">{candidate.name}</p>
+                  {/* The verified fact, then Command's own note, kept apart. */}
+                  <p className="mt-0.5 text-xs leading-5 text-cmd-muted">
+                    {candidate.evidence}
+                    {candidate.note ? ` · ${candidate.note}` : ''}
+                  </p>
+                </div>
               </li>
             ))}
-          </ul>
+          </ol>
+
+          <p className="mt-3 text-xs leading-5 text-cmd-muted/70">
+            Market share from the NAIC Property/Casualty Market Share Report, countrywide rather than
+            for your state. An independent agent can quote several of these in one call.
+          </p>
         </div>
       )}
 

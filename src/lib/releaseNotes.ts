@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.53.0',
+    date: '2026-08-20',
+    title: 'Carrier recommendations backed by market data',
+    items: [
+      'Who to get quotes from is now ranked by how much of that insurance each carrier actually writes, from the NAIC market share report, with your own carrier left off',
+      'Replaced the cost-per-$1,000 comparison with where your premium actually goes, and it says how many of your policies it covers',
+    ],
+  },
+  {
     version: '0.52.0',
     date: '2026-08-20',
     title: 'Whether your insurance is worth shopping',

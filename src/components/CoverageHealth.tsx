@@ -1,5 +1,7 @@
 import React from 'react';
 import type { HouseholdProfile, InsurancePolicy, InsurancePolicyExtraction } from '../lib/supabase';
+import { FindingList } from './FindingList';
+import { useDismissals } from './useDismissals';
 import { computeCoverageHealth, gradeTone, type FindingSeverity } from '../lib/coverageHealth';
 import { currency, titleCase } from './InsurancePolicyReview';
 import { AlertTriangle, CheckCircle2, Info, ShieldAlert } from 'lucide-react';
@@ -14,6 +16,9 @@ export function CoverageHealth({ policies, extractions, profile }: Props) {
   const confirmed = extractions.filter((e) => e.review_status === 'confirmed');
   const { score, grade, findings, dataFindings, confidence, confidenceReason, totalPremium, byType } =
     computeCoverageHealth(policies, extractions, profile);
+  // Findings the household has put down stay put -- and come back on their own
+  // when the facts behind them change. See lib/dismissals.
+  const { visible, hiddenCount, onDismiss, onRestore } = useDismissals('insurance', findings);
 
   const criticals = findings.filter((f) => f.severity === 'critical');
   const attention = findings.filter((f) => f.severity === 'attention');
@@ -77,7 +82,7 @@ export function CoverageHealth({ policies, extractions, profile }: Props) {
         </p>
       ) : (
         <div className="mt-6 space-y-3">
-          {findings.length === 0 ? (
+          {visible.length === 0 && hiddenCount === 0 ? (
             <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
               <CheckCircle2 className="h-4 w-4 text-emerald-300" />
               <p className="text-sm text-cmd-muted">
@@ -86,15 +91,13 @@ export function CoverageHealth({ policies, extractions, profile }: Props) {
               </p>
             </div>
           ) : (
-            findings.map((f, i) => (
-              <div key={i} className={`flex gap-3 rounded-2xl border px-4 py-3 ${borders[f.severity]}`}>
-                {icons[f.severity]}
-                <div>
-                  <p className="text-sm font-semibold text-cmd-offwhite">{f.title}</p>
-                  <p className="mt-1 text-sm text-cmd-muted">{f.detail}</p>
-                </div>
-              </div>
-            ))
+            <FindingList
+              section="insurance"
+              findings={visible}
+              hiddenCount={hiddenCount}
+              onDismiss={onDismiss}
+              onRestore={onRestore}
+            />
           )}
           {dataFindings.length > 0 && (
             <div className="mt-5 rounded-2xl border border-cmd-border bg-cmd-black/20 px-4 py-3">

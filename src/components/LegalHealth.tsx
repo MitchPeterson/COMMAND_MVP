@@ -7,6 +7,8 @@ import type {
   LegalDocumentExtraction,
 } from '../lib/supabase';
 import { computeLegalHealth, type LegalFindingSeverity } from '../lib/legalHealth';
+import { FindingList } from './FindingList';
+import { useDismissals } from './useDismissals';
 import { gradeTone } from '../lib/coverageHealth';
 import { AlertTriangle, CheckCircle2, Info, Scale, ShieldAlert } from 'lucide-react';
 
@@ -35,6 +37,9 @@ const ESSENTIAL_LABEL: Record<string, string> = {
 export function LegalHealth({ extractions, documents, profile, familyMembers = [], assets = [] }: Props) {
   const { score, grade, findings, dataFindings, confidence, confidenceReason, essentials, documentCount } =
     computeLegalHealth(extractions, documents, profile, familyMembers, assets);
+  // Findings the household has put down stay put -- and come back on their own
+  // when the facts behind them change. See lib/dismissals.
+  const { visible, hiddenCount, onDismiss, onRestore } = useDismissals('legal', findings);
 
   const criticals = findings.filter((f) => f.severity === 'critical');
   const attention = findings.filter((f) => f.severity === 'attention');
@@ -93,7 +98,7 @@ export function LegalHealth({ extractions, documents, profile, familyMembers = [
       </div>
 
       <div className="mt-6 space-y-3">
-        {findings.length === 0 ? (
+        {visible.length === 0 && hiddenCount === 0 ? (
           <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
             <CheckCircle2 className="h-4 w-4 text-emerald-300" />
             <p className="text-sm text-cmd-muted">
@@ -102,20 +107,13 @@ export function LegalHealth({ extractions, documents, profile, familyMembers = [
             </p>
           </div>
         ) : (
-          findings.map((finding, i) => (
-            <div key={i} className={`flex gap-3 rounded-2xl border px-4 py-3 ${borders[finding.severity]}`}>
-              {icons[finding.severity]}
-              <div>
-                <p className="text-sm font-semibold text-cmd-offwhite">{finding.title}</p>
-                <p className="mt-1 text-sm text-cmd-muted">{finding.detail}</p>
-                {finding.attorneyReview && (
-                  <p className="mt-1.5 flex items-center gap-1.5 text-xs text-cmd-gold">
-                    <Scale className="h-3 w-3" /> An attorney is the right person to answer this one.
-                  </p>
-                )}
-              </div>
-            </div>
-          ))
+          <FindingList
+              section="legal"
+              findings={visible}
+              hiddenCount={hiddenCount}
+              onDismiss={onDismiss}
+              onRestore={onRestore}
+            />
         )}
 
         {dataFindings.length > 0 && (

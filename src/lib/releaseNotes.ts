@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.55.0',
+    date: '2026-08-21',
+    title: 'Put a finding down',
+    items: [
+      'Every finding can now be snoozed for a month or three, or marked as handled — and nothing is lost, since a hidden count offers them back',
+      'A finding returns on its own when the facts behind it change, so next year\'s renewal is not silenced by this year\'s dismissal',
+      'Policies renewing on the same day with the same carrier are reported once, not once each',
+    ],
+  },
+  {
     version: '0.54.1',
     date: '2026-08-21',
     title: 'Rename the refine button',

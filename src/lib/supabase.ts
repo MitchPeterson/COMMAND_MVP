@@ -1827,6 +1827,61 @@ export interface InsuranceEndorsementRow {
  * Public market data: how much of a line of business a carrier group actually
  * writes. Not household data — the same rows for every account.
  */
+export interface DismissedFindingRow {
+  fingerprint: string;
+  section: string;
+  title: string;
+  snoozed_until: string | null;
+}
+
+export async function getDismissedFindings(householdId: string): Promise<DismissedFindingRow[]> {
+  const { data, error } = await supabase
+    .from('dismissed_findings')
+    .select('fingerprint, section, title, snoozed_until')
+    .eq('household_id', householdId);
+  if (error) {
+    // A failure here must not hide findings, so it degrades to showing them all.
+    console.warn('Could not load dismissals; showing every finding:', error.message);
+    return [];
+  }
+  return (data ?? []) as DismissedFindingRow[];
+}
+
+/** Puts a finding down, either until a date or for good. */
+export async function dismissFinding(
+  householdId: string,
+  input: { fingerprint: string; section: string; title: string; snoozedUntil?: string | null },
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('dismissed_findings')
+    .upsert([{
+      household_id: householdId,
+      fingerprint: input.fingerprint,
+      section: input.section,
+      title: input.title.slice(0, 300),
+      snoozed_until: input.snoozedUntil ?? null,
+    }], { onConflict: 'household_id,fingerprint' });
+  if (error) {
+    console.error('Failed to dismiss the finding:', error);
+    throw new Error(`Could not hide that: ${error.message}`);
+  }
+  return true;
+}
+
+/** Brings hidden findings in a section back. */
+export async function restoreFindings(householdId: string, section: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('dismissed_findings')
+    .delete()
+    .eq('household_id', householdId)
+    .eq('section', section);
+  if (error) {
+    console.error('Failed to restore findings:', error);
+    throw new Error(`Could not bring those back: ${error.message}`);
+  }
+  return true;
+}
+
 export type FeedbackKind = 'idea' | 'defect' | 'question';
 
 export interface FeedbackTicket {

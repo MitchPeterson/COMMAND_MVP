@@ -1,5 +1,7 @@
 import React from 'react';
 import type { HouseholdProfile } from '../lib/supabase';
+import { FindingList } from './FindingList';
+import { useDismissals } from './useDismissals';
 import { computeHomeHealth, type HomeFindingSeverity } from '../lib/homeHealth';
 import { gradeTone } from '../lib/coverageHealth';
 import type { HomeSystemRow } from '../lib/homeSystems';
@@ -19,6 +21,9 @@ export function HomeHealth({ systems, profile, mortgagePrincipal }: Props) {
     score, grade, findings, dataFindings, confidence, confidenceReason, fiveYearExposure, systemsTracked,
   } = computeHomeHealth(systems, profile, mortgagePrincipal);
 
+  // Findings the household has put down stay put -- and come back on their own
+  // when the facts behind them change. See lib/dismissals.
+  const { visible, hiddenCount, onDismiss, onRestore } = useDismissals('home', findings);
   const criticals = findings.filter((f) => f.severity === 'critical');
   const attention = findings.filter((f) => f.severity === 'attention');
 
@@ -76,7 +81,7 @@ export function HomeHealth({ systems, profile, mortgagePrincipal }: Props) {
         </p>
       ) : (
         <div className="mt-6 space-y-3">
-          {findings.length === 0 ? (
+          {visible.length === 0 && hiddenCount === 0 ? (
             <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
               <CheckCircle2 className="h-4 w-4 text-emerald-300" />
               <p className="text-sm text-cmd-muted">
@@ -85,15 +90,13 @@ export function HomeHealth({ systems, profile, mortgagePrincipal }: Props) {
               </p>
             </div>
           ) : (
-            findings.map((finding, i) => (
-              <div key={i} className={`flex gap-3 rounded-2xl border px-4 py-3 ${borders[finding.severity]}`}>
-                {icons[finding.severity]}
-                <div>
-                  <p className="text-sm font-semibold text-cmd-offwhite">{finding.title}</p>
-                  <p className="mt-1 text-sm text-cmd-muted">{finding.detail}</p>
-                </div>
-              </div>
-            ))
+            <FindingList
+              section="home"
+              findings={visible}
+              hiddenCount={hiddenCount}
+              onDismiss={onDismiss}
+              onRestore={onRestore}
+            />
           )}
 
           {dataFindings.length > 0 && (

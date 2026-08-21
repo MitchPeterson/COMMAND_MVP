@@ -200,23 +200,41 @@ export function computeCoverageHealth(
   }
 
   // 6. Lapsed or imminent renewals.
+  //
+  // Grouped by carrier and date rather than reported per policy. A household
+  // with home, auto and umbrella all renewing on the same day with the same
+  // carrier got the identical sentence three times, which reads as a bug and
+  // buries whatever finding sits under it.
   const now = Date.now();
+  const renewals = new Map<string, { carrier: string; date: string; days: number; types: string[] }>();
   for (const policy of policies) {
     if (!policy.renewal_date) continue;
     const renewal = new Date(policy.renewal_date).getTime();
     if (Number.isNaN(renewal)) continue;
     const days = Math.round((renewal - now) / 86_400_000);
-    if (days < 0) {
+    if (days > 45) continue;
+    const carrier = policy.carrier ?? 'A policy';
+    const key = `${carrier}|${policy.renewal_date}`;
+    const entry = renewals.get(key)
+      ?? { carrier, date: policy.renewal_date, days, types: [] };
+    entry.types.push(policy.type);
+    renewals.set(key, entry);
+  }
+  for (const entry of renewals.values()) {
+    const what = entry.types.length === 1
+      ? `${entry.carrier} ${entry.types[0]}`
+      : `${entry.types.length} ${entry.carrier} policies (${entry.types.join(', ')})`;
+    if (entry.days < 0) {
       findings.push({
         severity: 'critical',
-        title: `${policy.carrier ?? 'A policy'} shows a renewal date in the past`,
-        detail: `Renewal was ${policy.renewal_date}. Either it has lapsed or a newer policy has not been uploaded.`,
+        title: `${what} shows a renewal date in the past`,
+        detail: `Renewal was ${entry.date}. Either it has lapsed or a newer policy has not been uploaded.`,
       });
-    } else if (days <= 45) {
+    } else {
       findings.push({
         severity: 'attention',
-        title: `${policy.carrier ?? 'A policy'} renews in ${days} day${days === 1 ? '' : 's'}`,
-        detail: `Renewal ${policy.renewal_date}. Worth comparing before it auto-renews.`,
+        title: `${what} renew${entry.types.length === 1 ? 's' : ''} in ${entry.days} day${entry.days === 1 ? '' : 's'}`,
+        detail: `Renewal ${entry.date}. Worth comparing before it auto-renews.`,
       });
     }
   }

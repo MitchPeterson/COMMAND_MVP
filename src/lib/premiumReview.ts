@@ -40,6 +40,8 @@ export interface PremiumReview {
   /** Policies on file with no premium recorded. */
   unpriced: number;
   findings: PremiumFinding[];
+  /** Premium by line, largest first. Rendered as a chart, not a sentence. */
+  mix: Array<{ line: string; label: string; amount: number; share: number }>;
   /** True when nothing on file carries a premium, so the total means nothing. */
   blind: boolean;
 }
@@ -167,32 +169,22 @@ export function reviewPremiums(
 
   // ── Where the money actually goes ──────────────────────────────────────────
   //
-  // This replaced a cost-per-$1,000-of-cover comparison, which was a metric
-  // that looked analytical and was not: it invited a comparison between lines
-  // in the same sentence that admitted the lines are not comparable, and it
-  // offered no sense of what any figure should be. A share of the household's
-  // own premium needs no benchmark to be read — it answers "where is my money
-  // going", which is a question the data can actually settle.
-  if (priced.length >= 2) {
-    const byLine = new Map<string, number>();
-    for (const p of priced) {
-      const line = lineOf(p.type);
-      byLine.set(line, (byLine.get(line) ?? 0) + (p.annual_premium ?? 0));
-    }
-    const rows = [...byLine.entries()]
-      .map(([line, amount]) => ({ line, amount, share: Math.round((amount / annualTotal) * 100) }))
-      .sort((a, b) => b.amount - a.amount);
-    findings.push({
-      id: 'premium-mix',
-      severity: 'context',
-      title: 'Where your premium goes',
-      detail: rows
-        .map((r) => `${LINE_LABEL[r.line] ?? r.line}: ${money(r.amount)} (${r.share}%)`)
-        .join(' · ')
-        + `. Covers ${priced.length} of ${policies.length} policies on file`
-        + (policies.length - priced.length > 0 ? ', the rest having no premium recorded.' : '.'),
-    });
+  // Returned as data rather than a finding. It was a five-item list separated
+  // by interpuncts, which is a table pretending to be a sentence; the panel
+  // draws it instead.
+  const byLine = new Map<string, number>();
+  for (const p of priced) {
+    const line = lineOf(p.type);
+    byLine.set(line, (byLine.get(line) ?? 0) + (p.annual_premium ?? 0));
   }
+  const mix = [...byLine.entries()]
+    .map(([line, amount]) => ({
+      line,
+      label: LINE_LABEL[line] ?? line,
+      amount,
+      share: annualTotal > 0 ? Math.round((amount / annualTotal) * 100) : 0,
+    }))
+    .sort((a, b) => b.amount - a.amount);
 
   const unpriced = policies.length - priced.length;
   if (unpriced > 0) {
@@ -208,7 +200,7 @@ export function reviewPremiums(
   const order: Record<PremiumSeverity, number> = { act: 0, consider: 1, context: 2 };
   findings.sort((a, b) => order[a.severity] - order[b.severity]);
 
-  return { annualTotal, priced: priced.length, unpriced, findings, blind: priced.length === 0 };
+  return { annualTotal, priced: priced.length, unpriced, findings, mix, blind: priced.length === 0 };
 }
 
 // ── Who to ask ────────────────────────────────────────────────────────────────

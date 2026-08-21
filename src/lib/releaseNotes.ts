@@ -25,6 +25,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.56.0',
+    date: '2026-08-21',
+    title: 'Premium mix as a chart',
+    items: [
+      'Where your premium goes is now a donut with a legend instead of a run-on line of figures',
+    ],
+  },
+  {
     version: '0.55.0',
     date: '2026-08-21',
     title: 'Put a finding down',

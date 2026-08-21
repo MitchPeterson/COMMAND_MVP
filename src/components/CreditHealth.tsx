@@ -1,5 +1,7 @@
 import React from 'react';
 import type { CreditCard as CreditCardRow, HouseholdProfile } from '../lib/supabase';
+import { FindingList } from './FindingList';
+import { useDismissals } from './useDismissals';
 import { computeCreditHealth, type CreditFindingSeverity } from '../lib/creditHealth';
 import { gradeTone } from '../lib/coverageHealth';
 import { AlertTriangle, CheckCircle2, Info, ShieldAlert } from 'lucide-react';
@@ -20,6 +22,9 @@ export function CreditHealth({ cards, profile, awaitingCard = 0 }: Props) {
     totalLimit, totalBalance, utilization, cardCount,
   } = computeCreditHealth(cards, profile);
 
+  // Findings the household has put down stay put -- and come back on their own
+  // when the facts behind them change. See lib/dismissals.
+  const { visible, hiddenCount, onDismiss, onRestore } = useDismissals('credit', findings);
   const criticals = findings.filter((f) => f.severity === 'critical');
   const attention = findings.filter((f) => f.severity === 'attention');
 
@@ -82,7 +87,7 @@ export function CreditHealth({ cards, profile, awaitingCard = 0 }: Props) {
         </p>
       ) : (
         <div className="mt-6 space-y-3">
-          {findings.length === 0 ? (
+          {visible.length === 0 && hiddenCount === 0 ? (
             <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
               <CheckCircle2 className="h-4 w-4 text-emerald-300" />
               <p className="text-sm text-cmd-muted">
@@ -91,15 +96,13 @@ export function CreditHealth({ cards, profile, awaitingCard = 0 }: Props) {
               </p>
             </div>
           ) : (
-            findings.map((finding, i) => (
-              <div key={i} className={`flex gap-3 rounded-2xl border px-4 py-3 ${borders[finding.severity]}`}>
-                {icons[finding.severity]}
-                <div>
-                  <p className="text-sm font-semibold text-cmd-offwhite">{finding.title}</p>
-                  <p className="mt-1 text-sm text-cmd-muted">{finding.detail}</p>
-                </div>
-              </div>
-            ))
+            <FindingList
+              section="credit"
+              findings={visible}
+              hiddenCount={hiddenCount}
+              onDismiss={onDismiss}
+              onRestore={onRestore}
+            />
           )}
 
           {dataFindings.length > 0 && (

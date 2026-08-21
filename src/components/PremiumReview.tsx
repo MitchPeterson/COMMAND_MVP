@@ -7,11 +7,13 @@
 // conversation with the figures already assembled.
 
 import React from 'react';
-import { AlertTriangle, ArrowRight, Building2, FileDown, Info, TrendingUp } from 'lucide-react';
+import { ArrowRight, Building2, FileDown } from 'lucide-react';
 import type { InsurancePolicy, InsurancePolicyExtraction } from '../lib/supabase';
+import { FindingList } from './FindingList';
+import { useDismissals } from './useDismissals';
 import {
   reviewPremiums, shoppingCandidates,
-  type MarketShareInput, type PremiumSeverity,
+  type MarketShareInput,
 } from '../lib/premiumReview';
 
 interface Props {
@@ -25,26 +27,21 @@ interface Props {
 const money = (value: number): string =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 
-const TONE: Record<PremiumSeverity, { icon: React.ReactNode; ring: string; label: string }> = {
-  act: {
-    icon: <TrendingUp className="h-4 w-4" />,
-    ring: 'border-cmd-gold/40 bg-cmd-gold/5 text-cmd-gold',
-    label: 'Worth doing now',
-  },
-  consider: {
-    icon: <AlertTriangle className="h-4 w-4" />,
-    ring: 'border-cmd-border bg-cmd-black/40 text-cmd-offwhite',
-    label: 'Worth a look',
-  },
-  context: {
-    icon: <Info className="h-4 w-4" />,
-    ring: 'border-cmd-border bg-cmd-black/30 text-cmd-muted',
-    label: 'For context',
-  },
+
+/** The premium panel's own severities, mapped onto the shared renderer's. */
+const SEVERITY_MAP: Record<string, string> = {
+  act: 'attention', consider: 'info', context: 'info',
 };
 
 export function PremiumReview({ policies, extractions, market = [], onOpenReport }: Props) {
   const review = reviewPremiums(policies, extractions);
+  // The action line is part of what makes a finding dismissible-worthy, so it
+  // is folded into the detail rather than dropped.
+  const withAction = review.findings.map((f) => ({
+    ...f,
+    detail: f.action ? `${f.detail} ${f.action}` : f.detail,
+  }));
+  const { visible, hiddenCount, onDismiss, onRestore } = useDismissals('premium', withAction);
   const candidates = shoppingCandidates(policies, market);
 
   if (policies.length === 0) return null;
@@ -74,27 +71,15 @@ export function PremiumReview({ policies, extractions, market = [], onOpenReport
         )}
       </div>
 
-      {review.findings.length > 0 && (
-        <div className="mt-6 space-y-2.5">
-          {review.findings.map((finding) => {
-            const tone = TONE[finding.severity];
-            return (
-              <div key={finding.id} className={`rounded-2xl border p-4 ${tone.ring}`}>
-                <div className="flex items-start gap-3">
-                  <span className="mt-0.5 shrink-0">{tone.icon}</span>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold">{finding.title}</p>
-                    <p className="mt-1.5 text-sm leading-6 text-cmd-muted">{finding.detail}</p>
-                    {finding.action && (
-                      <p className="mt-2 text-sm leading-6 text-cmd-offwhite">{finding.action}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+      <div className="mt-6">
+        <FindingList
+          section="premium"
+          findings={visible.map((f) => ({ ...f, severity: SEVERITY_MAP[f.severity] }))}
+          hiddenCount={hiddenCount}
+          onDismiss={onDismiss}
+          onRestore={onRestore}
+        />
+      </div>
 
       {candidates.length > 0 && (
         <div className="mt-6 border-t border-cmd-border pt-6">

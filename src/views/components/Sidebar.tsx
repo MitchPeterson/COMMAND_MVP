@@ -55,13 +55,21 @@ export function Sidebar({
           open ? 'translate-x-0' : 'max-lg:-translate-x-full'
         }`}
       >
-      <div className="flex items-center gap-3 border-b border-cmd-border px-5 py-5">
+      {/* The mark is the way home, which is what a logo in a top corner is for
+          everywhere else. It closes the drawer too, so tapping it on a phone
+          does not leave the nav sitting over the dashboard it just opened. */}
+      <button
+        type="button"
+        onClick={() => go('dashboard')}
+        aria-label="Go to the dashboard"
+        className="flex w-full items-center gap-3 border-b border-cmd-border px-5 py-5 text-left transition hover:bg-cmd-charcoal"
+      >
         <HubMark size={22} />
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.2em] text-cmd-offwhite">COMMAND</div>
           <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cmd-muted">Household OS</div>
         </div>
-      </div>
+      </button>
 
       <nav className="flex-1 overflow-y-auto px-2 py-4">
         <div className="space-y-1">

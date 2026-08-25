@@ -25,6 +25,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.58.1',
+    date: '2026-08-25',
+    title: 'The mark takes you home',
+    items: [
+      'Clicking the Command mark in the sidebar returns you to the dashboard, and closes the nav drawer on a phone',
+    ],
+  },
+  {
     version: '0.58.0',
     date: '2026-08-21',
     title: 'Finances, in four views',

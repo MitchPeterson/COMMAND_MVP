@@ -15,6 +15,7 @@
 // automatically.
 
 import type { CreditStatement, CreditTransaction } from './supabase';
+import { isAcceptedTransaction } from './spending';
 
 export interface RecurringCharge {
   merchant: string;
@@ -102,7 +103,11 @@ export function findRecurringCharges(
 
   const charges = transactions.filter(
     (t) => t.direction === 'charge' && t.transaction_date && t.amount != null
-      && (!accepted || accepted.has(t.statement_id)),
+      && isAcceptedTransaction(t, accepted)
+      // A transfer repeats every month and renews nothing. Without this, the
+      // monthly card payment out of checking is the largest "subscription"
+      // the household has.
+      && t.flow !== 'transfer' && t.flow !== 'income',
   );
 
   const groups = new Map<string, CreditTransaction[]>();

@@ -67,6 +67,28 @@ const GROUPS: Array<{ code: string; label: string; match: string[] }> = [
   { code: 'cash', label: 'Cash advances', match: ['cash advance', 'atm'] },
 ];
 
+/**
+ * Whether a transaction is something the household has accepted as true.
+ *
+ * Two ways in, and they are confirmed differently. A row read off a statement
+ * counts once that statement has been reviewed. A row from an uploaded
+ * spreadsheet has no statement at all -- it was confirmed at the moment of
+ * import, in a preview showing the columns, the sign convention and the first
+ * rows -- so it always counts.
+ *
+ * Written once and shared, because the same filter appears in spending,
+ * recurring charges and the rewards strategy, and a version that dropped
+ * imported rows in only one of them would have the same screen reporting two
+ * different totals.
+ */
+export function isAcceptedTransaction(
+  t: { statement_id: string | null; import_id?: string | null },
+  acceptedStatementIds: Set<string> | null,
+): boolean {
+  if (t.statement_id == null) return true;
+  return !acceptedStatementIds || acceptedStatementIds.has(t.statement_id);
+}
+
 export function categoryGroup(raw: string | null | undefined): { code: string; label: string } {
   const value = (raw ?? '').toLowerCase().trim();
   if (!value) return { code: 'uncategorized', label: 'Not categorized' };
@@ -113,7 +135,11 @@ export function monthlySpending(
     : null;
 
   const spending = transactions.filter(
-    (t) => t.transaction_date && !isCardPayment(t) && (!accepted || accepted.has(t.statement_id)),
+    (t) => t.transaction_date && !isCardPayment(t) && isAcceptedTransaction(t, accepted)
+      // Imported rows say outright what they were. Income is not spending, and
+      // a transfer between the household's own accounts is the same money as
+      // the purchases it pays for -- counting either would inflate the month.
+      && t.flow !== 'income' && t.flow !== 'transfer',
   );
 
   const byMonth = new Map<string, CreditTransaction[]>();

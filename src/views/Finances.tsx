@@ -9,6 +9,7 @@ import { LoanList } from '../components/LoanList';
 import { OwnedThings } from '../components/OwnedThings';
 import { MonthlySpending } from '../components/MonthlySpending';
 import { RecurringCharges } from '../components/RecurringCharges';
+import { TransactionImportPanel } from '../components/TransactionImportPanel';
 import { SegmentedTabs } from '../components/SegmentedTabs';
 import { InvestmentsPanel } from './Investments';
 import { isInvested } from '../lib/investments';
@@ -59,11 +60,14 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
   const tabs = [
     { id: 'accounts', label: 'Accounts', count: cashAccounts.length + (data?.assets ?? []).length },
     { id: 'debt', label: 'Debt', count: activeLoans.length + cardsWithBalance.length },
-    { id: 'spending', label: 'Spending', count: transactions.length },
+    { id: 'spending', label: 'Spending', count: transactions.length, always: true },
     { id: 'investments', label: 'Investments', count: investedCount },
-  // Accounts always shows, because manual entry lives there and a household
-  // with nothing on file still needs somewhere to put the first thing.
-  ].filter((t) => t.id === 'accounts' || (t.count ?? 0) > 0);
+    // Accounts always shows, because manual entry lives there and a household
+    // with nothing on file still needs somewhere to put the first thing.
+    // Spending always shows for the same reason: the importer that produces
+    // the transactions lives on it, so hiding the tab until transactions
+    // exist would hide the only way to get any.
+  ].filter((t) => t.id === 'accounts' || t.always || (t.count ?? 0) > 0);
 
 
   const familiarity = familiarityState(accounts.length, (data?.loans ?? []).length);
@@ -198,6 +202,15 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
             transactions={transactions}
             statements={data?.creditStatements ?? []}
           />
+          {data?.household?.id && (
+            <TransactionImportPanel
+              householdId={data.household.id}
+              cards={data?.creditCards ?? []}
+              accounts={accounts}
+              imports={data?.transactionImports ?? []}
+              onChanged={refresh}
+            />
+          )}
         </>
       )}
 

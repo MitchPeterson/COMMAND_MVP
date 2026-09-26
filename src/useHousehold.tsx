@@ -72,6 +72,8 @@ import {
   getDismissedFindings,
   type InvestmentHoldingRow,
   getInvestmentHoldings,
+  type TransactionImportRow,
+  getTransactionImports,
   type DeductionLogEntry,
 } from './lib/supabase';
 
@@ -113,6 +115,8 @@ export interface HouseholdData {
   /** Findings this household has dismissed or snoozed. */
   dismissedFindings: DismissedFindingRow[];
   investmentHoldings: InvestmentHoldingRow[];
+  /** Spreadsheets of transactions the household uploaded. */
+  transactionImports: TransactionImportRow[];
 }
 
 export interface UseHouseholdReturn {
@@ -159,6 +163,7 @@ const EMPTY_DATA: HouseholdData = {
   marketShare: [],
   dismissedFindings: [],
   investmentHoldings: [],
+  transactionImports: [],
 };
 
 /**
@@ -231,6 +236,7 @@ function useHouseholdState(): UseHouseholdReturn {
         marketShare,
         dismissedFindings,
         investmentHoldings,
+        transactionImports,
       ] = await Promise.all([
         supabase
           .from('household_profile')
@@ -272,6 +278,7 @@ function useHouseholdState(): UseHouseholdReturn {
         getMarketShare(),
         getDismissedFindings(hid),
         getInvestmentHoldings(hid),
+        getTransactionImports(hid),
       ]);
 
       setData({
@@ -310,6 +317,7 @@ function useHouseholdState(): UseHouseholdReturn {
         marketShare,
         dismissedFindings,
         investmentHoldings,
+        transactionImports,
       });
     } catch (err) {
       console.error('Failed to load household data:', err);

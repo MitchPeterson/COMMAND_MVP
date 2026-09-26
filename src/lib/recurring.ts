@@ -32,6 +32,54 @@ export interface RecurringCharge {
   markedAutopay: boolean;
   /** How confident, and why, in the user's terms. */
   basis: string;
+  /**
+   * A price rise, where the charge settled at one figure and then settled at a
+   * higher one.
+   *
+   * This is the finding people act on. Nobody notices a subscription going
+   * from $12.99 to $17.99 -- the email is one of forty that week -- and
+   * nothing else in the household's records would ever surface it, because
+   * both figures look entirely normal on their own.
+   */
+  priceIncrease: { from: number; to: number; since: string; annualDifference: number } | null;
+}
+
+/**
+ * A charge that settled at one amount and later settled at a higher one.
+ *
+ * Deliberately strict. It requires the old amount to have been charged at
+ * least twice and the new amount to be the current one, so a single unusual
+ * month -- an annual renewal, a one-off overage -- is not reported as a price
+ * rise. Utilities move every month and never trigger this, which is correct:
+ * a heating bill going up in January is weather, not a price increase.
+ */
+function findPriceIncrease(
+  rows: Array<{ amount: number; date: string }>,
+): RecurringCharge['priceIncrease'] {
+  if (rows.length < 3) return null;
+  const ordered = [...rows].sort((a, b) => a.date.localeCompare(b.date));
+  const current = ordered[ordered.length - 1].amount;
+
+  // Where the current amount started. Everything before it is the old price.
+  let firstAtCurrent = ordered.length - 1;
+  while (firstAtCurrent > 0 && Math.abs(ordered[firstAtCurrent - 1].amount - current) < 0.01) {
+    firstAtCurrent -= 1;
+  }
+  const before = ordered.slice(0, firstAtCurrent);
+  if (before.length < 2) return null;
+
+  // The old price has to have been a price, not a wobble.
+  const previous = before[before.length - 1].amount;
+  const settled = before.filter((r) => Math.abs(r.amount - previous) < 0.01).length >= 2;
+  if (!settled) return null;
+  if (current <= previous * 1.03) return null;
+
+  return {
+    from: previous,
+    to: current,
+    since: ordered[firstAtCurrent].date,
+    annualDifference: (current - previous) * 12,
+  };
 }
 
 export interface RecurringSummary {
@@ -145,8 +193,21 @@ export function findRecurringCharges(
     // A merchant appearing twice for different amounts is otherwise just a place
     // the household shops.
     const repeats = months.length >= 2;
+    // A fourth way, and the one the price-rise finding depends on. A
+    // subscription that went from $15.49 to $22.99 has two amounts, so it is
+    // not "the same every month", and its category is Entertainment rather
+    // than anything that reads as a bill -- so Netflix was being dropped by
+    // all three tests above, and a price rise can only be reported on a
+    // charge that was recognized as recurring in the first place.
+    //
+    // Three months and at most two distinct amounts. Two flights in two
+    // months are two amounts over two months and still do not qualify.
+    const distinctAmounts = new Set(amounts.map((a) => a.toFixed(2))).size;
+    const settledTwice = months.length >= 3 && distinctAmounts <= 2;
+
     const recurring = marked
       || (repeats && sameAmount)
+      || settledTwice
       || (repeats && looksLikeABill(newestCategory(rows)));
     if (!recurring) continue;
 
@@ -162,6 +223,9 @@ export function findRecurringCharges(
       category: newest.category ?? null,
       lastSeen: newest.transaction_date ?? '',
       markedAutopay: marked,
+      priceIncrease: findPriceIncrease(
+        rows.map((t) => ({ amount: Number(t.amount), date: t.transaction_date ?? '' })),
+      ),
       basis: marked && repeats
         ? `Marked automatic on your statement, and seen in ${months.length} months.`
         : marked

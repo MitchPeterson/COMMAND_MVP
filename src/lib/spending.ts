@@ -57,6 +57,12 @@ const GROUPS: Array<{ code: string; label: string; match: string[] }> = [
   { code: 'utilities', label: 'Utilities', match: ['utilit', 'electric', 'internet', 'phone', 'cable'] },
   { code: 'health', label: 'Health and medical', match: ['health', 'medical', 'pharmac', 'dental', 'vision'] },
   { code: 'shopping', label: 'Shopping', match: ['shop', 'retail', 'merchandise', 'department', 'amazon'] },
+  // Before the 'home' group, so a home loan is a loan rather than a trip to
+  // the hardware store. Without these the mortgage was the single largest
+  // thing in "Everything else", which made that bucket 46% of the chart and
+  // the category breakdown useless.
+  { code: 'housing', label: 'Housing and loans', match: ['mortgage', 'loan', 'rent', 'heloc', 'lease'] },
+  { code: 'taxes', label: 'Taxes', match: ['tax'] },
   { code: 'home', label: 'Home and improvement', match: ['home', 'hardware', 'furnish', 'garden', 'improvement'] },
   { code: 'home_services', label: 'Home services', match: ['home_services', 'contractor', 'repair', 'lawn'] },
   { code: 'education', label: 'Education and childcare', match: ['education', 'school', 'tuition', 'childcare', 'camp'] },
@@ -110,11 +116,18 @@ function isCardPayment(t: CreditTransaction): boolean {
     || /payment\s*-?\s*thank\s*you|online payment|autopay|electronic payment/.test(merchant);
 }
 
+// Formatted in UTC, not local time.
+//
+// The date is built with Date.UTC and Intl formats in the runtime's own zone,
+// so midnight on May 1 UTC is April 30 anywhere west of Greenwich -- and every
+// month on the page rendered as the one before it for most of the US. The
+// month string carries no time at all; UTC is just the way to say so.
+const MONTH_FORMAT = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
+
 const MONTH_LABEL = (month: string) => {
   const [y, m] = month.split('-').map(Number);
   if (!y || !m) return month;
-  return new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' })
-    .format(new Date(Date.UTC(y, m - 1, 1)));
+  return MONTH_FORMAT.format(new Date(Date.UTC(y, m - 1, 1)));
 };
 
 export function monthlySpending(

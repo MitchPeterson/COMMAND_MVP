@@ -15,6 +15,15 @@
   --cmd-offwhite: 240 240 238;
   --cmd-gold: 201 162 77;
   --cmd-gold-hover: 212 174 90;
+/* The second series in a chart.
+   Not cmd-muted, deliberately. Gold against cmd-muted measures a colorblind-
+   safe separation but a normal-vision separation of only 13.3 (a chart needs
+   15), because the two sit at almost the same lightness -- so two series next
+   to each other read as one smudge for everybody, not just for the 8% the
+   usual check is about. Stepped darker until it measured 22.6 against gold on
+   this surface, which is the whole reason it is a token of its own rather
+   than an opacity on an existing one. Re-measure if the palette moves. */
+  --cmd-series-2: 110 110 116;
 }
 
 /* A preview of the light direction, applied to the whole document.
@@ -31,6 +40,7 @@
   --cmd-muted: 154 154 164;
   --cmd-offwhite: 240 240 238;
   --cmd-gold: 212 174 90;
+  --cmd-series-2: 110 110 116;
   background-color: rgb(var(--cmd-black));
 }
 
@@ -44,6 +54,8 @@
   --cmd-offwhite: 24 24 26;
   --cmd-gold: 191 149 58;
   --cmd-gold-hover: 168 130 48;
+  /* Measures 19.8 against the light gold on the light page. */
+  --cmd-series-2: 106 106 112;
 }
 @tailwind base;
 @tailwind components;

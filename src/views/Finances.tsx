@@ -1,6 +1,6 @@
 import { SectionIntro } from '../components/SectionIntro';
 import { familiarityState, introFor } from '../lib/sectionIntros';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useHousehold } from '../useHousehold';
 import { UploadDropzone } from '../components/UploadDropzone';
 import { UnfiledDocuments } from '../components/UnfiledDocuments';
@@ -10,6 +10,10 @@ import { OwnedThings } from '../components/OwnedThings';
 import { MonthlySpending } from '../components/MonthlySpending';
 import { RecurringCharges } from '../components/RecurringCharges';
 import { TransactionImportPanel } from '../components/TransactionImportPanel';
+import { CashflowOverview } from '../components/CashflowOverview';
+import { SpendingInsights } from '../components/SpendingInsights';
+import { computeCashflow } from '../lib/cashflow';
+import { findRecurringCharges } from '../lib/recurring';
 import { SegmentedTabs } from '../components/SegmentedTabs';
 import { InvestmentsPanel } from './Investments';
 import { isInvested } from '../lib/investments';
@@ -52,6 +56,12 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
   const activeLoans = (data?.loans ?? []).filter((l) => l.status === 'active');
   const cardsWithBalance = (data?.creditCards ?? []).filter((c) => (c.current_balance ?? 0) > 0);
   const transactions = data?.creditTransactions ?? [];
+  const statements = data?.creditStatements ?? [];
+  // Computed once for the tab: the overview, the insights and the recurring
+  // panel all read the same numbers, and three separate passes over the same
+  // transactions is how two of them end up disagreeing.
+  const cashflow = useMemo(() => computeCashflow(transactions, statements), [transactions, statements]);
+  const recurring = useMemo(() => findRecurringCharges(transactions, statements), [transactions, statements]);
 
   // A question that named an asset lands on the tab where things get typed in.
   const [tab, setTab] = useState<string>(focusId ? 'accounts' : 'accounts');
@@ -190,6 +200,11 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
 
       {tab === 'spending' && (
         <>
+          {/* The shape of the money first, then what it means, then the
+              detail. Someone who reads only the top of this tab should still
+              come away with the two figures that matter. */}
+          <CashflowOverview cashflow={cashflow} />
+          <SpendingInsights cashflow={cashflow} recurring={recurring} />
           <MonthlySpending
             transactions={transactions}
             cards={data?.creditCards ?? []}

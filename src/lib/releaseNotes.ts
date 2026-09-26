@@ -25,6 +25,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.60.0',
+    date: '2026-09-26',
+    title: 'See income against spending, and what it says',
+    items: [
+      'Money in against money out, month by month, with the months that are only partly covered drawn as such rather than quietly averaged in.',
+      'Red flags and opportunities: overdrafts, fees and interest, cash advances, a category that moved, and what is committed before anything discretionary.',
+      'Recurring charges now catch a subscription whose price went up — the one nobody notices — and separate fixed bills from what could actually be cancelled.',
+      'Names a hole it cannot fill: money paid to a card that is not on file is spending Command cannot see, and it says so rather than counting it as money saved.',
+    ],
+  },
+  {
     version: '0.59.0',
     date: '2026-09-26',
     title: 'Import bank and card transactions from a spreadsheet',

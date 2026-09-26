@@ -23,6 +23,10 @@ export default {
         'cmd-offwhite': 'rgb(var(--cmd-offwhite) / <alpha-value>)',
         'cmd-gold': 'rgb(var(--cmd-gold) / <alpha-value>)',
         'cmd-gold-hover': 'rgb(var(--cmd-gold-hover) / <alpha-value>)',
+        // The second series in a chart. See the note in index.css: it is not
+        // cmd-muted because cmd-muted does not separate from gold well enough
+        // to carry a second series.
+        'cmd-series-2': 'rgb(var(--cmd-series-2) / <alpha-value>)',
       },
       fontFamily: {
         sans: ['IBM Plex Sans', 'sans-serif'],

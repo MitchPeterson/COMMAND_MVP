@@ -1231,16 +1231,26 @@ export interface CreditAprTerm {
 
 export interface CreditTransaction {
   id: string;
-  statement_id: string;
+  /** Null on a row that came from an uploaded spreadsheet rather than a statement. */
+  statement_id: string | null;
+  /** Set instead, on those. Exactly one of the two is ever present. */
+  import_id?: string | null;
   household_id: string;
   credit_card_id: string | null;
+  finance_account_id?: string | null;
+  /**
+   * What the money did. Null on rows read off a card statement, where the
+   * direction plus the merchant name is enough. Always set on an imported row,
+   * because a bank credit is a paycheck far more often than a refund.
+   */
+  flow?: 'expense' | 'income' | 'transfer' | 'refund' | null;
   transaction_date: string | null;
   posting_date: string | null;
   merchant_description: string;
   amount: number | null;
   direction: 'charge' | 'credit';
   category: string | null;
-  category_source: 'issuer_provided' | 'ai_classified' | 'user_set';
+  category_source: 'issuer_provided' | 'ai_classified' | 'user_set' | 'rule_matched';
   category_confidence: number | null;
   cardholder: string | null;
   source_page: number | null;
@@ -1393,18 +1403,33 @@ export async function getCreditStatements(householdId: string): Promise<CreditSt
   return (data ?? []) as CreditStatement[];
 }
 
-/** Every transaction across the household, for spend analysis. */
+/**
+ * Every transaction across the household, for spend analysis.
+ *
+ * Paged, because PostgREST caps a response at 1,000 rows and says nothing when
+ * it does. A year of one checking account is comfortably past that, so the
+ * unpaged version would have silently analyzed the most recent thousand and
+ * reported the total as if it were the year.
+ */
 export async function getCreditTransactions(householdId: string): Promise<CreditTransaction[]> {
-  const { data, error } = await supabase
-    .from('credit_transactions')
-    .select('*')
-    .eq('household_id', householdId)
-    .order('transaction_date', { ascending: false, nullsFirst: false });
-  if (error) {
-    console.error('Error fetching credit transactions:', error);
-    return [];
+  const PAGE = 1000;
+  const all: CreditTransaction[] = [];
+  for (let page = 0; page < 40; page += 1) {
+    const { data, error } = await supabase
+      .from('credit_transactions')
+      .select('*')
+      .eq('household_id', householdId)
+      .order('transaction_date', { ascending: false, nullsFirst: false })
+      .order('id', { ascending: true })
+      .range(page * PAGE, page * PAGE + PAGE - 1);
+    if (error) {
+      console.error('Error fetching credit transactions:', error);
+      return all;
+    }
+    all.push(...((data ?? []) as CreditTransaction[]));
+    if (!data || data.length < PAGE) break;
   }
-  return (data ?? []) as CreditTransaction[];
+  return all;
 }
 
 export async function getCreditStatementDetail(statementId: string): Promise<CreditStatementDetail> {
@@ -4344,4 +4369,194 @@ export async function deleteAllHouseholdData(): Promise<DeletionResult> {
   // Last, because everything above cascades from it.
   await supabase.from('households').delete().not('id', 'is', null);
   return { tablesCleared, filesRemoved };
+}
+
+// ============================================================
+// TRANSACTION IMPORTS (CSV / XLSX)
+// ============================================================
+
+/** One uploaded spreadsheet of transactions, and how it was read. */
+export interface TransactionImportRow {
+  id: string;
+  household_id: string;
+  document_id: string | null;
+  file_name: string;
+  file_format: 'csv' | 'xlsx';
+  source_kind: 'bank' | 'card';
+  account_label: string;
+  institution: string | null;
+  credit_card_id: string | null;
+  finance_account_id: string | null;
+  period_start: string | null;
+  period_end: string | null;
+  row_count: number;
+  imported_count: number;
+  duplicate_count: number;
+  skipped_count: number;
+  sign_convention: 'negative_is_spending' | 'positive_is_spending' | 'debit_credit_columns';
+  column_map: Record<string, unknown>;
+  created_at: string;
+}
+
+/** A row ready to be written, in Command's own terms rather than the file's. */
+export interface ImportableTransaction {
+  date: string;
+  postedDate: string | null;
+  description: string;
+  /** Signed so that negative is money leaving. */
+  amount: number;
+  flow: 'expense' | 'income' | 'transfer' | 'refund';
+  category: string;
+  categorySource: 'issuer_provided' | 'rule_matched';
+  fingerprint: string;
+}
+
+export interface TransactionImportSpec {
+  fileName: string;
+  fileFormat: 'csv' | 'xlsx';
+  sourceKind: 'bank' | 'card';
+  accountLabel: string;
+  institution: string | null;
+  documentId: string | null;
+  creditCardId: string | null;
+  financeAccountId: string | null;
+  signConvention: 'negative_is_spending' | 'positive_is_spending' | 'debit_credit_columns';
+  columnMap: Record<string, unknown>;
+  rowCount: number;
+  skippedCount: number;
+}
+
+export async function getTransactionImports(householdId: string): Promise<TransactionImportRow[]> {
+  const { data, error } = await supabase
+    .from('transaction_imports')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('created_at', { ascending: false });
+  if (error) {
+    console.error('Error fetching transaction imports:', error);
+    return [];
+  }
+  return (data ?? []) as TransactionImportRow[];
+}
+
+/**
+ * Which of these fingerprints the household already has.
+ *
+ * Asked before writing rather than relying on the unique index, for two
+ * reasons: the index is partial and PostgREST cannot infer a partial index as
+ * an ON CONFLICT arbiter, and an exact duplicate count is worth having. "142
+ * imported, 89 already on file" is the line that tells someone their second
+ * export overlapped the first, instead of leaving them wondering why the month
+ * did not change.
+ */
+async function existingFingerprints(householdId: string, fingerprints: string[]): Promise<Set<string>> {
+  const found = new Set<string>();
+  const CHUNK = 400;
+  for (let i = 0; i < fingerprints.length; i += CHUNK) {
+    const batch = fingerprints.slice(i, i + CHUNK);
+    const { data, error } = await supabase
+      .from('credit_transactions')
+      .select('fingerprint')
+      .eq('household_id', householdId)
+      .in('fingerprint', batch);
+    if (error) {
+      console.error('Error checking for transactions already on file:', error);
+      // Throwing rather than returning an empty set: a failed duplicate check
+      // that reads as "none found" doubles the month, which is worse than a
+      // failed import the household can retry.
+      throw new Error(`Could not check which transactions are already on file: ${error.message}`);
+    }
+    for (const row of data ?? []) found.add((row as { fingerprint: string }).fingerprint);
+  }
+  return found;
+}
+
+export interface ImportResult {
+  importId: string;
+  imported: number;
+  duplicates: number;
+}
+
+/**
+ * Write an import and its transactions.
+ *
+ * Not a transaction in the database sense -- PostgREST has no way to open one
+ * -- so the order is chosen to fail safe. The import row goes first and the
+ * transactions hang off it; if a chunk fails partway, the import row is
+ * deleted, and the cascade takes every row that made it with it. The household
+ * is left exactly where it started rather than with two thirds of a month.
+ */
+export async function commitTransactionImport(
+  householdId: string,
+  spec: TransactionImportSpec,
+  transactions: ImportableTransaction[],
+): Promise<ImportResult> {
+  const already = await existingFingerprints(householdId, transactions.map((t) => t.fingerprint));
+  const fresh = transactions.filter((t) => !already.has(t.fingerprint));
+  const dates = fresh.map((t) => t.date).sort();
+
+  const { data: created, error: importError } = await supabase
+    .from('transaction_imports')
+    .insert([{
+      household_id: householdId,
+      document_id: spec.documentId,
+      file_name: spec.fileName,
+      file_format: spec.fileFormat,
+      source_kind: spec.sourceKind,
+      account_label: spec.accountLabel,
+      institution: spec.institution,
+      credit_card_id: spec.creditCardId,
+      finance_account_id: spec.financeAccountId,
+      period_start: dates[0] ?? null,
+      period_end: dates[dates.length - 1] ?? null,
+      row_count: spec.rowCount,
+      imported_count: fresh.length,
+      duplicate_count: transactions.length - fresh.length,
+      skipped_count: spec.skippedCount,
+      sign_convention: spec.signConvention,
+      column_map: spec.columnMap,
+    }])
+    .select()
+    .single();
+
+  if (importError || !created) {
+    throw new Error(`Could not record the import: ${importError?.message ?? 'no row returned'}`);
+  }
+  const importId = (created as TransactionImportRow).id;
+
+  const rows = fresh.map((t) => ({
+    import_id: importId,
+    statement_id: null,
+    household_id: householdId,
+    credit_card_id: spec.creditCardId,
+    finance_account_id: spec.financeAccountId,
+    transaction_date: t.date,
+    posting_date: t.postedDate,
+    merchant_description: t.description,
+    // Stored as a magnitude, with direction carrying the sign -- the shape the
+    // rest of the app already reads.
+    amount: Math.abs(t.amount),
+    direction: t.amount < 0 ? 'charge' : 'credit',
+    flow: t.flow,
+    category: t.category,
+    category_source: t.categorySource,
+    fingerprint: t.fingerprint,
+  }));
+
+  const CHUNK = 500;
+  for (let i = 0; i < rows.length; i += CHUNK) {
+    const { error } = await supabase.from('credit_transactions').insert(rows.slice(i, i + CHUNK));
+    if (error) {
+      await supabase.from('transaction_imports').delete().eq('id', importId);
+      throw new Error(`Could not save the transactions, so nothing was imported: ${error.message}`);
+    }
+  }
+
+  return { importId, imported: fresh.length, duplicates: transactions.length - fresh.length };
+}
+
+/** Removing an import takes its transactions with it, by cascade. */
+export async function deleteTransactionImport(importId: string): Promise<void> {
+  const { error } = await supabase.from('transaction_imports').delete().eq('id', importId);
+  if (error) throw new Error(`Could not remove the import: ${error.message}`);
 }

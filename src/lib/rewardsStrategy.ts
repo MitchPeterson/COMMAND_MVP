@@ -13,6 +13,7 @@
 // sit in the same list looking alike.
 
 import type { CreditCard, CreditStatement, CreditTransaction } from './supabase';
+import { isAcceptedTransaction } from './spending';
 
 export interface CategorySpend {
   category: string;
@@ -86,7 +87,12 @@ export function computeRewardsStrategy(
     (s) => s.review_status === 'confirmed' || s.review_status === 'partially_confirmed',
   );
   const confirmedIds = new Set(confirmed.map((s) => s.id));
-  const charges = transactions.filter((t) => t.direction === 'charge' && confirmedIds.has(t.statement_id));
+  // Imported rows have no statement to confirm; they were confirmed at import.
+  // Transfers and income are not card spending and earn nothing.
+  const charges = transactions.filter(
+    (t) => t.direction === 'charge' && isAcceptedTransaction(t, confirmedIds)
+      && t.flow !== 'transfer' && t.flow !== 'income',
+  );
 
   // ── Where the money goes ───────────────────────────────────────────────────
   const byCategory = new Map<string, { total: number; count: number; ai: number }>();

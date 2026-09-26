@@ -25,6 +25,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.59.0',
+    date: '2026-09-26',
+    title: 'Import bank and card transactions from a spreadsheet',
+    items: [
+      'Upload a CSV or XLSX export from any bank or card account. Command reads it in your browser — no model, no cost — and shows you exactly how it read it before anything is saved.',
+      'Every guess is on screen first: which column is the merchant, which way the amounts run, and what each row was for. Correct any of them and the preview updates.',
+      'Income and transfers are separated from spending, so a paycheck is not a refund and a card payment out of checking is not counted twice.',
+      'Re-importing an overlapping export adds only what is new, and says how many were already on file.',
+    ],
+  },
+  {
     version: '0.58.1',
     date: '2026-08-25',
     title: 'The mark takes you home',

@@ -81,6 +81,71 @@ export interface ImportReading {
   totalRows: number;
   periodStart: string | null;
   periodEnd: string | null;
+  /**
+   * The running balance on the newest row, where the file carries one.
+   *
+   * Worth pulling out because it answers a question the household would
+   * otherwise have to answer by hand: an account created from this import
+   * starts with a real balance and a real as-of date instead of a blank.
+   */
+  closingBalance: number | null;
+  /** Digits that look like an account number's last four, from the file name. */
+  accountHint: { institution: string | null; lastFour: string | null };
+}
+
+/**
+ * What a bank calls its export tells you what the account is.
+ *
+ * "Chase8841_Activity_20260926.csv" carries both the institution and the last
+ * four, which is exactly what is needed to offer the right account rather than
+ * a blank dropdown.
+ */
+const INSTITUTIONS = [
+  'chase', 'wells fargo', 'wellsfargo', 'bank of america', 'bofa', 'citi',
+  'capital one', 'capitalone', 'us bank', 'usbank', 'pnc', 'truist', 'ally',
+  'discover', 'amex', 'american express', 'schwab', 'fidelity', 'navy federal',
+  'usaa', 'regions', 'huntington', 'citizens', 'td bank', 'synchrony', 'sofi',
+  'marcus', 'barclays', 'santander', 'keybank', 'fifth third', 'bmo', 'venmo',
+];
+
+export function hintFromFileName(fileName: string): { institution: string | null; lastFour: string | null } {
+  const raw = fileName.toLowerCase().replace(/\.[^.]+$/, '');
+  const letters = raw.replace(/[^a-z ]/g, '');
+  const found = INSTITUTIONS.find((i) => letters.includes(i));
+
+  // Digits stuck to the bank's own name are the account, whatever they look
+  // like. Chase2085_Activity_20260926.csv is account 2085 exported in 2026,
+  // and a rule that threw out anything resembling a year threw out the
+  // account number along with it.
+  let lastFour: string | null = null;
+  if (found) {
+    // Exactly four, and not the leading four of a longer run. Anything else
+    // picks up a product name: CapitalOne_360Checking_9902 is account 9902,
+    // and a looser pattern read it as 360.
+    const attached = raw.match(new RegExp(`${found.replace(/ /g, '[ _-]?')}[ _-]?(\\d{4})(?!\\d)`));
+    if (attached) [, lastFour] = attached;
+  }
+
+  // Failing that, a standalone group of exactly four digits that is not a
+  // year -- an eight-digit date cannot produce one, since every four-digit
+  // window inside it touches another digit.
+  if (!lastFour) {
+    lastFour = (raw.match(/(?:^|[^0-9])(\d{4})(?:[^0-9]|$)/g) ?? [])
+      .map((d) => d.replace(/[^0-9]/g, ''))
+      .find((d) => !/^(19|20)\d\d$/.test(d)) ?? null;
+  }
+
+  return {
+    institution: found
+      ? found.replace(/\b\w/g, (c) => c.toUpperCase())
+        // Title case turns "bank of america" into "Bank Of America".
+        .replace(/ Of /g, ' of ')
+        .replace('Bofa', 'Bank of America').replace('Wellsfargo', 'Wells Fargo')
+        .replace('Capitalone', 'Capital One').replace('Usbank', 'US Bank')
+        .replace('Td Bank', 'TD Bank').replace('Bmo', 'BMO').replace('Sofi', 'SoFi')
+      : null,
+    lastFour,
+  };
 }
 
 // ============================================================
@@ -450,6 +515,8 @@ export function fingerprintRow(
 
 export interface ReadOptions {
   accountLabel: string;
+  /** Used only to guess the institution and last four for the account step. */
+  fileName?: string;
   sourceKind: 'bank' | 'card';
   /** Overrides, when the household has corrected the guess. */
   mapping?: ColumnMapping;
@@ -623,7 +690,20 @@ export function readTransactions(grid: SheetGrid, options: ReadOptions): ImportR
 
   const dates = transactions.map((t) => t.date).sort();
 
+  // The balance beside the newest transaction in the file. Read off the row
+  // rather than the last line of the file, because exports run newest-first
+  // about as often as oldest-first.
+  let closingBalance: number | null = null;
+  if (mapping.balance !== -1 && transactions.length > 0) {
+    const newest = transactions.reduce((a, b) => (a.date >= b.date ? a : b));
+    const row = body[newest.rowNumber - headerRow - 2];
+    const parsed = row ? parseAmount(row[mapping.balance] ?? '') : null;
+    if (parsed != null) closingBalance = parsed;
+  }
+
   return {
+    closingBalance,
+    accountHint: hintFromFileName(options.fileName ?? ''),
     headerRow,
     headers,
     mapping,

@@ -25,6 +25,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.60.1',
+    date: '2026-09-28',
+    title: 'Accept a CSV, and ask which account it is',
+    items: [
+      'The uploader at the bottom of Finances now takes .csv and .xlsx exports, not just photos and PDFs — a bank export could not even be selected in the file picker before, with nothing on screen saying why.',
+      'A spreadsheet dropped there goes to the transaction importer rather than being filed as a document.',
+      'Importing now asks which account the transactions belong to, and offers to create one if it does not exist yet — prefilled from the file name, so Chase8841_Activity.csv suggests Chase, account 8841.',
+      'Where the file carries a running balance, the new account can start from it.',
+    ],
+  },
+  {
     version: '0.60.0',
     date: '2026-09-26',
     title: 'See income against spending, and what it says',

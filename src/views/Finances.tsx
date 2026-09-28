@@ -63,6 +63,12 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
   const cashflow = useMemo(() => computeCashflow(transactions, statements), [transactions, statements]);
   const recurring = useMemo(() => findRecurringCharges(transactions, statements), [transactions, statements]);
 
+  // A spreadsheet handed to the section's uploader. Finances has one obvious
+  // place to put a file -- the card at the bottom of the page -- so that is
+  // where a bank export lands, and it used to be rejected by a file picker
+  // that only offered photos and PDFs.
+  const [pendingImport, setPendingImport] = useState<File | null>(null);
+
   // A question that named an asset lands on the tab where things get typed in.
   const [tab, setTab] = useState<string>(focusId ? 'accounts' : 'accounts');
   useEffect(() => { if (focusId) setTab('accounts'); }, [focusId]);
@@ -224,6 +230,8 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
               accounts={accounts}
               imports={data?.transactionImports ?? []}
               onChanged={refresh}
+              incomingFile={pendingImport}
+              onIncomingHandled={() => setPendingImport(null)}
             />
           )}
         </>
@@ -235,11 +243,41 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
       <section id="section-uploader" className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
         <UploadDropzone
           contextLabel="Add a financial document"
-          buttonLabel="Upload a statement or account summary"
+          buttonLabel="Upload a statement, account summary or transaction export"
+          hint="or click to browse PDFs, photos and .csv / .xlsx exports"
+          accept={{
+            'image/*': [],
+            'application/pdf': [],
+            // Spelled out rather than relying on the browser's guess: macOS
+            // reports a .csv as text/csv, Windows as application/vnd.ms-excel,
+            // and an export saved from Numbers as text/plain. A type that is
+            // not listed is greyed out in the picker with nothing on screen
+            // saying why, which is exactly how this went wrong.
+            'text/csv': ['.csv'],
+            'text/plain': ['.csv', '.tsv', '.txt'],
+            'text/tab-separated-values': ['.tsv'],
+            'application/vnd.ms-excel': ['.csv', '.xls'],
+            'application/csv': ['.csv'],
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+          }}
+          nativeAccept="image/*,application/pdf,.csv,.tsv,.xlsx"
           onUpload={async (file) => {
             if (!data?.household?.id) return;
-            const document = await uploadDocumentAsset(data.household.id, file, 'finance');
-            await invokeDocumentExtraction(document.id);
+            // A spreadsheet is a list of transactions, not a document to read
+            // with a model. It goes to the importer, which is the only thing
+            // that can ask which account it belongs to.
+            if (/\.(csv|tsv|xlsx|xlsm)$/i.test(file.name)) {
+              setPendingImport(file);
+              setTab('spending');
+              // After the tab has rendered the panel it is being sent to.
+              window.setTimeout(() => {
+                document.getElementById('transaction-import')
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              }, 60);
+              return;
+            }
+            const stored = await uploadDocumentAsset(data.household.id, file, 'finance');
+            await invokeDocumentExtraction(stored.id);
             await refresh();
           }}
         />

@@ -4560,3 +4560,32 @@ export async function deleteTransactionImport(importId: string): Promise<void> {
   const { error } = await supabase.from('transaction_imports').delete().eq('id', importId);
   if (error) throw new Error(`Could not remove the import: ${error.message}`);
 }
+
+/**
+ * A card record with nothing on it but its identity.
+ *
+ * Statement extraction creates cards as a side effect of reading a statement,
+ * which left no way to create one from a CSV import -- so a household
+ * importing an Amex export had an account to attach it to only if they had
+ * already uploaded a PDF statement for the same card.
+ */
+export async function addCreditCardShell(
+  householdId: string,
+  input: { card_name: string; issuer?: string | null; last_four?: string | null },
+): Promise<CreditCard> {
+  if (!input.card_name.trim()) throw new Error('Give the card a name.');
+  const { data, error } = await supabase
+    .from('credit_cards')
+    .insert([{
+      household_id: householdId,
+      card_name: input.card_name.trim(),
+      issuer: input.issuer?.trim() || null,
+      last_four: input.last_four?.trim() || null,
+    }])
+    .select('*')
+    .single();
+  if (error || !data) {
+    throw new Error(`Could not add that card: ${error?.message ?? 'no row returned'}`);
+  }
+  return data as CreditCard;
+}

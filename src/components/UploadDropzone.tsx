@@ -8,6 +8,20 @@ interface UploadDropzoneProps {
   buttonLabel?: string;
   onUpload?: (file: File) => Promise<void>;
   className?: string;
+  /**
+   * What the picker will let through. Defaults to photos and PDFs.
+   *
+   * It exists because the default silently greys out everything else in the
+   * file dialog: a household exporting transactions from their bank got a CSV,
+   * brought it to the uploader at the bottom of Finances -- the only uploader
+   * on the page -- and the file could not even be selected, with nothing on
+   * screen explaining why.
+   */
+  accept?: Record<string, string[]>;
+  /** The matching attribute for the mobile camera input. */
+  nativeAccept?: string;
+  /** The line under the heading. Say what can actually be dropped. */
+  hint?: string;
 }
 
 type UploadState = 'idle' | 'uploading' | 'processing' | 'done';
@@ -25,6 +39,9 @@ export function UploadDropzone({
   buttonLabel = 'Add document',
   onUpload,
   className = '',
+  accept = { 'image/*': [], 'application/pdf': [] },
+  nativeAccept = 'image/*,application/pdf',
+  hint = 'or click to browse photos and PDFs',
 }: UploadDropzoneProps) {
   const isMobile = useMemo(() => isMobileDevice(), []);
   const [status, setStatus] = useState<UploadState>('idle');
@@ -91,7 +108,7 @@ export function UploadDropzone({
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: { 'image/*': [], 'application/pdf': [] },
+    accept,
     multiple: false,
     noClick: isMobile,
     noKeyboard: true,
@@ -142,7 +159,7 @@ export function UploadDropzone({
           <input
             {...getInputProps()}
             type="file"
-            accept="image/*,application/pdf"
+            accept={nativeAccept}
             capture="environment"
             className="sr-only"
             onChange={handleNativeInput}
@@ -160,7 +177,7 @@ export function UploadDropzone({
             <UploadCloud className="h-10 w-10 text-cmd-gold" />
             <div>
               <p className="text-sm font-semibold text-cmd-offwhite">Drag & drop a file here</p>
-              <p className="mt-1 text-sm text-cmd-muted">or click to browse photos and PDFs</p>
+              <p className="mt-1 text-sm text-cmd-muted">{hint}</p>
             </div>
             <div className="inline-flex items-center gap-2 rounded-full border border-cmd-border bg-cmd-black/60 px-4 py-2 text-xs uppercase tracking-[0.16em] text-cmd-muted">
               <FilePlus className="h-4 w-4" /> Select file

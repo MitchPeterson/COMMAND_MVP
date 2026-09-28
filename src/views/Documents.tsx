@@ -178,6 +178,7 @@ export function DocumentsView({ onNavigate, focusId = null }: DocumentsViewProps
               financeAccounts: data?.financeAccounts, creditCards: data?.creditCards,
               creditStatements: data?.creditStatements, mortgageStatements: data?.mortgageStatements,
               taxDocuments: data?.taxDocuments, taxReturns: data?.taxReturns,
+          transactionImports: data?.transactionImports,
             });
 
             return (

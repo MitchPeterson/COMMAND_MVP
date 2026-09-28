@@ -41,6 +41,15 @@ interface Props {
    * it hands the file here instead of filing it as a document.
    */
   incomingFile?: File | null;
+  /**
+   * Set when the incoming file is one already in the vault.
+   *
+   * It stops the import storing a second copy of a file the household has
+   * uploaded once, and links the import to the document that is already
+   * there -- which is what makes that file stop reading as "nothing on this
+   * page depends on it".
+   */
+  incomingDocumentId?: string | null;
   onIncomingHandled?: () => void;
 }
 
@@ -82,10 +91,12 @@ const ACCOUNT_TYPES = [
 ];
 
 export function TransactionImportPanel({
-  householdId, cards, accounts, imports, onChanged, incomingFile, onIncomingHandled,
+  householdId, cards, accounts, imports, onChanged,
+  incomingFile, incomingDocumentId, onIncomingHandled,
 }: Props) {
   const [grid, setGrid] = useState<SheetGrid | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [vaultDocumentId, setVaultDocumentId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState<string | null>(null);
@@ -129,7 +140,7 @@ export function TransactionImportPanel({
   }, [grid, accountLabel, file, sourceKind, mapping, sign]);
 
   const reset = () => {
-    setGrid(null); setFile(null); setMapping(null); setSign(null);
+    setGrid(null); setFile(null); setVaultDocumentId(null); setMapping(null); setSign(null);
     setChoice(''); setMatchNote(null); setError(null); setShowSkipped(false);
     setDraft({ account_name: '', account_type: 'checking', institution: '', balance: '' });
   };
@@ -206,6 +217,7 @@ export function TransactionImportPanel({
   // A file handed over by the section's own uploader.
   useEffect(() => {
     if (!incomingFile) return;
+    setVaultDocumentId(incomingDocumentId ?? null);
     void loadFile(incomingFile);
     onIncomingHandled?.();
     // loadFile is stable enough here; re-running on a new file is the point.
@@ -245,8 +257,11 @@ export function TransactionImportPanel({
     if (!reading || !file || reading.missing.length > 0 || !accountReady) return;
     setBusy(true); setError(null);
     try {
-      let documentId: string | null = null;
-      if (keepFile) {
+      // A file that came out of the vault is already stored. Uploading it
+      // again would leave two copies of one statement and link the import to
+      // the wrong one.
+      let documentId: string | null = vaultDocumentId;
+      if (keepFile && !vaultDocumentId) {
         // Stored, never sent for extraction: the rows are already read, and a
         // model pass over a CSV would cost money to learn nothing.
         const stored = await uploadDocumentAsset(householdId, file, 'finance');
@@ -686,6 +701,12 @@ export function TransactionImportPanel({
             )}
           </div>
 
+          {vaultDocumentId ? (
+            <p className="text-sm text-cmd-muted">
+              This file is already in your vault. Importing links it to the transactions rather
+              than storing a second copy.
+            </p>
+          ) : (
           <label className="flex items-start gap-2.5 text-sm text-cmd-muted">
             <input
               type="checkbox"
@@ -698,6 +719,7 @@ export function TransactionImportPanel({
               decides whether the original spreadsheet is kept alongside them.
             </span>
           </label>
+          )}
 
           <div className="flex flex-wrap items-center gap-3">
             <button

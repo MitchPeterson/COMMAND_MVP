@@ -20,7 +20,7 @@
 import type {
   CreditCard, CreditStatement, Document, FinanceAccount, InsurancePolicy,
   InsurancePolicyExtraction, LegalDocument, LegalDocumentExtraction,
-  MortgageStatement, TaxDocument, TaxReturn,
+  MortgageStatement, TaxDocument, TaxReturn, TransactionImportRow,
 } from './supabase';
 
 export type LinkState =
@@ -82,6 +82,7 @@ export interface LinkableData {
   mortgageStatements?: MortgageStatement[];
   taxDocuments?: TaxDocument[];
   taxReturns?: TaxReturn[];
+  transactionImports?: TransactionImportRow[];
 }
 
 /**
@@ -147,6 +148,24 @@ export function usesOf(documentId: string, data: LinkableData): DocumentUse[] {
   for (const card of data.creditCards ?? []) {
     if (card.source_document_id === documentId) {
       uses.push({ section: 'credit', label: 'Credit', detail: card.card_name, pending: false });
+    }
+  }
+
+  // A spreadsheet that produced transactions. Without this a CSV that imported
+  // 107 rows still read as a file nothing depends on, and the page said so in
+  // a banner directly above the tab showing the 107 -- which is a worse
+  // failure than saying nothing, because it contradicts itself on one screen.
+  for (const record of data.transactionImports ?? []) {
+    if (record.document_id === documentId) {
+      uses.push({
+        section: 'finances',
+        label: 'Finances',
+        detail: `${record.imported_count} transaction${record.imported_count === 1 ? '' : 's'} `
+          + `imported to ${record.account_label}`,
+        // Imports are confirmed at the moment they are made, in the preview.
+        // There is no second review step for them to be waiting on.
+        pending: false,
+      });
     }
   }
 

@@ -18,9 +18,21 @@ interface Props {
   documents: Document[];
   data: LinkableData;
   onChanged: () => Promise<void> | void;
+  /**
+   * Where a spreadsheet should go instead of to a model.
+   *
+   * Sections that can import transactions pass this; the rest do not, and
+   * simply say a spreadsheet is not something they read.
+   */
+  onImportSpreadsheet?: (file: Document) => void;
 }
 
-export function UnfiledDocuments({ section, documents, data, onChanged }: Props) {
+/** A file of rows, not a document to be read. */
+const isSpreadsheet = (name: string) => /\.(csv|tsv|xlsx|xlsm|xls)$/i.test(name);
+
+export function UnfiledDocuments({
+  section, documents, data, onChanged, onImportSpreadsheet,
+}: Props) {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const unfiled = unfiledFor(section, documents, data);
@@ -34,6 +46,13 @@ export function UnfiledDocuments({ section, documents, data, onChanged }: Props)
   };
 
   const read = async (file: Document) => {
+    // A spreadsheet is already machine-readable. Sending one to the extraction
+    // model costs money to learn nothing it did not already know, and was how
+    // an uploaded CSV ended up showing an API error on the Finances page.
+    if (isSpreadsheet(file.name)) {
+      onImportSpreadsheet?.(file);
+      return;
+    }
     setBusyId(file.id);
     setError(null);
     try {
@@ -71,11 +90,13 @@ export function UnfiledDocuments({ section, documents, data, onChanged }: Props)
               <div className="min-w-0">
                 <p className="truncate text-sm font-semibold text-cmd-offwhite">{file.name}</p>
                 <p className="text-xs text-cmd-muted">
-                  {file.status === 'processed'
-                    ? 'Read, but not confirmed into this section'
-                    : file.status === 'error'
-                      ? 'The last reading failed'
-                      : 'Not read yet'}
+                  {isSpreadsheet(file.name)
+                    ? 'A spreadsheet of rows — import it rather than reading it'
+                    : file.status === 'processed'
+                      ? 'Read, but not confirmed into this section'
+                      : file.status === 'error'
+                        ? 'The last reading failed'
+                        : 'Not read yet'}
                 </p>
               </div>
             </div>
@@ -88,14 +109,21 @@ export function UnfiledDocuments({ section, documents, data, onChanged }: Props)
               >
                 View file
               </button>
-              <button
-                type="button"
-                onClick={() => read(file)}
-                disabled={busyId === file.id}
-                className="rounded-xl border border-cmd-gold/40 bg-cmd-gold/10 px-3 py-1.5 text-xs text-cmd-gold transition hover:bg-cmd-gold/20 disabled:opacity-50"
-              >
-                {busyId === file.id ? 'Reading…' : 'Read it'}
-              </button>
+              {/* A spreadsheet only gets a button where there is somewhere for
+                  it to go. Offering "Read it" on a CSV in a section that
+                  cannot import one would just spend money on a failure. */}
+              {(!isSpreadsheet(file.name) || onImportSpreadsheet) && (
+                <button
+                  type="button"
+                  onClick={() => read(file)}
+                  disabled={busyId === file.id}
+                  className="rounded-xl border border-cmd-gold/40 bg-cmd-gold/10 px-3 py-1.5 text-xs text-cmd-gold transition hover:bg-cmd-gold/20 disabled:opacity-50"
+                >
+                  {isSpreadsheet(file.name)
+                    ? 'Import transactions'
+                    : busyId === file.id ? 'Reading…' : 'Read it'}
+                </button>
+              )}
             </div>
           </div>
         ))}

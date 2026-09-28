@@ -18,7 +18,10 @@ import { SegmentedTabs } from '../components/SegmentedTabs';
 import { InvestmentsPanel } from './Investments';
 import { isInvested } from '../lib/investments';
 import { DocumentLinkBadge } from '../components/DocumentLinkBadge';
-import { uploadDocumentAsset, invokeDocumentExtraction, type FinanceAccount } from '../lib/supabase';
+import {
+  uploadDocumentAsset, invokeDocumentExtraction, getDocumentUrl,
+  type Document as StoredDocument, type FinanceAccount,
+} from '../lib/supabase';
 import { Wallet } from 'lucide-react';
 
 const money = (value: number | null | undefined) =>
@@ -68,6 +71,40 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
   // where a bank export lands, and it used to be rejected by a file picker
   // that only offered photos and PDFs.
   const [pendingImport, setPendingImport] = useState<File | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [pendingImportDocId, setPendingImportDocId] = useState<string | null>(null);
+
+  /** Send a file to the importer and put the importer in front of the user. */
+  const handOffToImporter = (file: File, documentId: string | null = null) => {
+    setPendingImportDocId(documentId);
+    setPendingImport(file);
+    setTab('spending');
+    // After the tab has rendered the panel being scrolled to.
+    window.setTimeout(() => {
+      document.getElementById('transaction-import')
+        ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
+  };
+
+  /**
+   * A spreadsheet already in the vault, sent back through the importer.
+   *
+   * It has to come back down from storage to be read: parsing happens in the
+   * browser, and the browser no longer has the file the household picked.
+   */
+  const importFromVault = async (stored: StoredDocument) => {
+    setImportError(null);
+    try {
+      if (!stored.file_path) throw new Error('That file has no path in the vault.');
+      const url = await getDocumentUrl(stored.file_path);
+      if (!url) throw new Error('Could not open that file from the vault.');
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`Could not download that file (${response.status}).`);
+      handOffToImporter(new File([await response.blob()], stored.name), stored.id);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Could not open that file.');
+    }
+  };
 
   // A question that named an asset lands on the tab where things get typed in.
   const [tab, setTab] = useState<string>(focusId ? 'accounts' : 'accounts');
@@ -125,9 +162,15 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
           financeAccounts: data?.financeAccounts, creditCards: data?.creditCards,
           creditStatements: data?.creditStatements, mortgageStatements: data?.mortgageStatements,
           taxDocuments: data?.taxDocuments, taxReturns: data?.taxReturns,
+          transactionImports: data?.transactionImports,
         }}
         onChanged={refresh}
+        onImportSpreadsheet={importFromVault}
       />
+
+      {importError && (
+        <p className="px-1 text-sm text-red-400">{importError}</p>
+      )}
 
       <SegmentedTabs tabs={tabs} active={tab} onChange={setTab} ariaLabel="Finances views" />
 
@@ -231,6 +274,7 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
               imports={data?.transactionImports ?? []}
               onChanged={refresh}
               incomingFile={pendingImport}
+              incomingDocumentId={pendingImportDocId}
               onIncomingHandled={() => setPendingImport(null)}
             />
           )}
@@ -267,13 +311,7 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
             // with a model. It goes to the importer, which is the only thing
             // that can ask which account it belongs to.
             if (/\.(csv|tsv|xlsx|xlsm)$/i.test(file.name)) {
-              setPendingImport(file);
-              setTab('spending');
-              // After the tab has rendered the panel it is being sent to.
-              window.setTimeout(() => {
-                document.getElementById('transaction-import')
-                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-              }, 60);
+              handOffToImporter(file);
               return;
             }
             const stored = await uploadDocumentAsset(data.household.id, file, 'finance');

@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.60.2',
+    date: '2026-09-28',
+    title: 'A CSV that imported transactions no longer reads as unused',
+    items: [
+      'An imported spreadsheet now shows what it produced — "107 transactions imported to Chase checking" — instead of appearing under "files nothing on this page depends on" directly above the tab counting those transactions.',
+      '"Read it" on a spreadsheet sent it to the extraction model, which costs money to learn nothing and was the source of the API error shown on the Finances page. A spreadsheet now offers "Import transactions" instead.',
+      'Importing a file already in your vault links it to that file rather than storing a second copy.',
+    ],
+  },
+  {
     version: '0.60.1',
     date: '2026-09-28',
     title: 'Accept a CSV, and ask which account it is',

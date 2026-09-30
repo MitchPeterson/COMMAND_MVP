@@ -19,15 +19,24 @@
 // printed above the preview.
 
 import type { SheetGrid } from './transactionFile';
-import { categoryFromDescription } from './transactions/taxonomy';
+import { classify, looksLikeIncome, type ClassifiedSource } from './transactions/classify';
+import { cleanCounterparty } from './transactions/counterparty';
+import { fingerprint as makeFingerprint } from './transactions/fingerprint';
+import { detectAdapter, applyAdapter, type Adapter } from './transactions/adapters';
+import { categoryByCode, categoryFromDescription } from './transactions/taxonomy';
 
 export type ColumnRole =
   | 'date' | 'posted_date' | 'description' | 'amount' | 'debit' | 'credit'
-  | 'category' | 'type' | 'balance' | 'cardholder' | 'ignore';
+  | 'category' | 'type' | 'balance' | 'cardholder' | 'transaction_id' | 'ignore';
 
 export type SignConvention = 'negative_is_spending' | 'positive_is_spending' | 'debit_credit_columns';
 
-export type Flow = 'expense' | 'income' | 'transfer' | 'refund';
+// Re-exported from where they live now, for the callers that have always
+// imported them from here.
+export type { Flow } from './transactions/classify';
+export { classifyFlow } from './transactions/classify';
+export { fingerprint } from './transactions/fingerprint';
+import type { Flow } from './transactions/classify';
 
 export interface ColumnMapping {
   /** Index into the header row, or -1 for a role the file does not carry. */
@@ -41,6 +50,8 @@ export interface ColumnMapping {
   type: number;
   balance: number;
   cardholder: number;
+  /** The bank's own row identifier, which beats any hash Command can compute. */
+  transactionId: number;
 }
 
 export interface ParsedTransaction {
@@ -53,7 +64,16 @@ export interface ParsedTransaction {
   category: string;
   /** The issuer's own category, when the file carried one. */
   rawCategory: string | null;
-  categorySource: 'issuer_provided' | 'rule_matched';
+  /** The taxonomy code, which is what gets stored. */
+  categoryCode: string;
+  categorySource: ClassifiedSource;
+  /** The cleaned merchant identity, and the name to show for it. */
+  counterpartyKey: string;
+  counterpartyName: string;
+  /** The bank's own row id, when the export carried one. */
+  sourceRecordId: string | null;
+  reviewState: 'none' | 'needs_review';
+  reviewReason: string | null;
   fingerprint: string;
   /** The row as it appeared, for the preview and for a support question later. */
   rowNumber: number;
@@ -80,6 +100,8 @@ export interface ImportReading {
   transactions: ParsedTransaction[];
   skipped: SkippedRow[];
   totalRows: number;
+  /** The format this file was recognised as, or null for "nothing claimed it". */
+  adapter: Adapter | null;
   periodStart: string | null;
   periodEnd: string | null;
   /**
@@ -178,6 +200,10 @@ const HEADER_WORDS: Array<{ role: ColumnRole; words: string[] }> = [
   { role: 'type', words: ['transaction type', 'debit/credit', 'dr/cr', 'cr/dr', 'trans type', 'direction', 'type'] },
   { role: 'balance', words: ['running balance', 'ending balance', 'account balance', 'balance'] },
   { role: 'cardholder', words: ['cardholder', 'card member', 'card holder', 'account holder'] },
+  // Deliberately last and deliberately narrow. A column called "reference" is
+  // as often a memo as an identifier, and reading a memo as an id would give
+  // every row in the file the same identity.
+  { role: 'transaction_id', words: ['transaction id', 'transaction number', 'transaction ref', 'trans id', 'unique id'] },
 ];
 
 const normalize = (value: string) =>
@@ -228,11 +254,13 @@ export function mapColumns(headers: string[]): ColumnMapping {
   const mapping: ColumnMapping = {
     date: -1, postedDate: -1, description: -1, amount: -1, debit: -1,
     credit: -1, category: -1, type: -1, balance: -1, cardholder: -1,
+    transactionId: -1,
   };
   const field: Record<string, keyof ColumnMapping> = {
     date: 'date', posted_date: 'postedDate', description: 'description',
     amount: 'amount', debit: 'debit', credit: 'credit', category: 'category',
     type: 'type', balance: 'balance', cardholder: 'cardholder',
+    transaction_id: 'transactionId',
   };
 
   // Every column against every role it could fill, best fit first. Assigned
@@ -384,68 +412,6 @@ export function parseAmount(value: string): number | null {
 // ============================================================
 
 /**
- * Money arriving that the household earned or was owed, rather than money
- * coming back from a purchase.
- */
-const INCOME_MARKERS = /\b(payroll|direct dep|dir dep|dirdep|salary|wages|paycheck|pay check|employer|dividend|interest paid|interest earned|int paid|pension|annuity|social security|ssa treas|irs treas|tax ref|state of \w+ tax|unemployment|rental income|invoice|remittance|commission|bonus)\b/i;
-
-/**
- * Money moving between the household's own accounts.
- *
- * Counting one of these as spending is the worst error available here. Import
- * a checking account alongside the card statement it pays and the same dollars
- * land twice -- once as the purchases and once as the payment -- so the month
- * reads roughly double and every finding built on it is wrong.
- */
-const SELF_TRANSFER = /\b(transfer|xfer|trnsfr|acct to acct|account to account|to savings|from savings|to checking|from checking|overdraft protection|online banking transfer|funds moved)\b/i;
-
-/**
- * A payment aimed at a credit card, which is the same money as the purchases
- * on that card's statement.
- *
- * The card word has to be near the payment word. "AUTOPAY" on its own does not
- * qualify, because on a checking account it means a bill is paid
- * automatically -- XCEL ENERGY AUTOPAY is a utility bill, not a transfer, and
- * an earlier version of this pattern quietly removed every autopaid bill from
- * the household's spending.
- */
-const CARD_PAYMENT = /\b(payment|pmt|autopay|auto ?pay|epay)\b.{0,24}\b(card|crd|visa|mastercard|amex|american express|discover|chase|citi|capital one|barclay|synchrony)\b|\b(card|crd|credit card)\b.{0,24}\b(payment|pmt|autopay)\b/i;
-
-/** On a card, money arriving with one of these on it is the bill being paid. */
-const CARD_INFLOW_PAYMENT = /\b(payment thank you|thank you payment|payment - thank|online payment|payment received|mobile payment|electronic payment|autopay)\b/i;
-
-/** Money coming back from something that was bought. */
-const REFUND_MARKERS = /\b(refund|return|reversal|reversed|credit adjustment|chargeback|dispute|price adjustment|cashback bonus|reward|statement credit)\b/i;
-
-export function classifyFlow(description: string, amount: number, sourceKind: 'bank' | 'card'): Flow {
-  const text = description.toLowerCase();
-
-  // A transfer points both ways, so this is tested on either sign.
-  if (SELF_TRANSFER.test(text) || CARD_PAYMENT.test(text)) return 'transfer';
-  if (sourceKind === 'card' && amount > 0 && CARD_INFLOW_PAYMENT.test(text)) return 'transfer';
-
-  if (amount > 0) {
-    if (REFUND_MARKERS.test(text)) return 'refund';
-    if (INCOME_MARKERS.test(text)) return 'income';
-    // On a card, an unexplained credit is far more likely a refund than a
-    // salary. On a bank account the reverse is true.
-    return sourceKind === 'card' ? 'refund' : 'income';
-  }
-  return 'expense';
-}
-
-/**
- * Merchant to category, by keyword.
- *
- * Labels are chosen to match the groups in spending.ts, which matches on
- * substrings -- so "Groceries" lands in groceries and "Dining" in dining,
- * without a second mapping table that can drift out of step with the first.
- *
- * These are rules, not a model. That is why they are recorded as
- * category_source 'rule_matched': the household should be able to see that
- * "Groceries" against SUPERVALU was a keyword and not a judgement.
- */
-/**
  * The category a merchant description names.
  *
  * Was CATEGORY_RULES, eighteen label/regex pairs whose labels were chosen so
@@ -461,36 +427,16 @@ export function categorize(description: string): string | null {
 // Fingerprint
 // ============================================================
 
-/** FNV-1a. Not a security hash -- an identity for a row, short enough to index. */
-function hash(value: string): string {
-  let h = 0x811c9dc5;
-  for (let i = 0; i < value.length; i += 1) {
-    h ^= value.charCodeAt(i);
-    h = Math.imul(h, 0x01000193) >>> 0;
-  }
-  return h.toString(16).padStart(8, '0');
-}
-
-/**
- * Two coffees at the same shop on the same day for the same price are two
- * transactions, so the occurrence number is part of the identity. The account
- * label is too, so the same charge on two cards is not one charge. Everything
- * else about the row is, which is what makes re-importing an overlapping
- * export a no-op rather than a doubled month.
- */
-export function fingerprintRow(
-  accountLabel: string, date: string, description: string, amount: number, occurrence: number,
-): string {
-  const merchant = description.toLowerCase().replace(/\s+/g, ' ').trim();
-  return `imp_${hash(`${accountLabel.toLowerCase()}|${date}|${merchant}|${amount.toFixed(2)}|${occurrence}`)}`;
-}
-
 // ============================================================
 // The read
 // ============================================================
 
 export interface ReadOptions {
   accountLabel: string;
+  /** counterparty_key -> category_code, as the household taught it. */
+  rules?: Map<string, string> | Record<string, string>;
+  /** counterparty_key -> display name, where the household renamed one. */
+  aliases?: Map<string, string> | Record<string, string>;
   /** Used only to guess the institution and last four for the account step. */
   fileName?: string;
   sourceKind: 'bank' | 'card';
@@ -527,7 +473,7 @@ function inferSign(
 
   // The strongest evidence in the file: a payroll deposit is money arriving,
   // and its sign says which direction positive means.
-  const payroll = amounts.filter((a) => INCOME_MARKERS.test(a.description));
+  const payroll = amounts.filter((a) => looksLikeIncome(a.description));
   if (payroll.length > 0) {
     const positive = payroll.filter((a) => a.value > 0).length;
     if (positive === payroll.length) {
@@ -575,7 +521,13 @@ export function readTransactions(grid: SheetGrid, options: ReadOptions): ImportR
   const headerRow = options.headerRow ?? findHeaderRow(grid.rows);
   const headers = headerRow >= 0 ? grid.rows[headerRow] : [];
   const body = grid.rows.slice(headerRow + 1);
-  const mapping = options.mapping ?? mapColumns(headers);
+  // The format, if one claims this header row. Null is the ordinary case and
+  // not a failure: the generic scorer below reads it either way, and an
+  // adapter mostly exists to be certain about the sign rather than probably
+  // right about it.
+  const adapter = detectAdapter(headers);
+  const sourceKind = options.sourceKind ?? adapter?.sourceKind ?? 'bank';
+  const mapping = options.mapping ?? applyAdapter(mapColumns(headers), adapter);
 
   const missing: ColumnRole[] = [];
   if (mapping.date === -1) missing.push('date');
@@ -584,7 +536,16 @@ export function readTransactions(grid: SheetGrid, options: ReadOptions): ImportR
 
   const sign = options.signConvention
     ? { convention: options.signConvention, basis: 'Set by you.', uncertain: false }
-    : inferSign(body, mapping, options.sourceKind);
+    // A recognised format knows its own convention, which beats inferring it
+    // from the data: the inference is right until someone imports a fortnight
+    // where it is not.
+    : adapter?.signConvention
+      ? {
+        convention: adapter.signConvention,
+        basis: `This is a ${adapter.label} export.${adapter.note ? ` ${adapter.note}` : ''}`,
+        uncertain: false,
+      }
+      : inferSign(body, mapping, sourceKind);
 
   const dateOrder = mapping.date === -1
     ? 'unknown'
@@ -640,11 +601,20 @@ export function readTransactions(grid: SheetGrid, options: ReadOptions): ImportR
     }
 
     const rawCategory = mapping.category === -1 ? null : (row[mapping.category] ?? '').trim() || null;
-    const flow = classifyFlow(description, amount, options.sourceKind);
-    // Flow has already settled these two, and a keyword that disagreed with it
-    // would put a paycheck in a spending category.
-    const byFlow = flow === 'transfer' ? 'Transfers' : flow === 'income' ? 'Income' : null;
-    const ruled = byFlow ?? categorize(description);
+    const sourceRecordId = mapping.transactionId === -1
+      ? null : (row[mapping.transactionId] ?? '').trim() || null;
+
+    // Who was paid, cleaned of everything the payment rail added.
+    const counterparty = cleanCounterparty(description, options.aliases);
+
+    const verdict = classify({
+      description,
+      amount,
+      sourceKind,
+      counterpartyKey: counterparty.key,
+      issuerCategory: rawCategory,
+      rules: options.rules,
+    });
 
     const key = `${date}|${description.toLowerCase()}|${amount.toFixed(2)}`;
     const occurrence = (seen.get(key) ?? 0) + 1;
@@ -655,11 +625,19 @@ export function readTransactions(grid: SheetGrid, options: ReadOptions): ImportR
       postedDate: mapping.postedDate === -1 ? null : parseDate(row[mapping.postedDate] ?? '', dateOrder),
       description,
       amount,
-      flow,
-      category: rawCategory ?? ruled ?? 'Not categorized',
+      flow: verdict.flow,
+      category: categoryByCode(verdict.categoryCode)?.label ?? 'Not categorized',
+      categoryCode: verdict.categoryCode,
       rawCategory,
-      categorySource: rawCategory ? 'issuer_provided' : 'rule_matched',
-      fingerprint: fingerprintRow(options.accountLabel, date, description, amount, occurrence),
+      categorySource: verdict.categorySource,
+      counterpartyKey: counterparty.key,
+      counterpartyName: counterparty.name,
+      sourceRecordId,
+      reviewState: verdict.reviewState,
+      reviewReason: verdict.reviewReason,
+      fingerprint: makeFingerprint({
+        accountLabel: options.accountLabel, date, description, amount, occurrence, sourceRecordId,
+      }),
       rowNumber,
     });
   });
@@ -678,6 +656,7 @@ export function readTransactions(grid: SheetGrid, options: ReadOptions): ImportR
   }
 
   return {
+    adapter,
     closingBalance,
     accountHint: hintFromFileName(options.fileName ?? ''),
     headerRow,

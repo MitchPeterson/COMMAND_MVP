@@ -18,8 +18,11 @@ describe('flowOf', () => {
     expect(flowOf(txn({ flow: null, direction: 'charge' }))).toBe('expense');
     expect(flowOf(txn({ flow: null, direction: 'credit', merchant_description: 'PAYMENT - THANK YOU' })))
       .toBe('transfer');
+    // DELIBERATE CHANGE: was 'refund'. A refund is an expense that came back,
+    // and direction='credit' already carries the sign, so it nets against the
+    // category it came from instead of sitting in a total of its own.
     expect(flowOf(txn({ flow: null, direction: 'credit', merchant_description: 'RETURN' })))
-      .toBe('refund');
+      .toBe('expense');
   });
 });
 
@@ -36,6 +39,17 @@ describe('computeCashflow totals', () => {
     expect(flow.totalExpenses).toBe(200);
     expect(flow.totalTransfers).toBe(1800);
     expect(flow.net).toBe(4800);
+  });
+
+  it('nets a refund against the category it came from', () => {
+    const flow = computeCashflow([
+      txn({ transaction_date: '2026-09-05', amount: 100, flow: 'expense', direction: 'charge' }),
+      txn({ transaction_date: '2026-09-09', amount: 30, flow: 'expense', direction: 'credit' }),
+    ]);
+    // Spending is net of the return, not gross with the return parked beside it.
+    expect(flow.totalExpenses).toBe(70);
+    expect(flow.months[0].refunds).toBe(30);
+    expect(flow.categories[0].amount).toBe(70);
   });
 
   it('counts savings as kept, not as spent', () => {

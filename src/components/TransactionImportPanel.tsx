@@ -13,7 +13,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import {
-  ArrowLeftRight, ArrowDownLeft, ArrowUpRight, FileSpreadsheet, Loader2,
+  ArrowLeftRight, ArrowDownLeft, ArrowUpRight, FileSpreadsheet, Loader2, PiggyBank,
   RotateCcw, Trash2, AlertTriangle, Check, Lock,
 } from 'lucide-react';
 import { readTransactionFile, TransactionFileError, type SheetGrid } from '../lib/transactionFile';
@@ -65,8 +65,8 @@ const exact = (value: number) =>
 const FLOW_STYLE: Record<Flow, { label: string; className: string; icon: React.ReactNode }> = {
   expense: { label: 'Spent', className: 'text-cmd-offwhite', icon: <ArrowUpRight className="h-3 w-3" /> },
   income: { label: 'Income', className: 'text-cmd-gold', icon: <ArrowDownLeft className="h-3 w-3" /> },
+  savings: { label: 'Saved', className: 'text-cmd-gold', icon: <PiggyBank className="h-3 w-3" /> },
   transfer: { label: 'Transfer', className: 'text-cmd-muted', icon: <ArrowLeftRight className="h-3 w-3" /> },
-  refund: { label: 'Refund', className: 'text-cmd-muted', icon: <ArrowDownLeft className="h-3 w-3" /> },
 };
 
 /** The roles a household can reassign. Balance and cardholder are read but not used. */
@@ -242,7 +242,7 @@ export function TransactionImportPanel({
   });
 
   const totals = useMemo(() => {
-    const sum = { expense: 0, income: 0, transfer: 0, refund: 0 };
+    const sum: Record<Flow, number> = { expense: 0, income: 0, savings: 0, transfer: 0 };
     for (const t of reading?.transactions ?? []) sum[t.flow] += Math.abs(t.amount);
     return sum;
   }, [reading]);
@@ -316,7 +316,13 @@ export function TransactionImportPanel({
           amount: t.amount,
           flow: t.flow,
           category: t.category,
+          categoryCode: t.categoryCode,
           categorySource: t.categorySource,
+          counterpartyKey: t.counterpartyKey,
+          counterpartyName: t.counterpartyName,
+          sourceRecordId: t.sourceRecordId,
+          reviewState: t.reviewState,
+          reviewReason: t.reviewReason,
           fingerprint: t.fingerprint,
         })),
       );
@@ -493,8 +499,8 @@ export function TransactionImportPanel({
             {([
               ['Spending', totals.expense, `${reading.transactions.filter((t) => t.flow === 'expense').length} items`],
               ['Income', totals.income, `${reading.transactions.filter((t) => t.flow === 'income').length} items`],
+              ['Saved', totals.savings, 'moved somewhere it is kept'],
               ['Transfers', totals.transfer, 'not counted as spending'],
-              ['Refunds', totals.refund, `${reading.transactions.filter((t) => t.flow === 'refund').length} items`],
             ] as Array<[string, number, string]>).map(([name, value, note]) => (
               <div key={name} className="rounded-2xl border border-cmd-border bg-cmd-charcoal p-4">
                 <p className="text-[11px] uppercase tracking-[0.16em] text-cmd-muted">{name}</p>

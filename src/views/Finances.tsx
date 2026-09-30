@@ -272,6 +272,7 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
               cards={data?.creditCards ?? []}
               accounts={accounts}
               imports={data?.transactionImports ?? []}
+              rules={data?.counterpartyRules ?? []}
               onChanged={refresh}
               incomingFile={pendingImport}
               incomingDocumentId={pendingImportDocId}

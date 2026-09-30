@@ -25,6 +25,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.63.0',
+    date: '2026-09-30',
+    title: 'Drop every export at once',
+    items: [
+      'Drag in as many CSVs as you like. Anything Command can match to an account on file goes straight in; only the files it is unsure about stop for a look.',
+      'Each file reports for itself — "Chase checking, 142 new, 31 already loaded" — because one total across four exports tells you nothing about which account is short.',
+      'A file it cannot read says why, and does not stop the others.',
+      'Corrections you have taught are applied as files are read, not afterwards.',
+    ],
+  },
+  {
     version: '0.62.0',
     date: '2026-09-30',
     title: 'Command can be taught, and knows the formats',

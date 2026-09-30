@@ -3,6 +3,7 @@
 // Install: npm install @supabase/supabase-js
 // Add to .env: VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
 
+import { pairTransfers } from './transactions/pairing';
 import { createClient } from '@supabase/supabase-js';
 import { currentReadings } from './readings';
 import type { ExecutionObservation } from '../components/ExecutionStatus';
@@ -4456,6 +4457,8 @@ export interface TransactionImportSpec {
   financeAccountId: string | null;
   signConvention: 'negative_is_spending' | 'positive_is_spending' | 'debit_credit_columns';
   columnMap: Record<string, unknown>;
+  /** Which named format read this file, or null for the generic scorer. */
+  adapterId?: string | null;
   rowCount: number;
   skippedCount: number;
 }
@@ -4549,6 +4552,7 @@ export async function commitTransactionImport(
       skipped_count: spec.skippedCount,
       sign_convention: spec.signConvention,
       column_map: spec.columnMap,
+      adapter_id: spec.adapterId ?? null,
     }])
     .select()
     .single();
@@ -4720,4 +4724,87 @@ export async function getSourcePeriodMarks(householdId: string): Promise<SourceP
     return [];
   }
   return (data ?? []) as SourcePeriodMarkRow[];
+}
+
+/**
+ * Link the two halves of every internal move Command can be sure about.
+ *
+ * Run after an import, over the whole household rather than just the new rows,
+ * because the leg that completes a pair is usually in the file that arrived
+ * last. Only rows that are not already linked are considered: re-running this
+ * must never disturb a pair, and a household that unlinked one by hand should
+ * not find it relinked on the next upload.
+ */
+export async function applyTransferPairing(
+  householdId: string,
+): Promise<{ paired: number; flagged: number }> {
+  const { data, error } = await supabase
+    .from('credit_transactions')
+    .select('id,transaction_date,amount,direction,flow,finance_account_id,credit_card_id,paired_with_id,review_state')
+    .eq('household_id', householdId)
+    .in('flow', ['transfer', 'savings'])
+    .is('paired_with_id', null);
+
+  if (error) {
+    console.error('Could not load transfers to pair:', error);
+    return { paired: 0, flagged: 0 };
+  }
+
+  const rows = (data ?? []).map((r) => {
+    const row = r as Record<string, unknown>;
+    return {
+      id: row.id as string,
+      date: (row.transaction_date as string) ?? '',
+      // Back to a signed amount, which is how the pairing module reasons.
+      amount: row.direction === 'credit'
+        ? Math.abs(Number(row.amount) || 0)
+        : -Math.abs(Number(row.amount) || 0),
+      sourceId: (row.finance_account_id as string) ?? (row.credit_card_id as string) ?? null,
+      flow: row.flow as 'savings' | 'transfer',
+      // A row someone has already looked at and cleared is left alone.
+      lockedBy: row.review_state === 'cleared' ? ('user' as const) : null,
+    };
+  });
+
+  const { pairs, ambiguous } = pairTransfers(rows);
+
+  // Both directions, so either leg can find the other without a second query.
+  for (const pair of pairs) {
+    const [a, b] = await Promise.all([
+      supabase.from('credit_transactions').update({ paired_with_id: pair.in }).eq('id', pair.out),
+      supabase.from('credit_transactions').update({ paired_with_id: pair.out }).eq('id', pair.in),
+    ]);
+    if (a.error || b.error) console.error('Could not link a transfer pair:', a.error ?? b.error);
+  }
+
+  for (const row of ambiguous) {
+    const { error: flagError } = await supabase
+      .from('credit_transactions')
+      .update({ review_state: 'needs_review', review_reason: row.reason })
+      .eq('id', row.id)
+      // Never downgrade a row someone has already settled.
+      .neq('review_state', 'cleared');
+    if (flagError) console.error('Could not flag an ambiguous transfer:', flagError);
+  }
+
+  return { paired: pairs.length, flagged: ambiguous.length };
+}
+
+/**
+ * The household's taught rules, in the shape the classifier wants them.
+ *
+ * Two maps rather than one object, because a rule can rename without
+ * recategorizing and the import path asks two different questions.
+ */
+export function rulesToMaps(rules: CounterpartyRuleRow[]): {
+  categories: Map<string, string>;
+  names: Map<string, string>;
+} {
+  const categories = new Map<string, string>();
+  const names = new Map<string, string>();
+  for (const rule of rules) {
+    if (rule.category_code) categories.set(rule.counterparty_key, rule.category_code);
+    if (rule.display_name) names.set(rule.counterparty_key, rule.display_name);
+  }
+  return { categories, names };
 }

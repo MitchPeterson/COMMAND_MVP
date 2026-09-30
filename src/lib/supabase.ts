@@ -1242,8 +1242,28 @@ export interface CreditTransaction {
    * What the money did. Null on rows read off a card statement, where the
    * direction plus the merchant name is enough. Always set on an imported row,
    * because a bank credit is a paycheck far more often than a refund.
+   *
+   * `refund` is gone from the database CHECK: a refund is an expense carrying
+   * `direction = 'credit'`, so the sign was already right and the fourth value
+   * only ever meant "expense, backwards". It stays in this union for one more
+   * phase because `flowOf()` still computes it for statement rows, which have
+   * no stored flow at all.
    */
-  flow?: 'expense' | 'income' | 'transfer' | 'refund' | null;
+  flow?: 'expense' | 'income' | 'savings' | 'transfer' | 'refund' | null;
+
+  /** Resolves against the taxonomy, then the household's own categories. */
+  category_code?: string | null;
+  /** The cleaned merchant key a taught rule matches on, and its display name. */
+  counterparty_key?: string | null;
+  counterparty_name?: string | null;
+  /** Why Command is unsure, in the household's terms. */
+  review_state?: 'none' | 'needs_review' | 'cleared';
+  review_reason?: string | null;
+  /** The source system's own id, when the export carried one. */
+  source_record_id?: string | null;
+  /** The other leg of an internal transfer, when both sides are loaded. */
+  paired_with_id?: string | null;
+  updated_at?: string | null;
   transaction_date: string | null;
   posting_date: string | null;
   merchant_description: string;
@@ -4302,8 +4322,15 @@ export async function deleteFinanceAccount(id: string): Promise<boolean> {
 
 /** Every table a household owns, leaf-first so deletion respects its own keys. */
 const HOUSEHOLD_TABLES = [
+  // Pure leaves first. source_period_marks points at finance_accounts and
+  // credit_cards, so it has to go before both of them.
+  'source_period_marks', 'counterparty_rules', 'transaction_categories',
   'tax_return_fields', 'tax_returns', 'deduction_log', 'tax_documents', 'tax_recommendations',
-  'credit_transactions', 'credit_apr_terms', 'credit_statement_fields', 'credit_statements',
+  // transaction_imports is the parent of the imported half of
+  // credit_transactions, so it follows them. It was missing from this list
+  // entirely, which meant "delete all my data" left every import row behind.
+  'credit_transactions', 'transaction_imports',
+  'credit_apr_terms', 'credit_statement_fields', 'credit_statements',
   'card_offer_candidates', 'card_offer_research', 'credit_cards',
   'insurance_coverages', 'insurance_deductibles', 'insurance_exclusions', 'insurance_endorsements',
   'insurance_insured_parties', 'insurance_insured_assets', 'insurance_beneficiaries',
@@ -4588,4 +4615,96 @@ export async function addCreditCardShell(
     throw new Error(`Could not add that card: ${error?.message ?? 'no row returned'}`);
   }
   return data as CreditCard;
+}
+
+// ============================================================
+// TRANSACTION TAXONOMY: categories, taught rules, coverage marks
+// ============================================================
+
+/**
+ * A category a household added, or a change it made to one of Command's.
+ *
+ * Command's own list lives in src/lib/transactions/taxonomy.ts as data; this
+ * table holds only the household's departures from it. An untouched household
+ * has no rows here at all, which is the point: the taxonomy is not a copy of
+ * itself in two places.
+ */
+export interface TransactionCategoryRow {
+  id: string;
+  household_id: string;
+  code: string;
+  label: string;
+  kind: 'income' | 'expense' | 'savings' | 'transfer';
+  /** True when this customizes a built-in rather than adding a new one. */
+  overrides_default: boolean;
+  /** Archived categories still resolve for rows already filed under them. */
+  archived_at: string | null;
+  sort_order: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** A correction the household made once, applied to everything matching. */
+export interface CounterpartyRuleRow {
+  household_id: string;
+  counterparty_key: string;
+  /** Null when the rule only renames. */
+  category_code: string | null;
+  /** Null when the rule only recategorizes. */
+  display_name: string | null;
+  applied_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** What the household asserted about one source in one period. */
+export interface SourcePeriodMarkRow {
+  id: string;
+  household_id: string;
+  finance_account_id: string | null;
+  credit_card_id: string | null;
+  /** First of the month. */
+  period: string;
+  mark: 'complete' | 'not_needed';
+  note: string | null;
+  created_at: string;
+}
+
+export async function getTransactionCategories(householdId: string): Promise<TransactionCategoryRow[]> {
+  const { data, error } = await supabase
+    .from('transaction_categories')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('sort_order', { ascending: true, nullsFirst: false })
+    .order('label');
+  if (error) {
+    console.error('Error fetching transaction categories:', error);
+    return [];
+  }
+  return (data ?? []) as TransactionCategoryRow[];
+}
+
+export async function getCounterpartyRules(householdId: string): Promise<CounterpartyRuleRow[]> {
+  const { data, error } = await supabase
+    .from('counterparty_rules')
+    .select('*')
+    .eq('household_id', householdId);
+  if (error) {
+    console.error('Error fetching counterparty rules:', error);
+    return [];
+  }
+  return (data ?? []) as CounterpartyRuleRow[];
+}
+
+export async function getSourcePeriodMarks(householdId: string): Promise<SourcePeriodMarkRow[]> {
+  const { data, error } = await supabase
+    .from('source_period_marks')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('period', { ascending: false });
+  if (error) {
+    console.error('Error fetching source period marks:', error);
+    return [];
+  }
+  return (data ?? []) as SourcePeriodMarkRow[];
 }

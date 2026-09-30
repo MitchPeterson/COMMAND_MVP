@@ -35,6 +35,14 @@ export interface MonthFlow {
   expenses: number;
   refunds: number;
   transfers: number;
+  /**
+   * Money deliberately put aside, counted as kept rather than as spent.
+   *
+   * Distinct from a transfer: both move between the household's own accounts,
+   * but a transfer is bookkeeping and this is a decision. Populated only from
+   * rows a classifier or a person marked as savings; nothing infers it yet.
+   */
+  savings: number;
   /** Income less expenses, refunds included. Transfers never touch this. */
   net: number;
   transactionCount: number;
@@ -78,6 +86,8 @@ export interface Cashflow {
   totalIncome: number;
   totalExpenses: number;
   totalTransfers: number;
+  /** Money put aside across the whole window. */
+  totalSavings: number;
   net: number;
   averageIncome: number | null;
   averageExpenses: number | null;
@@ -136,7 +146,9 @@ const daysIn = (month: string) => {
  * flow column, so they are read the way Credit has always read them: a charge
  * is spending, and a credit is a payment to the card or a refund.
  */
-export function flowOf(t: CreditTransaction): 'expense' | 'income' | 'transfer' | 'refund' {
+export type ComputedFlow = 'expense' | 'income' | 'savings' | 'transfer' | 'refund';
+
+export function flowOf(t: CreditTransaction): ComputedFlow {
   if (t.flow) return t.flow;
   if (t.direction === 'charge') return 'expense';
   const merchant = (t.merchant_description ?? '').toLowerCase();
@@ -176,6 +188,7 @@ export function computeCashflow(
   let totalIncome = 0;
   let totalExpenses = 0;
   let totalTransfers = 0;
+  let totalSavings = 0;
   let feeTotal = 0;
   let feeCount = 0;
   let advanceTotal = 0;
@@ -192,11 +205,12 @@ export function computeCashflow(
 
     const held = byMonth.get(month) ?? {
       month, label: MONTH_LABEL(month), income: 0, expenses: 0, refunds: 0,
-      transfers: 0, net: 0, transactionCount: 0, partial: false,
+      transfers: 0, savings: 0, net: 0, transactionCount: 0, partial: false,
     };
     held.transactionCount += 1;
 
     if (flow === 'income') { held.income += amount; totalIncome += amount; }
+    else if (flow === 'savings') { held.savings += amount; totalSavings += amount; }
     else if (flow === 'transfer') {
       held.transfers += amount;
       totalTransfers += amount;
@@ -316,6 +330,7 @@ export function computeCashflow(
     totalIncome,
     totalExpenses,
     totalTransfers,
+    totalSavings,
     net: totalIncome - totalExpenses,
     averageIncome: avgIncome,
     averageExpenses: avgExpenses,

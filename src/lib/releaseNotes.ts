@@ -25,6 +25,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.60.4',
+    date: '2026-09-30',
+    title: 'Groundwork for categories you can change',
+    items: [
+      'Schema for a real category model: categories carry a kind (income, expense, savings or transfer), a merchant correction can be taught once, and a source\'s coverage can be asserted per period.',
+      'Refund retires as a state. A refund is an expense that came back, and it already carried the sign — so nothing moves, and the kinds stop having a member that only meant "expense, backwards".',
+      'Saved is now counted apart from transfers: both move money between your own accounts, but one is a decision and the other is bookkeeping.',
+      'Fixed: deleting all your data left every transaction import behind.',
+    ],
+  },
+  {
     version: '0.60.3',
     date: '2026-09-30',
     title: 'A test suite, and two components lifted out for reuse',

@@ -74,6 +74,12 @@ import {
   getInvestmentHoldings,
   type TransactionImportRow,
   getTransactionImports,
+  type TransactionCategoryRow,
+  getTransactionCategories,
+  type CounterpartyRuleRow,
+  getCounterpartyRules,
+  type SourcePeriodMarkRow,
+  getSourcePeriodMarks,
   type DeductionLogEntry,
 } from './lib/supabase';
 
@@ -117,6 +123,12 @@ export interface HouseholdData {
   investmentHoldings: InvestmentHoldingRow[];
   /** Spreadsheets of transactions the household uploaded. */
   transactionImports: TransactionImportRow[];
+  /** Categories this household added or changed. Command's defaults are in code. */
+  transactionCategories: TransactionCategoryRow[];
+  /** Corrections the household taught Command about a merchant. */
+  counterpartyRules: CounterpartyRuleRow[];
+  /** What the household asserted about a source's coverage in a period. */
+  sourcePeriodMarks: SourcePeriodMarkRow[];
 }
 
 export interface UseHouseholdReturn {
@@ -164,6 +176,9 @@ const EMPTY_DATA: HouseholdData = {
   dismissedFindings: [],
   investmentHoldings: [],
   transactionImports: [],
+  transactionCategories: [],
+  counterpartyRules: [],
+  sourcePeriodMarks: [],
 };
 
 /**
@@ -237,6 +252,9 @@ function useHouseholdState(): UseHouseholdReturn {
         dismissedFindings,
         investmentHoldings,
         transactionImports,
+        transactionCategories,
+        counterpartyRules,
+        sourcePeriodMarks,
       ] = await Promise.all([
         supabase
           .from('household_profile')
@@ -279,6 +297,9 @@ function useHouseholdState(): UseHouseholdReturn {
         getDismissedFindings(hid),
         getInvestmentHoldings(hid),
         getTransactionImports(hid),
+        getTransactionCategories(hid),
+        getCounterpartyRules(hid),
+        getSourcePeriodMarks(hid),
       ]);
 
       setData({
@@ -318,6 +339,9 @@ function useHouseholdState(): UseHouseholdReturn {
         dismissedFindings,
         investmentHoldings,
         transactionImports,
+        transactionCategories,
+        counterpartyRules,
+        sourcePeriodMarks,
       });
     } catch (err) {
       console.error('Failed to load household data:', err);

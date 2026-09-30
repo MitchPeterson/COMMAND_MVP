@@ -38,6 +38,22 @@ describe('computeCashflow totals', () => {
     expect(flow.net).toBe(4800);
   });
 
+  it('counts savings as kept, not as spent', () => {
+    // Savings and transfers both move money between the household's own
+    // accounts. The difference is that one is a decision and the other is
+    // bookkeeping, so they are totalled apart and neither is spending.
+    const flow = computeCashflow([
+      txn({ transaction_date: '2026-09-02', amount: 5000, flow: 'income', direction: 'credit' }),
+      txn({ transaction_date: '2026-09-05', amount: 200, flow: 'expense' }),
+      txn({ transaction_date: '2026-09-06', amount: 800, flow: 'savings' }),
+    ]);
+    expect(flow.totalSavings).toBe(800);
+    expect(flow.totalExpenses).toBe(200);
+    expect(flow.months[0].savings).toBe(800);
+    // Savings is not a spending category, so it never reaches the chart.
+    expect(flow.categories.map((c) => c.code)).toEqual(['groceries']);
+  });
+
   it('does not categorize income or transfers, which would top the chart', () => {
     const flow = computeCashflow([
       txn({ transaction_date: '2026-09-02', amount: 5000, flow: 'income', direction: 'credit', category: 'Income' }),

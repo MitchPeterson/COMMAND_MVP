@@ -4808,3 +4808,177 @@ export function rulesToMaps(rules: CounterpartyRuleRow[]): {
   }
   return { categories, names };
 }
+
+// ============================================================
+// RECATEGORIZING, AND LEARNING FROM IT
+// ============================================================
+
+/** Raised when someone else changed the row first. */
+export class StaleRowError extends Error {
+  constructor(message: string) { super(message); this.name = 'StaleRowError'; }
+}
+
+/**
+ * Change one transaction's category.
+ *
+ * The first per-row update in this app -- until now `credit_transactions` was
+ * written by the importer and never touched again, and `category_source =
+ * 'user_set'` existed in the schema with nothing to write it.
+ *
+ * Guarded against a concurrent edit by `updated_at`, which the touch trigger
+ * now maintains. Two people looking at the same review queue is the ordinary
+ * case for a household, and last-write-wins would let one silently undo the
+ * other's correction. The guard cannot lose a write: an update that matches
+ * nothing returns no rows, and the caller is told rather than being shown a
+ * success for something that did not happen.
+ */
+export async function updateTransactionCategory(
+  transaction: { id: string; updated_at?: string | null },
+  categoryCode: string,
+  label: string,
+): Promise<CreditTransaction> {
+  let query = supabase
+    .from('credit_transactions')
+    .update({
+      category_code: categoryCode,
+      category: label,
+      category_source: 'user_set',
+      // A person looked at it, so it is no longer waiting on one.
+      review_state: 'cleared',
+      review_reason: null,
+    })
+    .eq('id', transaction.id);
+
+  // Rows written before the trigger existed have no updated_at to compare.
+  if (transaction.updated_at) query = query.eq('updated_at', transaction.updated_at);
+
+  const { data, error } = await query.select('*');
+  if (error) throw new Error(`Could not change that category: ${error.message}`);
+  if (!data || data.length === 0) {
+    throw new StaleRowError(
+      'Someone else changed this transaction while you were looking at it. Reload and try again.',
+    );
+  }
+  return data[0] as CreditTransaction;
+}
+
+/** A person saying a flagged row is fine as it stands. */
+export async function clearTransactionReview(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('credit_transactions')
+    .update({ review_state: 'cleared', review_reason: null })
+    .eq('id', id);
+  if (error) throw new Error(`Could not clear that: ${error.message}`);
+}
+
+/**
+ * How many other transactions the same correction would cover.
+ *
+ * Asked before offering to apply one, so the offer can name a number. "Also
+ * move 14 other Starbucks records?" is a decision; "apply to all?" is a
+ * gamble.
+ *
+ * Rows the household already set by hand are excluded from the count and from
+ * the update, so a rule can never undo an individual correction made earlier.
+ */
+export async function countMatchingCounterparty(
+  householdId: string,
+  counterpartyKey: string,
+  exceptId: string,
+): Promise<number> {
+  const { count, error } = await supabase
+    .from('credit_transactions')
+    .select('id', { count: 'exact', head: true })
+    .eq('household_id', householdId)
+    .eq('counterparty_key', counterpartyKey)
+    .neq('category_source', 'user_set')
+    .neq('id', exceptId);
+  if (error) {
+    console.error('Could not count matching transactions:', error);
+    return 0;
+  }
+  return count ?? 0;
+}
+
+/**
+ * Teach Command a merchant, and apply it to everything already on file.
+ *
+ * The rule is saved first. If the bulk update fails afterwards the household
+ * is left with a rule that governs future imports and some rows not yet moved,
+ * which is recoverable by applying it again -- where the other order would
+ * leave rows moved under a rule that does not exist, which is not.
+ */
+export async function applyCounterpartyRule(
+  householdId: string,
+  input: { counterpartyKey: string; categoryCode: string; label: string; displayName?: string | null },
+): Promise<{ updated: number }> {
+  const { error: ruleError } = await supabase
+    .from('counterparty_rules')
+    .upsert({
+      household_id: householdId,
+      counterparty_key: input.counterpartyKey,
+      category_code: input.categoryCode,
+      display_name: input.displayName ?? null,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'household_id,counterparty_key' });
+  if (ruleError) throw new Error(`Could not save that rule: ${ruleError.message}`);
+
+  const { data, error } = await supabase
+    .from('credit_transactions')
+    .update({
+      category_code: input.categoryCode,
+      category: input.label,
+      category_source: 'user_set',
+      review_state: 'cleared',
+      review_reason: null,
+    })
+    .eq('household_id', householdId)
+    .eq('counterparty_key', input.counterpartyKey)
+    .neq('category_source', 'user_set')
+    .select('id');
+  if (error) throw new Error(`The rule was saved, but the existing records could not be moved: ${error.message}`);
+
+  return { updated: data?.length ?? 0 };
+}
+
+/** A category the household invented, created and ready to assign in one step. */
+export async function addTransactionCategory(
+  householdId: string,
+  input: { label: string; kind: 'income' | 'expense' | 'savings' | 'transfer' },
+): Promise<TransactionCategoryRow> {
+  const label = input.label.trim();
+  if (!label) throw new Error('Give the category a name.');
+
+  // A readable code derived from the name, which is what makes a stored
+  // category_code legible in the database a year from now.
+  const base = label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 40)
+    || `category_${Date.now()}`;
+
+  const { data, error } = await supabase
+    .from('transaction_categories')
+    .insert([{ household_id: householdId, code: base, label, kind: input.kind }])
+    .select('*')
+    .single();
+
+  if (error) {
+    if (error.code === '23505') throw new Error(`You already have a category called "${label}".`);
+    throw new Error(`Could not add that category: ${error.message}`);
+  }
+  return data as TransactionCategoryRow;
+}
+
+/** Every transaction still waiting on a person, newest first. */
+export async function getFlaggedTransactions(householdId: string): Promise<CreditTransaction[]> {
+  const { data, error } = await supabase
+    .from('credit_transactions')
+    .select('*')
+    .eq('household_id', householdId)
+    .eq('review_state', 'needs_review')
+    .order('transaction_date', { ascending: false, nullsFirst: false })
+    .limit(500);
+  if (error) {
+    console.error('Could not load the review queue:', error);
+    return [];
+  }
+  return (data ?? []) as CreditTransaction[];
+}

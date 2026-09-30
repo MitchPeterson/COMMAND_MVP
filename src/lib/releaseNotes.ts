@@ -25,6 +25,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '1.1.0',
+    date: '2026-09-30',
+    title: 'Correct it once and Command learns',
+    items: [
+      'Change a category and it saves immediately. Then Command offers to do the same to every other record from that merchant, and to everything imported from now on — naming how many, because "also move 14 other Starbucks records" is a decision and "apply to all" is a gamble.',
+      'A new category can be made and used in one step, without leaving the row.',
+      'Anything Command could not place now has a page of its own, each row saying why in plain words — a check, a payment to a person, or an honest "could not tell". Waving one through is a real answer.',
+      'A rule never overwrites a category you set by hand.',
+    ],
+  },
+  {
     version: '1.0.0',
     date: '2026-09-30',
     title: 'Spending is one month at a time now',

@@ -20,15 +20,20 @@ import { ArrowDownLeft, ArrowUpRight, ChevronDown, ChevronRight, PiggyBank, Wall
 import type { CreditCard, CreditTransaction, FinanceAccount } from '../lib/supabase';
 import type { Cashflow } from '../lib/cashflow';
 import { periodDetail, worthMentioning, type Delta } from '../lib/transactions/period';
+import type { TransactionCategory } from '../lib/transactions/taxonomy';
 import { StatTile } from './StatTile';
 import { PeriodSelector } from './PeriodSelector';
 import { CategoryDrilldown } from './CategoryDrilldown';
 
 interface Props {
+  householdId: string;
   cashflow: Cashflow;
   transactions: CreditTransaction[];
   accounts: FinanceAccount[];
   cards: CreditCard[];
+  /** Everything a row can be moved to, defaults plus the household's own. */
+  categories: TransactionCategory[];
+  onChanged: () => Promise<void> | void;
   now?: Date;
 }
 
@@ -55,7 +60,9 @@ function DeltaNote({ delta, invert = false }: { delta: Delta | null; invert?: bo
   );
 }
 
-export function PeriodView({ cashflow, transactions, accounts, cards, now = new Date() }: Props) {
+export function PeriodView({
+  householdId, cashflow, transactions, accounts, cards, categories, onChanged, now = new Date(),
+}: Props) {
   const [index, setIndex] = useState(0);
   const [open, setOpen] = useState<string | null>(null);
 
@@ -190,6 +197,9 @@ export function PeriodView({ cashflow, transactions, accounts, cards, now = new 
 
                   {expanded && (
                     <CategoryDrilldown
+                      householdId={householdId}
+                      categories={categories}
+                      onChanged={onChanged}
                       cashflow={cashflow}
                       categoryCode={c.code}
                       selectedMonth={period.month}

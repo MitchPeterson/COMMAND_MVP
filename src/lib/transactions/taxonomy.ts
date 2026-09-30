@@ -257,3 +257,57 @@ export function isCommittedCategory(code: string | null | undefined): boolean {
 export function kindOf(code: string | null | undefined): CategoryKind {
   return categoryByCode(code)?.kind ?? 'expense';
 }
+
+/** A household's own category, or its change to one of Command's. */
+export interface CategoryOverride {
+  code: string;
+  label: string;
+  kind: CategoryKind;
+  archived_at?: string | null;
+}
+
+/**
+ * Command's defaults with the household's own laid over the top.
+ *
+ * Three things happen here, and all three are the reason the household's rows
+ * hold only departures rather than a copy of the whole list:
+ *
+ *   a household category is added,
+ *   a household row with a default's code renames or re-kinds that default,
+ *   an archived category drops out of the list but still resolves, because
+ *   transactions already filed under it have to keep reading as something.
+ *
+ * Archiving rather than deleting is the whole point of that last one. A
+ * category deleted out from under a year of transactions would turn them all
+ * into "Everything else" retroactively.
+ */
+export function availableCategories(overrides: CategoryOverride[] = []): TransactionCategory[] {
+  const byCode = new Map(allCategories().map((c) => [c.code, c]));
+
+  for (const row of overrides) {
+    const existing = byCode.get(row.code);
+    if (row.archived_at) { byCode.delete(row.code); continue; }
+    byCode.set(row.code, existing
+      ? { ...existing, label: row.label, kind: row.kind }
+      : { code: row.code, label: row.label, kind: row.kind, aliases: [] });
+  }
+
+  // Spending first, since that is what almost every correction is about, then
+  // the three that are not spending, then the fallbacks.
+  const rank = (c: TransactionCategory) =>
+    (c.code === 'uncategorized' || c.code === 'other' ? 2 : c.kind === 'expense' ? 0 : 1);
+  return [...byCode.values()].sort((a, b) => rank(a) - rank(b));
+}
+
+/**
+ * Resolve a code against the household's list as well as Command's.
+ *
+ * Falls back to the code itself rather than to "Everything else": a category
+ * that was archived still has to name itself for the rows filed under it.
+ */
+export function labelFor(code: string | null | undefined, overrides: CategoryOverride[] = []): string {
+  if (!code) return UNCATEGORIZED.label;
+  return overrides.find((o) => o.code === code)?.label
+    ?? categoryByCode(code)?.label
+    ?? code;
+}

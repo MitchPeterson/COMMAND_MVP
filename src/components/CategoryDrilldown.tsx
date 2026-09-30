@@ -20,11 +20,16 @@ import React, { useMemo, useState } from 'react';
 import type { CreditTransaction } from '../lib/supabase';
 import type { Cashflow } from '../lib/cashflow';
 import { categorySeries } from '../lib/transactions/period';
-import { categoryFromLabel } from '../lib/transactions/taxonomy';
+import { categoryFromLabel, type TransactionCategory } from '../lib/transactions/taxonomy';
+import { TransactionRow } from './TransactionRow';
 
 interface Props {
+  householdId: string;
   cashflow: Cashflow;
   categoryCode: string;
+  /** Everything a row can be moved to, defaults plus the household's own. */
+  categories: TransactionCategory[];
+  onChanged: () => Promise<void> | void;
   /** The period the page is showing, emphasized in the chart. */
   selectedMonth: string;
   onSelectMonth: (month: string) => void;
@@ -52,7 +57,8 @@ const HATCH = 'repeating-linear-gradient(45deg, rgb(var(--cmd-gold)) 0 2px, rgb(
 const H = 132;
 
 export function CategoryDrilldown({
-  cashflow, categoryCode, selectedMonth, onSelectMonth, transactions,
+  householdId, cashflow, categoryCode, categories, onChanged,
+  selectedMonth, onSelectMonth, transactions,
   now = new Date(), sourceLabel = () => 'Not attached',
 }: Props) {
   const [hovered, setHovered] = useState<string | null>(null);
@@ -166,35 +172,17 @@ export function CategoryDrilldown({
         {rows.length === 0 ? (
           <p className="mt-3 text-sm text-cmd-muted">Nothing in this category this month.</p>
         ) : (
-          <div className="mt-3 -mx-4 overflow-x-auto px-4">
-            <table className="w-full min-w-[36rem] text-sm">
-              <tbody>
-                {rows.map((t) => (
-                  <tr key={t.id} className="border-t border-cmd-border/60 align-top">
-                    <td className="whitespace-nowrap py-2 pr-3 font-mono text-xs text-cmd-muted">
-                      {t.transaction_date}
-                    </td>
-                    <td className="py-2 pr-3">
-                      <p className="text-cmd-offwhite">{t.counterparty_name || t.merchant_description}</p>
-                      {/* The raw text under the cleaned name, because the
-                          cleaning is a guess and the household may need to
-                          see what the bank actually wrote. */}
-                      {t.counterparty_name && t.counterparty_name !== t.merchant_description && (
-                        <p className="mt-0.5 truncate text-[11px] text-cmd-muted">{t.merchant_description}</p>
-                      )}
-                    </td>
-                    <td className="whitespace-nowrap py-2 pr-3 text-xs text-cmd-muted">
-                      {sourceLabel(t.finance_account_id ?? t.credit_card_id ?? null)}
-                    </td>
-                    <td className={`whitespace-nowrap py-2 text-right font-mono ${
-                      t.direction === 'credit' ? 'text-cmd-gold' : 'text-cmd-offwhite'
-                    }`}>
-                      {t.direction === 'credit' ? '+' : ''}{exact(Number(t.amount) || 0)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="mt-2">
+            {rows.map((t) => (
+              <TransactionRow
+                key={t.id}
+                householdId={householdId}
+                transaction={t}
+                categories={categories}
+                sourceLabel={sourceLabel}
+                onChanged={onChanged}
+              />
+            ))}
           </div>
         )}
       </div>

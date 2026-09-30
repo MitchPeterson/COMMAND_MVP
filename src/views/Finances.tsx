@@ -10,6 +10,8 @@ import { OwnedThings } from '../components/OwnedThings';
 import { RecurringCharges } from '../components/RecurringCharges';
 import { TransactionImportPanel } from '../components/TransactionImportPanel';
 import { PeriodView } from '../components/PeriodView';
+import { ReviewQueue } from '../components/ReviewQueue';
+import { availableCategories } from '../lib/transactions/taxonomy';
 import { SpendingInsights } from '../components/SpendingInsights';
 import { computeCashflow } from '../lib/cashflow';
 import { findRecurringCharges } from '../lib/recurring';
@@ -65,6 +67,25 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
   const cashflow = useMemo(() => computeCashflow(transactions, statements), [transactions, statements]);
   const recurring = useMemo(() => findRecurringCharges(transactions, statements), [transactions, statements]);
 
+  // Command's own categories with the household's laid over the top, and every
+  // row still waiting on a person. Both read from the transactions already
+  // loaded rather than asking the database again -- the review queue is a
+  // filter over what is on screen, not a second source of truth.
+  const categories = useMemo(
+    () => availableCategories(data?.transactionCategories ?? []),
+    [data?.transactionCategories],
+  );
+  const flagged = useMemo(
+    () => transactions.filter((t) => t.review_state === 'needs_review'),
+    [transactions],
+  );
+  const sourceLabel = useMemo(() => {
+    const names = new Map<string, string>();
+    for (const a of accounts) names.set(a.id, a.account_name);
+    for (const c of (data?.creditCards ?? [])) names.set(c.id, c.card_name || c.issuer || 'Card');
+    return (id: string | null) => (id && names.get(id)) || 'Not attached to an account';
+  }, [accounts, data?.creditCards]);
+
   // A spreadsheet handed to the section's uploader. Finances has one obvious
   // place to put a file -- the card at the bottom of the page -- so that is
   // where a bank export lands, and it used to be rejected by a file picker
@@ -112,7 +133,7 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
   const tabs = [
     { id: 'accounts', label: 'Accounts', count: cashAccounts.length + (data?.assets ?? []).length },
     { id: 'debt', label: 'Debt', count: activeLoans.length + cardsWithBalance.length },
-    { id: 'spending', label: 'Spending', count: transactions.length, always: true },
+    { id: 'spending', label: 'Spending', count: flagged.length, always: true },
     { id: 'investments', label: 'Investments', count: investedCount },
     // Accounts always shows, because manual entry lives there and a household
     // with nothing on file still needs somewhere to put the first thing.
@@ -254,11 +275,25 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
               and no way to move between them. Insights and recurring stay
               until their own rebuilds land -- removing them first would take
               away something that works. */}
+          {/* Items needing review come before the inventory, as they do in
+              every other section. */}
+          {data?.household?.id && (
+            <ReviewQueue
+              householdId={data.household.id}
+              flagged={flagged}
+              categories={categories}
+              sourceLabel={sourceLabel}
+              onChanged={refresh}
+            />
+          )}
           <PeriodView
+            householdId={data?.household?.id ?? ''}
             cashflow={cashflow}
             transactions={transactions}
             accounts={accounts}
             cards={data?.creditCards ?? []}
+            categories={categories}
+            onChanged={refresh}
           />
           <SpendingInsights cashflow={cashflow} recurring={recurring} />
           <RecurringCharges

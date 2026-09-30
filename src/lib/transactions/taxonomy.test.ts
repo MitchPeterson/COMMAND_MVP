@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CATEGORIES, allCategories, categoryByCode, categoryFromDescription,
   categoryFromLabel, isCommittedCategory, isVariableCategory, kindOf,
+  availableCategories, labelFor,
 } from './taxonomy';
 
 describe('the list is internally consistent', () => {
@@ -121,5 +122,47 @@ describe('the properties that replaced two whole lists', () => {
   it('treats an unknown code as an expense rather than dropping it', () => {
     expect(kindOf('something_a_household_invented')).toBe('expense');
     expect(categoryByCode('nope')).toBeNull();
+  });
+});
+
+describe('availableCategories', () => {
+  it('offers Command defaults when a household has added nothing', () => {
+    expect(availableCategories()).toHaveLength(allCategories().length);
+  });
+
+  it('adds a household category', () => {
+    const list = availableCategories([{ code: 'boat', label: 'Boat', kind: 'expense' }]);
+    expect(list.find((c) => c.code === 'boat')?.label).toBe('Boat');
+    expect(list).toHaveLength(allCategories().length + 1);
+  });
+
+  it('lets a household rename one of Command own', () => {
+    const list = availableCategories([{ code: 'dining', label: 'Eating out', kind: 'expense' }]);
+    expect(list.find((c) => c.code === 'dining')?.label).toBe('Eating out');
+    expect(list).toHaveLength(allCategories().length);
+  });
+
+  it('drops an archived category from the list', () => {
+    const list = availableCategories([
+      { code: 'cash', label: 'Cash advances', kind: 'expense', archived_at: '2026-09-01' },
+    ]);
+    expect(list.find((c) => c.code === 'cash')).toBeUndefined();
+  });
+
+  it('still names an archived category, for the rows already filed under it', () => {
+    // Deleting one out from under a year of transactions would turn them all
+    // into "Everything else" retroactively.
+    expect(labelFor('cash', [{ code: 'cash', label: 'Cash advances', kind: 'expense', archived_at: '2026-09-01' }]))
+      .toBe('Cash advances');
+  });
+
+  it('puts spending first, since that is what a correction is almost always about', () => {
+    const list = availableCategories();
+    const firstNonExpense = list.findIndex((c) => c.kind !== 'expense');
+    expect(list.slice(0, firstNonExpense).every((c) => c.kind === 'expense')).toBe(true);
+  });
+
+  it('names a code it has never seen rather than pretending it is Everything else', () => {
+    expect(labelFor('some_archived_thing')).toBe('some_archived_thing');
   });
 });

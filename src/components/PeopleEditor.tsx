@@ -324,7 +324,7 @@ export function PeopleEditor({ householdId, members, profile, onSaved, prefillNa
             <PersonFields form={form} onChange={setForm} />
           </div>
           {error && (
-            <div className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">
+            <div className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 text-sm text-cmd-bad">
               {error}
             </div>
           )}
@@ -375,7 +375,7 @@ export function PeopleEditor({ householdId, members, profile, onSaved, prefillNa
                       <PersonFields form={form} onChange={setForm} />
                     </div>
                     {error && (
-                      <div className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">
+                      <div className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 text-sm text-cmd-bad">
                         {error}
                       </div>
                     )}
@@ -430,7 +430,7 @@ export function PeopleEditor({ householdId, members, profile, onSaved, prefillNa
                             type="button"
                             disabled={busy}
                             onClick={() => remove(member)}
-                            className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs text-red-200 transition hover:bg-red-500/20 disabled:opacity-40"
+                            className="rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs text-cmd-bad transition hover:bg-red-500/20 disabled:opacity-40"
                           >
                             {busy ? 'Removing…' : 'Confirm remove'}
                           </button>
@@ -449,7 +449,7 @@ export function PeopleEditor({ householdId, members, profile, onSaved, prefillNa
                             setError(null);
                             setConfirmingRemoveId(member.id);
                           }}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-cmd-border px-3 py-1.5 text-xs text-cmd-muted transition hover:border-red-500/40 hover:text-red-200"
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-cmd-border px-3 py-1.5 text-xs text-cmd-muted transition hover:border-red-500/40 hover:text-cmd-bad"
                         >
                           <Trash2 className="h-3.5 w-3.5" /> Remove
                         </button>
@@ -464,7 +464,7 @@ export function PeopleEditor({ householdId, members, profile, onSaved, prefillNa
       )}
 
       {error && !adding && !editingId && (
-        <div className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">
+        <div className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 text-sm text-cmd-bad">
           {error}
         </div>
       )}

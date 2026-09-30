@@ -27,6 +27,12 @@ export default {
         // cmd-muted because cmd-muted does not separate from gold well enough
         // to carry a second series.
         'cmd-series-2': 'rgb(var(--cmd-series-2) / <alpha-value>)',
+        // Status, theme-aware. See the note in index.css: the Tailwind tints
+        // these replace were chosen against the dark palette and measure
+        // under 2:1 on the light one.
+        'cmd-good': 'rgb(var(--cmd-good) / <alpha-value>)',
+        'cmd-warn': 'rgb(var(--cmd-warn) / <alpha-value>)',
+        'cmd-bad': 'rgb(var(--cmd-bad) / <alpha-value>)',
       },
       fontFamily: {
         sans: ['IBM Plex Sans', 'sans-serif'],

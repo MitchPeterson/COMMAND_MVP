@@ -67,9 +67,9 @@ const APR_LABELS: Record<string, string> = {
 };
 
 const BAND_TONE: Record<ConfidenceBand, string> = {
-  high: 'text-emerald-300',
+  high: 'text-cmd-good',
   medium: 'text-cmd-gold',
-  low: 'text-amber-300',
+  low: 'text-cmd-warn',
 };
 
 const btn = 'inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-[11px] transition disabled:opacity-40';
@@ -159,7 +159,7 @@ function FieldRow({
       {!editing && (
         <div className="mt-2 flex flex-wrap gap-1">
           {field.review_state !== 'confirmed' && (
-            <button type="button" disabled={busy} onClick={() => act('confirmed')} className={`${btn} border-emerald-500/40 bg-emerald-500/10 text-emerald-200`}>
+            <button type="button" disabled={busy} onClick={() => act('confirmed')} className={`${btn} border-emerald-500/40 bg-emerald-500/10 text-cmd-good`}>
               <Check className="h-3 w-3" />
             </button>
           )}
@@ -167,7 +167,7 @@ function FieldRow({
             <Pencil className="h-3 w-3" />
           </button>
           {field.review_state !== 'rejected' && (
-            <button type="button" disabled={busy} onClick={() => act('rejected')} className={`${btn} ${btnIdle} hover:border-red-500/40 hover:text-red-200`}>
+            <button type="button" disabled={busy} onClick={() => act('rejected')} className={`${btn} ${btnIdle} hover:border-red-500/40 hover:text-cmd-bad`}>
               <X className="h-3 w-3" />
             </button>
           )}
@@ -337,7 +337,7 @@ export function CreditStatementReview({ statement, cards, transactions, onConfir
       <div className="rounded-2xl border border-cmd-border bg-cmd-black/40 p-4">
         <p className="text-[11px] uppercase tracking-[0.16em] text-cmd-muted">Which card is this?</p>
         {suggestion && (
-          <p className={`mt-2 text-xs ${suggestion.confidence >= 0.9 ? 'text-emerald-300' : 'text-amber-300'}`}>
+          <p className={`mt-2 text-xs ${suggestion.confidence >= 0.9 ? 'text-cmd-good' : 'text-cmd-warn'}`}>
             {suggestion.reason}
           </p>
         )}
@@ -363,8 +363,8 @@ export function CreditStatementReview({ statement, cards, transactions, onConfir
         </div>
       </div>
 
-      {result && <p className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-200">{result}</p>}
-      {error && <p className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p>}
+      {result && <p className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-3 text-sm text-cmd-good">{result}</p>}
+      {error && <p className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-cmd-bad">{error}</p>}
 
       {groups.map((group) => {
         const fields = detail.fields.filter((f) => group.codes.includes(f.field_code));
@@ -445,7 +445,7 @@ export function CreditStatementReview({ statement, cards, transactions, onConfir
                       )}
                     </span>
                   </span>
-                  <span className={`shrink-0 text-sm ${tx.direction === 'credit' ? 'text-emerald-300' : 'text-cmd-offwhite'}`}>
+                  <span className={`shrink-0 text-sm ${tx.direction === 'credit' ? 'text-cmd-good' : 'text-cmd-offwhite'}`}>
                     {tx.direction === 'credit' ? '−' : ''}{money(tx.amount)}
                   </span>
                 </div>

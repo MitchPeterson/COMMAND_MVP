@@ -280,7 +280,7 @@ export function AppHeader({ onOpenNav, onOpenBrief, householdId, activeView, doc
               // The payoff, stated before anything is asked of the user again.
               <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-5">
                 <p className="flex items-center gap-2 text-sm font-semibold text-cmd-offwhite">
-                  <Check className="h-4 w-4 shrink-0 text-emerald-300" /> {outcome.headline}
+                  <Check className="h-4 w-4 shrink-0 text-cmd-good" /> {outcome.headline}
                 </p>
                 <p className="mt-2 text-sm leading-6 text-cmd-muted">{outcome.detail}</p>
                 <div className="mt-4 flex flex-wrap gap-2">

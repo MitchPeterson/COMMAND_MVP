@@ -139,7 +139,7 @@ export function DocumentExtractionReview({ householdId, extractions, onChange }:
                   <div className="flex items-center gap-2 text-cmd-gold">
                     <span className="text-xs uppercase tracking-[0.24em] text-cmd-muted">{item.detected_type.replace('_', ' ')}</span>
                     {isLowConfidence && (
-                      <span className="rounded-full bg-amber-500/10 px-2 py-1 text-[11px] uppercase tracking-[0.16em] text-amber-200">Low confidence</span>
+                      <span className="rounded-full bg-amber-500/10 px-2 py-1 text-[11px] uppercase tracking-[0.16em] text-cmd-warn">Low confidence</span>
                     )}
                   </div>
                   <p className="mt-2 text-sm text-cmd-muted">Detected confidence: <span className="font-semibold text-cmd-offwhite">{item.confidence ?? 'unknown'}</span></p>
@@ -186,7 +186,7 @@ export function DocumentExtractionReview({ householdId, extractions, onChange }:
                         if (success && onChange) onChange();
                       }}
                       disabled={submitting[item.id]}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-200 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm font-semibold text-cmd-bad transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <XCircle className="h-4 w-4" /> Discard
                     </button>
@@ -199,7 +199,7 @@ export function DocumentExtractionReview({ householdId, extractions, onChange }:
                         if (success && onChange) onChange();
                       }}
                       disabled={submitting[item.id]}
-                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                      className="inline-flex items-center justify-center gap-2 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-cmd-good transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       <CheckCircle2 className="h-4 w-4" /> Confirm & Add to Profile
                     </button>

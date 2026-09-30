@@ -248,7 +248,7 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
       />
 
       {importError && (
-        <p className="px-1 text-sm text-red-400">{importError}</p>
+        <p className="px-1 text-sm text-cmd-bad">{importError}</p>
       )}
 
       <SegmentedTabs tabs={tabs} active={tab} onChange={setTab} ariaLabel="Finances views" />

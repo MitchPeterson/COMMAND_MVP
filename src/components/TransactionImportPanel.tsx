@@ -556,7 +556,7 @@ export function TransactionImportPanel({
       </div>
 
       {error && (
-        <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-300">
+        <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-cmd-bad">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
@@ -581,9 +581,9 @@ export function TransactionImportPanel({
               <li key={o.name} className="flex flex-wrap items-baseline gap-x-2 text-sm">
                 {o.error ? (
                   <>
-                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-red-400" />
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-cmd-bad" />
                     <span className="text-cmd-offwhite">{o.name}</span>
-                    <span className="text-red-500">{o.error}</span>
+                    <span className="text-cmd-bad">{o.error}</span>
                   </>
                 ) : (
                   <>
@@ -676,7 +676,7 @@ export function TransactionImportPanel({
           </div>
 
           {reading.missing.length > 0 ? (
-            <div className="rounded-2xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-red-300">
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/5 p-4 text-sm text-cmd-bad">
               Command could not find a {reading.missing.join(' or a ')} column in this file. Pick
               the right columns below, or export it again with headers.
             </div>
@@ -1022,7 +1022,7 @@ export function TransactionImportPanel({
                   type="button"
                   onClick={() => remove(row)}
                   disabled={busy}
-                  className="flex shrink-0 items-center gap-1.5 rounded-xl border border-cmd-border px-3 py-1.5 text-xs text-cmd-muted transition hover:border-red-500/40 hover:text-red-300 disabled:opacity-40"
+                  className="flex shrink-0 items-center gap-1.5 rounded-xl border border-cmd-border px-3 py-1.5 text-xs text-cmd-muted transition hover:border-red-500/40 hover:text-cmd-bad disabled:opacity-40"
                   title="Remove this import and every transaction that came with it"
                 >
                   <Trash2 className="h-3 w-3" /> Remove

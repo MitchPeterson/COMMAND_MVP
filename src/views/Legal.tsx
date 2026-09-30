@@ -35,9 +35,9 @@ function confidencePhrase(value: number | null): string {
 
 function confidenceTone(value: number | null): string {
   if (value == null) return 'border-cmd-border text-cmd-muted';
-  if (value >= 0.85) return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200';
+  if (value >= 0.85) return 'border-emerald-500/30 bg-emerald-500/10 text-cmd-good';
   if (value >= 0.6) return 'border-cmd-gold/30 bg-cmd-gold/10 text-cmd-gold';
-  return 'border-amber-500/30 bg-amber-500/10 text-amber-200';
+  return 'border-amber-500/30 bg-amber-500/10 text-cmd-warn';
 }
 
 interface TypeCorrectorProps {
@@ -100,7 +100,7 @@ function TypeCorrector({ extraction, onSaved }: TypeCorrectorProps) {
         ))}
       </div>
       {error && (
-        <div className="mt-3 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs text-red-200">
+        <div className="mt-3 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs text-cmd-bad">
           {error}
         </div>
       )}
@@ -303,7 +303,7 @@ export function LegalView({ focusId = null }: LegalViewProps) {
                     )}
 
                     {extraction.recognition === 'possibly_legal' && (
-                      <p className="mt-3 text-sm text-amber-200">
+                      <p className="mt-3 text-sm text-cmd-warn">
                         Command is not certain this is a legal document. It has been kept exactly as
                         uploaded and nothing has been added to your profile.
                       </p>
@@ -319,7 +319,7 @@ export function LegalView({ focusId = null }: LegalViewProps) {
                       <span
                         className={`rounded-lg border px-2.5 py-1 text-xs ${
                           extraction.review_status === 'confirmed'
-                            ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+                            ? 'border-emerald-500/30 bg-emerald-500/10 text-cmd-good'
                             : extraction.review_status === 'partially_confirmed'
                               ? 'border-cmd-gold/30 bg-cmd-gold/10 text-cmd-gold'
                               : 'border-cmd-border text-cmd-muted'

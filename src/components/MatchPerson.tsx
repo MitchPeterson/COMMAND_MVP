@@ -74,7 +74,7 @@ export function MatchPerson({ documentName, partyIds, members, onAddNew, onDone,
       </p>
 
       {error && (
-        <div className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">
+        <div className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 text-sm text-cmd-bad">
           {error}
         </div>
       )}

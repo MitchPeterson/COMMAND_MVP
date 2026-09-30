@@ -34,8 +34,8 @@ const money = (value: number | null | undefined) =>
     : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 
 const icons: Record<StrategySeverity, React.ReactNode> = {
-  critical: <ShieldAlert className="h-4 w-4 shrink-0 text-red-300" />,
-  attention: <AlertTriangle className="h-4 w-4 shrink-0 text-amber-300" />,
+  critical: <ShieldAlert className="h-4 w-4 shrink-0 text-cmd-bad" />,
+  attention: <AlertTriangle className="h-4 w-4 shrink-0 text-cmd-warn" />,
   info: <Info className="h-4 w-4 shrink-0 text-cmd-muted" />,
 };
 const borders: Record<StrategySeverity, string> = {
@@ -167,7 +167,7 @@ export function CardStrategy({
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
                       <p className="text-sm font-semibold text-cmd-offwhite">{finding.title}</p>
                       {finding.annualImpact != null && (
-                        <p className={`text-sm font-semibold ${finding.annualImpact < 0 ? 'text-red-300' : 'text-emerald-300'}`}>
+                        <p className={`text-sm font-semibold ${finding.annualImpact < 0 ? 'text-cmd-bad' : 'text-cmd-good'}`}>
                           {finding.annualImpact < 0 ? '' : '+'}{money(finding.annualImpact)}/yr
                         </p>
                       )}
@@ -253,10 +253,10 @@ export function CardStrategy({
           </p>
         )}
         {result && (
-          <p className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-200">{result}</p>
+          <p className="mt-4 rounded-2xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-3 text-sm text-cmd-good">{result}</p>
         )}
         {error && (
-          <p className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p>
+          <p className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-cmd-bad">{error}</p>
         )}
 
         {offers.length > 0 && (
@@ -281,7 +281,7 @@ export function CardStrategy({
                   </div>
                   {offer.estimated_annual_value != null && (
                     <div className="shrink-0 text-left sm:text-right">
-                      <p className="text-lg font-semibold text-emerald-300">
+                      <p className="text-lg font-semibold text-cmd-good">
                         {offer.estimated_annual_value >= 0 ? '+' : ''}{money(offer.estimated_annual_value)}/yr
                       </p>
                       <p className="text-[11px] text-cmd-muted">on your spending, after the fee</p>
@@ -320,11 +320,11 @@ export function CardStrategy({
                   </a>
                   <span className="text-[11px] text-cmd-muted">read {relativeDate(offer.retrieved_at)}</span>
                   {!offer.is_issuer_source && (
-                    <span className="text-[11px] text-amber-300">not the issuer's own page</span>
+                    <span className="text-[11px] text-cmd-warn">not the issuer's own page</span>
                   )}
                   <span
                     className={`text-[11px] ${
-                      offer.verification_state === 'user_confirmed' ? 'text-emerald-300' : 'text-amber-300'
+                      offer.verification_state === 'user_confirmed' ? 'text-cmd-good' : 'text-cmd-warn'
                     }`}
                   >
                     {offer.verification_state === 'user_confirmed'
@@ -338,14 +338,14 @@ export function CardStrategy({
                     <button
                       type="button"
                       onClick={() => verify(offer.id, 'user_confirmed')}
-                      className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[11px] text-emerald-200 transition hover:bg-emerald-500/20"
+                      className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-[11px] text-cmd-good transition hover:bg-emerald-500/20"
                     >
                       <Check className="h-3 w-3" /> I checked — terms are right
                     </button>
                     <button
                       type="button"
                       onClick={() => verify(offer.id, 'user_rejected')}
-                      className="inline-flex items-center gap-1 rounded-lg border border-cmd-border px-2.5 py-1 text-[11px] text-cmd-muted transition hover:border-red-500/40 hover:text-red-200"
+                      className="inline-flex items-center gap-1 rounded-lg border border-cmd-border px-2.5 py-1 text-[11px] text-cmd-muted transition hover:border-red-500/40 hover:text-cmd-bad"
                     >
                       <X className="h-3 w-3" /> Wrong or gone
                     </button>

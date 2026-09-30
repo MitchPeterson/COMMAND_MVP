@@ -27,10 +27,10 @@ const input =
 const label = 'text-[11px] uppercase tracking-[0.16em] text-cmd-muted';
 
 const STATE_TONE: Record<SystemOutlook['state'], string> = {
-  past_life: 'border-red-500/30 bg-red-500/10 text-red-200',
-  due_soon: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
+  past_life: 'border-red-500/30 bg-red-500/10 text-cmd-bad',
+  due_soon: 'border-amber-500/30 bg-amber-500/10 text-cmd-warn',
   watch: 'border-cmd-gold/30 bg-cmd-gold/10 text-cmd-gold',
-  fine: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
+  fine: 'border-emerald-500/30 bg-emerald-500/10 text-cmd-good',
   unknown_age: 'border-cmd-border bg-cmd-black/50 text-cmd-muted',
 };
 
@@ -326,7 +326,7 @@ export function HomeSystemsPanel({ householdId, systems, systemDocuments, docume
               <SystemFields form={form} onChange={setForm} />
             </div>
             {error && (
-              <div className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">
+              <div className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 text-sm text-cmd-bad">
                 {error}
               </div>
             )}
@@ -394,7 +394,7 @@ export function HomeSystemsPanel({ householdId, systems, systemDocuments, docume
 
                   <div className="mt-4 flex flex-wrap items-center gap-2 border-t border-cmd-border/60 pt-3">
                     <span className={`inline-flex items-center gap-1 text-[11px] ${
-                      outlook.warrantyState === 'active' ? 'text-emerald-300'
+                      outlook.warrantyState === 'active' ? 'text-cmd-good'
                         : outlook.warrantyState === 'expired' ? 'text-cmd-muted' : 'text-cmd-muted/70'
                     }`}>
                       <ShieldCheck className="h-3 w-3" />
@@ -419,7 +419,7 @@ export function HomeSystemsPanel({ householdId, systems, systemDocuments, docume
                     {confirmingRemove === system.id ? (
                       <>
                         <button type="button" disabled={busy} onClick={() => remove(system.id)}
-                          className="rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-1 text-[11px] text-red-200">
+                          className="rounded-lg border border-red-500/40 bg-red-500/10 px-2.5 py-1 text-[11px] text-cmd-bad">
                           Confirm remove
                         </button>
                         <button type="button" onClick={() => setConfirmingRemove(null)}
@@ -429,7 +429,7 @@ export function HomeSystemsPanel({ householdId, systems, systemDocuments, docume
                       </>
                     ) : (
                       <button type="button" onClick={() => setConfirmingRemove(system.id)}
-                        className="inline-flex items-center gap-1 rounded-lg border border-cmd-border px-2.5 py-1 text-[11px] text-cmd-muted transition hover:border-red-500/40 hover:text-red-200">
+                        className="inline-flex items-center gap-1 rounded-lg border border-cmd-border px-2.5 py-1 text-[11px] text-cmd-muted transition hover:border-red-500/40 hover:text-cmd-bad">
                         <Trash2 className="h-3 w-3" /> Remove
                       </button>
                     )}

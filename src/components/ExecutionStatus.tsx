@@ -34,10 +34,10 @@ interface Props {
 type Tone = 'draft' | 'signed' | 'recorded' | 'ended' | 'unstated' | 'neutral';
 
 const TONES: Record<Tone, string> = {
-  draft: 'border-amber-500/40 bg-amber-500/10 text-amber-200',
-  signed: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
-  recorded: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
-  ended: 'border-red-500/30 bg-red-500/10 text-red-200',
+  draft: 'border-amber-500/40 bg-amber-500/10 text-cmd-warn',
+  signed: 'border-emerald-500/30 bg-emerald-500/10 text-cmd-good',
+  recorded: 'border-emerald-500/30 bg-emerald-500/10 text-cmd-good',
+  ended: 'border-red-500/30 bg-red-500/10 text-cmd-bad',
   unstated: 'border-cmd-border bg-cmd-black/60 text-cmd-muted',
   neutral: 'border-cmd-border bg-cmd-black/60 text-cmd-offwhite',
 };

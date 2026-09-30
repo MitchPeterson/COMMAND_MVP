@@ -240,7 +240,7 @@ export function DeductionLog({
                   </td>
                   <td className="py-3 text-right">
                     <button type="button" onClick={() => remove(entry)}
-                      className="text-cmd-muted transition hover:text-red-400" aria-label="Remove">
+                      className="text-cmd-muted transition hover:text-cmd-bad" aria-label="Remove">
                       <Trash2 className="h-4 w-4" />
                     </button>
                   </td>
@@ -251,7 +251,7 @@ export function DeductionLog({
         </div>
       )}
 
-      {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
+      {error && <p className="mt-4 text-sm text-cmd-bad">{error}</p>}
       {notice && <p className="mt-4 text-sm text-cmd-muted">{notice}</p>}
 
       <div className="mt-6 flex flex-wrap gap-3 border-t border-cmd-border pt-6">

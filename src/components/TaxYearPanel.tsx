@@ -84,7 +84,7 @@ export function TaxYearPanel({
         </div>
 
         {error && (
-          <p className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p>
+          <p className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-cmd-bad">{error}</p>
         )}
 
         <div className="mt-5 space-y-2">

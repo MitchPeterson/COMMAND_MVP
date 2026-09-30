@@ -140,7 +140,7 @@ export function TransactionRow({
           <p className="mt-0.5 text-[11px] text-cmd-muted">
             {sourceLabel(transaction.finance_account_id ?? transaction.credit_card_id ?? null)}
             {transaction.review_reason && (
-              <span className="text-amber-700"> · {transaction.review_reason}</span>
+              <span className="text-cmd-warn"> · {transaction.review_reason}</span>
             )}
           </p>
         </div>
@@ -253,7 +253,7 @@ export function TransactionRow({
       )}
 
       {error && (
-        <p className="mt-2 flex items-start gap-1.5 text-xs text-red-500">
+        <p className="mt-2 flex items-start gap-1.5 text-xs text-cmd-bad">
           <X className="mt-0.5 h-3 w-3 shrink-0" /> {error}
         </p>
       )}

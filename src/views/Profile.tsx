@@ -94,7 +94,7 @@ export function ProfileView() {
           <p className="mt-2 text-sm text-cmd-muted">{profile?.partner_name ? `Partner: ${profile.partner_name}` : 'No partner listed'}</p>
         </div>
         <div className="rounded-3xl border border-cmd-border bg-cmd-black/40 p-6">
-          <div className="flex items-center gap-3 text-emerald-300">
+          <div className="flex items-center gap-3 text-cmd-good">
             <MapPin className="h-5 w-5" />
             <p className="text-xs uppercase tracking-[0.24em] text-cmd-muted">Location</p>
           </div>
@@ -152,7 +152,7 @@ export function ProfileView() {
               </div>
             </div>
             {error && (
-              <div className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">
+              <div className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 text-sm text-cmd-bad">
                 {error}
               </div>
             )}

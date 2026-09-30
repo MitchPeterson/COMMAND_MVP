@@ -269,7 +269,7 @@ function PolicyDetail({ extraction }: { extraction: InsurancePolicyExtraction })
     <div className="mt-5 space-y-5 border-t border-cmd-border pt-5">
       {extraction.declarations_only && (
         <div className="flex gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3">
-          <FileWarning className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+          <FileWarning className="mt-0.5 h-4 w-4 shrink-0 text-cmd-warn" />
           <p className="text-sm text-amber-100/80">
             Based on the summary page only — exclusions and endorsements were not available in
             the documents provided.
@@ -297,7 +297,7 @@ function PolicyDetail({ extraction }: { extraction: InsurancePolicyExtraction })
                   {d.amount !== null ? currency(d.amount) : `${d.percent}%`}
                 </p>
                 {d.calculated_amount !== null && (
-                  <p className="mt-1 text-xs text-sky-200">
+                  <p className="mt-1 text-xs text-cmd-muted">
                     ≈ {currency(d.calculated_amount)} on {d.calculation_basis}
                     <span className="text-cmd-muted"> (calculated)</span>
                   </p>
@@ -435,7 +435,7 @@ export function InsuranceView({ onNavigate }: { onNavigate?: (view: string, focu
         {data?.household?.id && <AddPolicyForm householdId={data.household.id} onAdded={refresh} />}
 
         {error && (
-          <div className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          <div className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-cmd-bad">
             {error}
           </div>
         )}
@@ -464,7 +464,7 @@ export function InsuranceView({ onNavigate }: { onNavigate?: (view: string, focu
                       <div className="flex items-center gap-2">
                         <p className="text-xs uppercase tracking-[0.24em] text-cmd-gold">{policy.type}</p>
                         {extraction?.declarations_only && (
-                          <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-200">
+                          <span className="rounded-full border border-amber-500/25 bg-amber-500/10 px-2 py-0.5 text-[11px] text-cmd-warn">
                             dec page only
                           </span>
                         )}
@@ -562,7 +562,7 @@ export function InsuranceView({ onNavigate }: { onNavigate?: (view: string, focu
                         type="button"
                         disabled={busy === policy.id}
                         onClick={() => removePolicy(policy.id)}
-                        className="rounded-lg border border-red-500/40 bg-red-500/15 px-3 py-1.5 text-sm font-semibold text-red-200 transition hover:bg-red-500/25 disabled:opacity-40"
+                        className="rounded-lg border border-red-500/40 bg-red-500/15 px-3 py-1.5 text-sm font-semibold text-cmd-bad transition hover:bg-red-500/25 disabled:opacity-40"
                       >
                         {busy === policy.id ? 'Removing…' : 'Remove'}
                       </button>
@@ -593,7 +593,7 @@ export function InsuranceView({ onNavigate }: { onNavigate?: (view: string, focu
                       <button
                         type="button"
                         onClick={() => setPendingRemove(policy.id)}
-                        className="inline-flex items-center gap-1.5 text-xs text-cmd-muted transition hover:text-red-200"
+                        className="inline-flex items-center gap-1.5 text-xs text-cmd-muted transition hover:text-cmd-bad"
                       >
                         <Trash2 className="h-3.5 w-3.5" /> Remove policy
                       </button>

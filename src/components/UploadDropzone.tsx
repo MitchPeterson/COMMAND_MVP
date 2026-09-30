@@ -205,12 +205,12 @@ export function UploadDropzone({
             <div className="h-full rounded-full bg-cmd-gold transition-all" style={{ width: `${progress}%` }} />
           </div>
           {status === 'done' && (
-            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+            <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-cmd-good">
               Upload completed. Document queued for extraction.
             </div>
           )}
           {error && (
-            <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-cmd-bad">
               {error}
             </div>
           )}

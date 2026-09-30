@@ -215,7 +215,7 @@ export function FeedbackDialog({ householdId, view, onClose }: Props) {
                   <button
                     type="button"
                     onClick={() => { URL.revokeObjectURL(shot.url); setShot(null); }}
-                    className="text-xs text-cmd-muted transition hover:text-red-400"
+                    className="text-xs text-cmd-muted transition hover:text-cmd-bad"
                   >
                     Remove
                   </button>
@@ -243,7 +243,7 @@ export function FeedbackDialog({ householdId, view, onClose }: Props) {
             )}
 
             {error && (
-              <p className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">
+              <p className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 text-sm text-cmd-bad">
                 {error}
               </p>
             )}

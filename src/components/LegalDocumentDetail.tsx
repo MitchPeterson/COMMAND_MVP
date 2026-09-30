@@ -59,9 +59,9 @@ const BAND_NOTE: Record<ConfidenceBand, string> = {
 };
 
 const BAND_TONE: Record<ConfidenceBand, string> = {
-  high: 'text-emerald-300',
+  high: 'text-cmd-good',
   medium: 'text-cmd-gold',
-  low: 'text-amber-300',
+  low: 'text-cmd-warn',
 };
 
 const btn =
@@ -117,9 +117,9 @@ function Provenance({
 function StateBadge({ state }: { state: string }) {
   if (state === 'unreviewed') return null;
   const tone: Record<string, string> = {
-    confirmed: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
+    confirmed: 'border-emerald-500/30 bg-emerald-500/10 text-cmd-good',
     edited: 'border-cmd-gold/30 bg-cmd-gold/10 text-cmd-gold',
-    rejected: 'border-red-500/30 bg-red-500/10 text-red-200',
+    rejected: 'border-red-500/30 bg-red-500/10 text-cmd-bad',
     unresolved: 'border-cmd-border bg-cmd-black/50 text-cmd-muted',
   };
   const label: Record<string, string> = {
@@ -233,7 +233,7 @@ function FieldRow({
         ) : (
           <>
             {field.review_state !== 'confirmed' && (
-              <button type="button" disabled={busy} onClick={() => act('confirmed')} className={`${btn} border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20`}>
+              <button type="button" disabled={busy} onClick={() => act('confirmed')} className={`${btn} border-emerald-500/40 bg-emerald-500/10 text-cmd-good hover:bg-emerald-500/20`}>
                 <Check className="h-3 w-3" /> {band === 'low' ? 'Confirm anyway' : 'Confirm'}
               </button>
             )}
@@ -241,7 +241,7 @@ function FieldRow({
               <Pencil className="h-3 w-3" /> Edit
             </button>
             {field.review_state !== 'rejected' && (
-              <button type="button" disabled={busy} onClick={() => act('rejected')} className={`${btn} ${btnIdle} hover:border-red-500/40 hover:text-red-200`}>
+              <button type="button" disabled={busy} onClick={() => act('rejected')} className={`${btn} ${btnIdle} hover:border-red-500/40 hover:text-cmd-bad`}>
                 <X className="h-3 w-3" /> Reject
               </button>
             )}
@@ -292,7 +292,7 @@ function PartyCard({
       {party.relationship && <p className="mt-1 text-xs text-cmd-muted">{party.relationship}</p>}
 
       {party.match_state === 'confirmed' && matched && (
-        <p className="mt-2 text-[11px] text-emerald-300">Linked to {matched.name} in your household</p>
+        <p className="mt-2 text-[11px] text-cmd-good">Linked to {matched.name} in your household</p>
       )}
       {party.match_state === 'suggested' && (
         <p className="mt-2 text-[11px] text-cmd-muted">
@@ -300,7 +300,7 @@ function PartyCard({
         </p>
       )}
       {party.match_state === 'conflict' && party.match_conflict && (
-        <p className="mt-2 text-[11px] text-amber-300">{party.match_conflict}</p>
+        <p className="mt-2 text-[11px] text-cmd-warn">{party.match_conflict}</p>
       )}
 
       <Provenance
@@ -319,7 +319,7 @@ function PartyCard({
               type="button"
               disabled={busy}
               onClick={() => run(() => resolveLegalPartyMatch(party.id, 'confirmed', party.matched_family_member_id))}
-              className={`${btn} border-emerald-500/40 bg-emerald-500/10 text-emerald-200`}
+              className={`${btn} border-emerald-500/40 bg-emerald-500/10 text-cmd-good`}
             >
               <Check className="h-3 w-3" /> Same person
             </button>
@@ -432,10 +432,10 @@ function ProvisionRow({
       />
       {provision.review_state === 'unreviewed' && (
         <div className="mt-3 flex flex-wrap gap-1.5">
-          <button type="button" disabled={busy} onClick={() => act('confirmed')} className={`${btn} border-emerald-500/40 bg-emerald-500/10 text-emerald-200`}>
+          <button type="button" disabled={busy} onClick={() => act('confirmed')} className={`${btn} border-emerald-500/40 bg-emerald-500/10 text-cmd-good`}>
             <Check className="h-3 w-3" /> Confirm
           </button>
-          <button type="button" disabled={busy} onClick={() => act('rejected')} className={`${btn} ${btnIdle} hover:border-red-500/40 hover:text-red-200`}>
+          <button type="button" disabled={busy} onClick={() => act('rejected')} className={`${btn} ${btnIdle} hover:border-red-500/40 hover:text-cmd-bad`}>
             <X className="h-3 w-3" /> Reject
           </button>
         </div>
@@ -602,10 +602,10 @@ export function LegalDocumentDetail({ extraction, filePath, familyMembers, onCon
       )}
 
       {result && (
-        <p className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-200">{result}</p>
+        <p className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 px-4 py-3 text-sm text-cmd-good">{result}</p>
       )}
       {error && (
-        <p className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p>
+        <p className="rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-cmd-bad">{error}</p>
       )}
 
       {detail.flags.length > 0 && (
@@ -615,7 +615,7 @@ export function LegalDocumentDetail({ extraction, filePath, familyMembers, onCon
             {detail.flags.map((flag) => (
               <li key={flag.id} className="rounded-2xl border border-amber-500/25 bg-amber-500/5 p-4">
                 <div className="flex items-start gap-2">
-                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-cmd-warn" />
                   <div>
                     <p className="text-sm text-cmd-offwhite">{flag.explanation}</p>
                     {flag.suggested_action && <p className="mt-1 text-xs text-cmd-muted">{flag.suggested_action}</p>}

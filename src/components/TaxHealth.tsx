@@ -37,14 +37,14 @@ export function TaxHealth(props: Props) {
   const attention = findings.filter((f) => f.severity === 'attention');
   const tone =
     criticals.length > 0
-      ? { label: 'Needs attention', className: 'text-red-300' }
+      ? { label: 'Needs attention', className: 'text-cmd-bad' }
       : attention.length > 0
-        ? { label: 'Something to chase', className: 'text-amber-300' }
-        : { label: 'On track', className: 'text-emerald-300' };
+        ? { label: 'Something to chase', className: 'text-cmd-warn' }
+        : { label: 'On track', className: 'text-cmd-good' };
 
   const icons: Record<TaxFindingSeverity, React.ReactNode> = {
-    critical: <ShieldAlert className="h-4 w-4 shrink-0 text-red-300" />,
-    attention: <AlertTriangle className="h-4 w-4 shrink-0 text-amber-300" />,
+    critical: <ShieldAlert className="h-4 w-4 shrink-0 text-cmd-bad" />,
+    attention: <AlertTriangle className="h-4 w-4 shrink-0 text-cmd-warn" />,
     info: <Info className="h-4 w-4 shrink-0 text-cmd-muted" />,
   };
   const borders: Record<TaxFindingSeverity, string> = {
@@ -87,7 +87,7 @@ export function TaxHealth(props: Props) {
       <div className="mt-6 space-y-3">
         {visible.length === 0 && hiddenCount === 0 ? (
           <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
-            <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+            <CheckCircle2 className="h-4 w-4 text-cmd-good" />
             <p className="text-sm text-cmd-muted">Nothing outstanding and no deadline close.</p>
           </div>
         ) : (

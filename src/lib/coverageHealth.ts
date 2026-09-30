@@ -412,10 +412,20 @@ export function computeCoverageHealth(
   return { score, grade, status, findings, dataFindings, confidence, confidenceReason, totalPremium, byType };
 }
 
+/**
+ * The letter grade's color, on the token scale rather than Tailwind's tints.
+ *
+ * This is the most prominent status color in the app -- it is the ring on all
+ * seven section cards -- and it was the worst offender: emerald-200 on the
+ * light page measures about 1.3:1, so a B grade was very nearly invisible.
+ *
+ * B and D no longer get their own shade. Five steps of one hue cannot be told
+ * apart anyway, and the letter is right there in the middle of the ring
+ * carrying the distinction already; the color only has to say which of three
+ * directions the grade points.
+ */
 export const gradeTone = (grade: string) =>
-  grade === 'A' ? 'text-emerald-300'
-  : grade === 'B' ? 'text-emerald-200'
-  : grade === 'C' ? 'text-amber-300'
-  : grade === 'D' ? 'text-orange-300'
-  : grade === 'F' ? 'text-red-300'
+  grade === 'A' || grade === 'B' ? 'text-cmd-good'
+  : grade === 'C' || grade === 'D' ? 'text-cmd-warn'
+  : grade === 'F' ? 'text-cmd-bad'
   : 'text-cmd-muted';

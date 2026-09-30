@@ -125,7 +125,7 @@ export function LoanList({ householdId, loans, assets, onChanged }: Props) {
           <button
             type="button"
             onClick={() => remove(loan)}
-            className="text-cmd-muted transition hover:text-red-400"
+            className="text-cmd-muted transition hover:text-cmd-bad"
             aria-label={`Remove ${loan.name}`}
           >
             <Trash2 className="h-4 w-4" />
@@ -153,7 +153,7 @@ export function LoanList({ householdId, loans, assets, onChanged }: Props) {
         </span>
       </div>
 
-      {error && <p className="mb-4 text-sm text-red-400">{error}</p>}
+      {error && <p className="mb-4 text-sm text-cmd-bad">{error}</p>}
 
       {active.length === 0 && closed.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-cmd-border bg-cmd-black/50 p-8 text-center">

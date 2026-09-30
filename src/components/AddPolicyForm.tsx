@@ -212,7 +212,7 @@ export function AddPolicyForm({ householdId, onAdded }: Props) {
       </div>
 
       {error && (
-        <div className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+        <div className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-cmd-bad">
           {error}
         </div>
       )}

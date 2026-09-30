@@ -73,7 +73,7 @@ export function YourData() {
 
       {open && (
         <div className="mt-6 space-y-6">
-          {error && <p className="text-sm text-red-400">{error}</p>}
+          {error && <p className="text-sm text-cmd-bad">{error}</p>}
 
           <div className="rounded-2xl border border-cmd-border bg-cmd-charcoal p-5">
             <p className="text-sm font-semibold text-cmd-offwhite">Download everything</p>
@@ -95,7 +95,7 @@ export function YourData() {
 
           <div className="rounded-2xl border border-red-500/25 bg-red-500/5 p-5">
             <p className="flex items-center gap-2 text-sm font-semibold text-cmd-offwhite">
-              <AlertTriangle className="h-4 w-4 text-red-300" /> Delete everything
+              <AlertTriangle className="h-4 w-4 text-cmd-bad" /> Delete everything
             </p>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-cmd-muted">
               Removes every document, every reading and every record, and deletes the uploaded files
@@ -111,7 +111,7 @@ export function YourData() {
               <button
                 type="button"
                 onClick={() => setArmed(true)}
-                className="mt-4 inline-flex items-center gap-2 rounded-xl border border-red-500/40 px-4 py-2 text-sm font-medium text-red-200 transition hover:bg-red-500/10"
+                className="mt-4 inline-flex items-center gap-2 rounded-xl border border-red-500/40 px-4 py-2 text-sm font-medium text-cmd-bad transition hover:bg-red-500/10"
               >
                 <Trash2 className="h-4 w-4" /> Delete all of my data
               </button>

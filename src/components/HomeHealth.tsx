@@ -29,14 +29,14 @@ export function HomeHealth({ systems, profile, mortgagePrincipal }: Props) {
 
   const tone =
     criticals.length > 0
-      ? { label: 'Money is coming due', className: 'text-red-300' }
+      ? { label: 'Money is coming due', className: 'text-cmd-bad' }
       : attention.length > 0
-        ? { label: 'Worth planning for', className: 'text-amber-300' }
-        : { label: 'Nothing pressing', className: 'text-emerald-300' };
+        ? { label: 'Worth planning for', className: 'text-cmd-warn' }
+        : { label: 'Nothing pressing', className: 'text-cmd-good' };
 
   const icons: Record<HomeFindingSeverity, React.ReactNode> = {
-    critical: <ShieldAlert className="h-4 w-4 shrink-0 text-red-300" />,
-    attention: <AlertTriangle className="h-4 w-4 shrink-0 text-amber-300" />,
+    critical: <ShieldAlert className="h-4 w-4 shrink-0 text-cmd-bad" />,
+    attention: <AlertTriangle className="h-4 w-4 shrink-0 text-cmd-warn" />,
     info: <Info className="h-4 w-4 shrink-0 text-cmd-muted" />,
   };
   const borders: Record<HomeFindingSeverity, string> = {
@@ -83,7 +83,7 @@ export function HomeHealth({ systems, profile, mortgagePrincipal }: Props) {
         <div className="mt-6 space-y-3">
           {visible.length === 0 && hiddenCount === 0 ? (
             <div className="flex items-center gap-3 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 px-4 py-3">
-              <CheckCircle2 className="h-4 w-4 text-emerald-300" />
+              <CheckCircle2 className="h-4 w-4 text-cmd-good" />
               <p className="text-sm text-cmd-muted">
                 Nothing on file is near the end of its service life. Adding more systems widens what can
                 be checked.

@@ -51,7 +51,7 @@ export function DocumentLinkBadge({
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs ${
       link.state === 'document_removed'
-        ? 'border-amber-500/30 bg-amber-500/5 text-amber-200'
+        ? 'border-amber-500/30 bg-amber-500/5 text-cmd-warn'
         : 'border-cmd-border bg-cmd-black/60 text-cmd-muted'
     } ${className}`}>
       <FileWarning className="h-3 w-3" /> {link.label}

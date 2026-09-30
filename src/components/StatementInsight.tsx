@@ -67,7 +67,7 @@ export function StatementInsight({ statement, transactions, cards }: Props) {
         {fit.interestCharged > 0 && (
           <div>
             <p className="text-xs text-cmd-muted">Interest charged</p>
-            <p className="text-xl font-semibold text-amber-300">{money(fit.interestCharged)}</p>
+            <p className="text-xl font-semibold text-cmd-warn">{money(fit.interestCharged)}</p>
           </div>
         )}
       </div>
@@ -83,7 +83,7 @@ export function StatementInsight({ statement, transactions, cards }: Props) {
       <div className="mt-5 space-y-3">
         {interestDominates && (
           <div className="flex gap-3 rounded-2xl border border-red-500/25 bg-red-500/5 px-4 py-3">
-            <Percent className="mt-0.5 h-4 w-4 shrink-0 text-red-300" />
+            <Percent className="mt-0.5 h-4 w-4 shrink-0 text-cmd-bad" />
             <div>
               <p className="text-sm font-semibold text-cmd-offwhite">
                 Interest cost {money(fit.interestCharged)} against {money(fit.rewardsValue)} of rewards

@@ -120,7 +120,7 @@ export function OwnedThings({ householdId, accounts, assets, prefillAsset, onCha
         Type either in — it counts toward your net worth exactly the same.
       </p>
 
-      {error && <p className="mt-4 text-sm text-red-400">{error}</p>}
+      {error && <p className="mt-4 text-sm text-cmd-bad">{error}</p>}
 
       {assets.length > 0 && (
         <div className="mt-5 space-y-2">
@@ -137,7 +137,7 @@ export function OwnedThings({ householdId, accounts, assets, prefillAsset, onCha
                 type="button"
                 onClick={() => remove('asset', item.id)}
                 aria-label={`Remove ${item.name}`}
-                className="shrink-0 text-cmd-muted transition hover:text-red-400"
+                className="shrink-0 text-cmd-muted transition hover:text-cmd-bad"
               >
                 <Trash2 className="h-4 w-4" />
               </button>

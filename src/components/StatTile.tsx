@@ -28,8 +28,8 @@ export type TileTone = 'default' | 'gold' | 'warn' | 'critical';
 const VALUE_TONE: Record<TileTone, string> = {
   default: 'text-cmd-offwhite',
   gold: 'text-cmd-gold',
-  warn: 'text-amber-700',
-  critical: 'text-red-500',
+  warn: 'text-cmd-warn',
+  critical: 'text-cmd-bad',
 };
 
 interface Props {

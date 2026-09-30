@@ -54,7 +54,7 @@ export function WeeklyBrief({ digest, onOpenSection, onClose }: Props) {
 
         {digest.quiet ? (
           <div className="mt-6 rounded-2xl border border-cmd-border bg-cmd-black/40 p-6 text-center">
-            <Check className="mx-auto h-5 w-5 text-emerald-300" />
+            <Check className="mx-auto h-5 w-5 text-cmd-good" />
             <p className="mt-3 text-sm text-cmd-offwhite">Nothing moved.</p>
             <p className="mx-auto mt-2 max-w-sm text-sm leading-6 text-cmd-muted">
               No new gaps, no scores changed and nothing falls due in the next two months. Quiet weeks
@@ -84,7 +84,7 @@ export function WeeklyBrief({ digest, onOpenSection, onClose }: Props) {
                       className="flex w-full gap-3 rounded-2xl border border-cmd-border bg-cmd-black/40 px-4 py-3 text-left transition hover:border-cmd-gold/40"
                     >
                       <AlertTriangle
-                        className={`mt-0.5 h-4 w-4 shrink-0 ${f.severity === 'critical' ? 'text-red-300' : 'text-amber-300'}`}
+                        className={`mt-0.5 h-4 w-4 shrink-0 ${f.severity === 'critical' ? 'text-cmd-bad' : 'text-cmd-warn'}`}
                       />
                       <span className="min-w-0">
                         <span className="block text-sm font-semibold text-cmd-offwhite">{f.title}</span>
@@ -133,8 +133,8 @@ export function WeeklyBrief({ digest, onOpenSection, onClose }: Props) {
                       className="flex w-full items-center gap-3 rounded-2xl border border-cmd-border bg-cmd-black/40 px-4 py-2.5 text-left transition hover:border-cmd-gold/40"
                     >
                       {m.delta > 0
-                        ? <ArrowUpRight className="h-4 w-4 shrink-0 text-emerald-300" />
-                        : <ArrowDownRight className="h-4 w-4 shrink-0 text-amber-300" />}
+                        ? <ArrowUpRight className="h-4 w-4 shrink-0 text-cmd-good" />
+                        : <ArrowDownRight className="h-4 w-4 shrink-0 text-cmd-warn" />}
                       <span className="text-sm text-cmd-offwhite">{m.label}</span>
                       <span className="ml-auto font-mono text-sm text-cmd-muted">
                         {m.from} → <span className="text-cmd-offwhite">{m.to}</span>
@@ -146,7 +146,7 @@ export function WeeklyBrief({ digest, onOpenSection, onClose }: Props) {
                       key={`${f.section}-${f.title}`}
                       className="flex items-start gap-3 rounded-2xl border border-cmd-border bg-cmd-black/40 px-4 py-2.5"
                     >
-                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-300" />
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-cmd-good" />
                       <p className="text-sm text-cmd-muted">
                         <span className="text-cmd-offwhite">{f.title}</span> — no longer flagged in {f.label}.
                       </p>

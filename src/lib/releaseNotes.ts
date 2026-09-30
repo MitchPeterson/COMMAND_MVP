@@ -25,6 +25,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '1.2.1',
+    date: '2026-09-30',
+    title: 'Status colors that work on both themes',
+    items: [
+      'Green, amber and red are palette tokens now rather than fixed Tailwind tints. The dark theme is unchanged; on the light one they were washed out to the point of invisibility — a B grade measured 1.3:1.',
+      'The letter grade no longer has five shades of one hue. Three directions, and the letter itself carries the rest.',
+    ],
+  },
+  {
     version: '1.2.0',
     date: '2026-09-30',
     title: 'Know what you have actually loaded',

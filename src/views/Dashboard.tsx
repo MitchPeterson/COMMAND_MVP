@@ -43,7 +43,7 @@ import {
 
 const severityOrder = ['critical', 'high', 'medium', 'low'] as const;
 const severityLabels = {
-  critical: { label: 'Critical', accent: 'bg-red-500/10 text-red-300 border-red-500/20' },
+  critical: { label: 'Critical', accent: 'bg-red-500/10 text-cmd-bad border-red-500/20' },
   high: { label: 'High', accent: 'bg-yellow-500/10 text-yellow-300 border-yellow-500/20' },
   medium: { label: 'Review', accent: 'bg-slate-500/10 text-slate-300 border-slate-500/20' },
   low: { label: 'Low', accent: 'bg-slate-700/10 text-slate-300 border-slate-700/20' },
@@ -117,9 +117,9 @@ function formatScore(score: number | null | undefined) {
 
 function getScoreState(score: number | null | undefined) {
   if (score == null) return { label: 'No score', className: 'text-cmd-muted', borderClass: 'border-cmd-border' };
-  if (score < 60) return { label: 'Needs attention', className: 'text-red-400', borderClass: 'border-red-500' };
+  if (score < 60) return { label: 'Needs attention', className: 'text-cmd-bad', borderClass: 'border-red-500' };
   if (score < 75) return { label: 'At risk', className: 'text-cmd-gold', borderClass: 'border-cmd-gold' };
-  return { label: 'On track', className: 'text-emerald-400', borderClass: 'border-emerald-500' };
+  return { label: 'On track', className: 'text-cmd-good', borderClass: 'border-emerald-500' };
 }
 
 interface DashboardProps {
@@ -626,7 +626,7 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
           {
             label: criticalCount === 1 ? 'Critical action' : 'Critical actions',
             value: String(criticalCount),
-            valueClassName: criticalCount > 0 ? 'text-red-400' : 'text-cmd-offwhite',
+            valueClassName: criticalCount > 0 ? 'text-cmd-bad' : 'text-cmd-offwhite',
             icon: overviewIcons.critical,
             scrollTo: 'dashboard-actions',
             linkLabel: criticalCount > 0 ? 'See what needs doing' : 'Nothing critical',
@@ -829,7 +829,7 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
                   <button
                     type="button"
                     onClick={() => onNavigate?.('documents')}
-                    className="w-full rounded-2xl border border-red-500/25 bg-red-500/5 px-4 py-3 text-left text-sm text-red-200 transition hover:border-red-500/40"
+                    className="w-full rounded-2xl border border-red-500/25 bg-red-500/5 px-4 py-3 text-left text-sm text-cmd-bad transition hover:border-red-500/40"
                   >
                     {awaitingReview.failed.length} document{awaitingReview.failed.length === 1 ? '' : 's'} could not be read. The originals are safe — retry from the vault.
                   </button>
@@ -889,10 +889,10 @@ export function DashboardView({ onNavigate, openBrief = 0, deferAuto = false }: 
                           section.score === 0
                             ? 'bg-cmd-black/60 text-cmd-muted'
                             : isCritical
-                            ? 'bg-red-500/10 text-red-300'
+                            ? 'bg-red-500/10 text-cmd-bad'
                             : isWarning
                             ? 'bg-cmd-gold/10 text-cmd-gold'
-                            : 'bg-emerald-500/10 text-emerald-300'
+                            : 'bg-emerald-500/10 text-cmd-good'
                         }`}>
                           {section.score === 0 ? 'not started' : section.status.replace('_', ' ')}
                         </span>

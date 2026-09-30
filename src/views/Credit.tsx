@@ -27,10 +27,10 @@ function utilizationOf(card: CreditCardRow): number | null {
 
 function utilizationTone(value: number | null): string {
   if (value == null) return 'text-cmd-muted';
-  if (value >= 80) return 'text-red-300';
-  if (value >= 50) return 'text-amber-300';
+  if (value >= 80) return 'text-cmd-bad';
+  if (value >= 50) return 'text-cmd-warn';
   if (value >= 30) return 'text-cmd-gold';
-  return 'text-emerald-300';
+  return 'text-cmd-good';
 }
 
 export function CreditView() {

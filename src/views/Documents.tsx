@@ -24,8 +24,8 @@ function formatDate(value: string | null) {
  */
 function StatusBadge({ status }: { status: string | null | undefined }) {
   const config = {
-    processed: { icon: CheckCircle2, label: 'Extracted', className: 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200' },
-    error: { icon: AlertCircle, label: 'Extraction failed', className: 'border-red-500/25 bg-red-500/10 text-red-200' },
+    processed: { icon: CheckCircle2, label: 'Extracted', className: 'border-emerald-500/25 bg-emerald-500/10 text-cmd-good' },
+    error: { icon: AlertCircle, label: 'Extraction failed', className: 'border-red-500/25 bg-red-500/10 text-cmd-bad' },
     uploaded: { icon: Clock, label: 'Awaiting extraction', className: 'border-cmd-border bg-cmd-black/60 text-cmd-muted' },
   }[status ?? 'uploaded'] ?? {
     icon: Clock,
@@ -140,7 +140,7 @@ export function DocumentsView({ onNavigate, focusId = null }: DocumentsViewProps
       </section>
 
       {error && (
-        <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</div>
+        <div className="rounded-2xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-cmd-bad">{error}</div>
       )}
 
       {documents.length === 0 ? (
@@ -221,7 +221,7 @@ export function DocumentsView({ onNavigate, focusId = null }: DocumentsViewProps
                     from both sides. */}
                 <div className="mt-4 border-t border-cmd-border pt-4">
                   {stalled ? (
-                    <p className="flex items-start gap-2 text-xs text-amber-200">
+                    <p className="flex items-start gap-2 text-xs text-cmd-warn">
                       <CornerDownRight className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                       This reading never finished — it was cut off by the server rather than failing,
                       so nothing was saved and nothing said so. Read it again.
@@ -338,7 +338,7 @@ export function DocumentsView({ onNavigate, focusId = null }: DocumentsViewProps
                     type="button"
                     disabled={busy}
                     onClick={() => startDelete(doc.id)}
-                    className="inline-flex items-center gap-2 rounded-xl border border-cmd-border px-4 py-2 text-sm font-medium text-cmd-muted transition hover:border-red-500/40 hover:text-red-200 disabled:opacity-40"
+                    className="inline-flex items-center gap-2 rounded-xl border border-cmd-border px-4 py-2 text-sm font-medium text-cmd-muted transition hover:border-red-500/40 hover:text-cmd-bad disabled:opacity-40"
                   >
                     <Trash2 className="h-4 w-4" /> Delete
                   </button>
@@ -387,7 +387,7 @@ export function DocumentsView({ onNavigate, focusId = null }: DocumentsViewProps
                         type="button"
                         disabled={busy}
                         onClick={() => confirmDelete(doc.id, doc.file_path)}
-                        className="inline-flex items-center gap-2 rounded-xl border border-red-500/40 bg-red-500/15 px-4 py-2 text-sm font-semibold text-red-200 transition hover:bg-red-500/25 disabled:opacity-40"
+                        className="inline-flex items-center gap-2 rounded-xl border border-red-500/40 bg-red-500/15 px-4 py-2 text-sm font-semibold text-cmd-bad transition hover:bg-red-500/25 disabled:opacity-40"
                       >
                         <Trash2 className="h-4 w-4" /> {busy ? 'Deleting…' : 'Delete permanently'}
                       </button>

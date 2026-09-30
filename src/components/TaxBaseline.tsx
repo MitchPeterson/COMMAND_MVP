@@ -317,7 +317,7 @@ export function TaxBaseline({
                 </label>
               ))}
             </div>
-            {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+            {error && <p className="mt-3 text-sm text-cmd-bad">{error}</p>}
             <div className="mt-4 flex gap-3">
               <button type="button" onClick={save} disabled={saving}
                 className="rounded-full bg-cmd-gold px-5 py-2 text-sm font-semibold text-cmd-black transition disabled:opacity-50">

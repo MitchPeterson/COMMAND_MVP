@@ -160,12 +160,12 @@ export function ApiUsageReport() {
                 </div>
                 <div className="rounded-2xl border border-cmd-border bg-cmd-charcoal p-5">
                   <p className="text-xs uppercase tracking-[0.2em] text-cmd-muted">Saved by replay</p>
-                  <p className="mt-2 text-3xl font-semibold text-emerald-300">{usd(s.saved)}</p>
+                  <p className="mt-2 text-3xl font-semibold text-cmd-good">{usd(s.saved)}</p>
                   <p className="mt-1 text-xs text-cmd-muted">{s.replayed} replayed</p>
                 </div>
                 <div className="rounded-2xl border border-cmd-border bg-cmd-charcoal p-5">
                   <p className="text-xs uppercase tracking-[0.2em] text-cmd-muted">Spent on failures</p>
-                  <p className={`mt-2 text-3xl font-semibold ${s.failedCost > 0 ? 'text-amber-300' : 'text-cmd-offwhite'}`}>
+                  <p className={`mt-2 text-3xl font-semibold ${s.failedCost > 0 ? 'text-cmd-warn' : 'text-cmd-offwhite'}`}>
                     {usd(s.failedCost)}
                   </p>
                   <p className="mt-1 text-xs text-cmd-muted">
@@ -232,7 +232,7 @@ export function ApiUsageReport() {
                           </td>
                           <td className="py-2 pr-4 text-cmd-muted">
                             {r.label}
-                            {!r.succeeded && <span className="ml-2 text-amber-300">failed</span>}
+                            {!r.succeeded && <span className="ml-2 text-cmd-warn">failed</span>}
                           </td>
                           <td className="py-2 pr-4 font-mono text-xs text-cmd-muted">{r.model}</td>
                           <td className="py-2 pr-4 text-right font-mono text-xs text-cmd-muted">
@@ -241,7 +241,7 @@ export function ApiUsageReport() {
                           <td className="py-2 pr-4 text-right font-mono text-xs text-cmd-muted">
                             {r.duration_ms ? `${(r.duration_ms / 1000).toFixed(1)}s` : '—'}
                           </td>
-                          <td className={`py-2 text-right font-mono ${r.replayed ? 'text-emerald-300' : 'text-cmd-offwhite'}`}>
+                          <td className={`py-2 text-right font-mono ${r.replayed ? 'text-cmd-good' : 'text-cmd-offwhite'}`}>
                             {r.replayed ? `${usd(0)} (saved ${usd(Number(r.saved_usd))})` : usd(Number(r.cost_usd))}
                           </td>
                         </tr>

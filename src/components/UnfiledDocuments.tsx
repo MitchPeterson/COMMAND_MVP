@@ -67,7 +67,7 @@ export function UnfiledDocuments({
 
   return (
     <section className="rounded-3xl border border-amber-500/25 bg-amber-500/5 p-6">
-      <p className="text-xs uppercase tracking-[0.24em] text-amber-200/80">In the vault, not counted here</p>
+      <p className="text-xs uppercase tracking-[0.24em] text-cmd-warn/80">In the vault, not counted here</p>
       <h2 className="mt-2 text-2xl font-semibold text-cmd-offwhite">
         {unfiled.length} file{unfiled.length === 1 ? '' : 's'} nothing on this page depends on
       </h2>
@@ -77,7 +77,7 @@ export function UnfiledDocuments({
         calculated without them.
       </p>
 
-      {error && <p className="mt-3 text-sm text-red-400">{error}</p>}
+      {error && <p className="mt-3 text-sm text-cmd-bad">{error}</p>}
 
       <div className="mt-5 space-y-3">
         {unfiled.map((file) => (

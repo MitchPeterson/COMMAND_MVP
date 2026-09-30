@@ -39,7 +39,7 @@ const BORDER: Record<string, string> = {
 };
 
 const ICON: Record<string, React.ReactNode> = {
-  critical: <AlertOctagon className="mt-0.5 h-4 w-4 shrink-0 text-red-400" />,
+  critical: <AlertOctagon className="mt-0.5 h-4 w-4 shrink-0 text-cmd-bad" />,
   attention: <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-cmd-gold" />,
   info: <Info className="mt-0.5 h-4 w-4 shrink-0 text-cmd-muted" />,
 };

@@ -37,11 +37,11 @@ interface Props {
 }
 
 const CHIP: Record<CoverageStatus, { label: string; className: string; icon: React.ReactNode }> = {
-  confirmed: { label: 'Confirmed', className: 'border-emerald-600/50 text-emerald-600', icon: <CheckCircle2 className="h-3 w-3" /> },
-  complete: { label: 'Complete', className: 'border-emerald-600/50 text-emerald-600', icon: <CheckCircle2 className="h-3 w-3" /> },
+  confirmed: { label: 'Confirmed', className: 'border-cmd-good/50 text-cmd-good', icon: <CheckCircle2 className="h-3 w-3" /> },
+  complete: { label: 'Complete', className: 'border-cmd-good/50 text-cmd-good', icon: <CheckCircle2 className="h-3 w-3" /> },
   in_progress: { label: 'In progress', className: 'border-cmd-border-hi text-cmd-muted', icon: <Clock className="h-3 w-3" /> },
-  partial: { label: 'Partial', className: 'border-amber-600/50 text-amber-700', icon: <CircleDashed className="h-3 w-3" /> },
-  missing: { label: 'Missing', className: 'border-red-500/40 text-red-500', icon: <CircleSlash className="h-3 w-3" /> },
+  partial: { label: 'Partial', className: 'border-cmd-warn/50 text-cmd-warn', icon: <CircleDashed className="h-3 w-3" /> },
+  missing: { label: 'Missing', className: 'border-red-500/40 text-cmd-bad', icon: <CircleSlash className="h-3 w-3" /> },
 };
 
 const SHORT = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: 'UTC' });
@@ -115,7 +115,7 @@ function SourceCard({
           type="button"
           onClick={() => run(() => setSourceTracking(source.kind, source.id, false))}
           disabled={busy}
-          className="shrink-0 rounded-xl border border-cmd-border px-3 py-1.5 text-xs text-cmd-muted transition hover:border-red-500/40 hover:text-red-500 disabled:opacity-40"
+          className="shrink-0 rounded-xl border border-cmd-border px-3 py-1.5 text-xs text-cmd-muted transition hover:border-red-500/40 hover:text-cmd-bad disabled:opacity-40"
           title="Stop asking about exports for this account. Nothing already loaded is removed."
         >
           Stop tracking
@@ -126,7 +126,7 @@ function SourceCard({
       <div className="mt-4 rounded-xl border border-cmd-border bg-cmd-black/40 p-3">
         {coverage.fill ? (
           <p className="text-sm text-cmd-offwhite">
-            Fill in <span className="text-amber-700">{describeRange(coverage.fill)}</span>.
+            Fill in <span className="text-cmd-warn">{describeRange(coverage.fill)}</span>.
             {coverage.nextExportFrom && (
               <span className="text-cmd-muted"> Next export starts {describeRange({ start: coverage.nextExportFrom, end: coverage.nextExportFrom })}.</span>
             )}
@@ -170,7 +170,7 @@ function SourceCard({
         </div>
       </div>
 
-      {error && <p className="mt-3 text-xs text-red-500">{error}</p>}
+      {error && <p className="mt-3 text-xs text-cmd-bad">{error}</p>}
       {busy && <Loader2 className="mt-3 h-3.5 w-3.5 animate-spin text-cmd-gold" />}
     </div>
   );

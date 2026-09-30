@@ -124,7 +124,7 @@ export function CardProfilePanel({ issuer, product, totals, heldKeys = [], defau
               {profile.annualFee > 0 && (
                 <p className={`mt-3 rounded-xl border px-3 py-2 text-sm ${
                   a.feeExceedsBonusValue
-                    ? 'border-amber-500/30 bg-amber-500/5 text-amber-200'
+                    ? 'border-amber-500/30 bg-amber-500/5 text-cmd-warn'
                     : 'border-cmd-border bg-cmd-black/40 text-cmd-muted'
                 }`}>
                   {a.feeExceedsBonusValue
@@ -164,9 +164,9 @@ export function CardProfilePanel({ issuer, product, totals, heldKeys = [], defau
                 const warn = b.code === 'foreign_fee';
                 return (
                   <div key={b.code} className="flex gap-2">
-                    <Icon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${warn ? 'text-amber-300' : 'text-cmd-gold/70'}`} />
+                    <Icon className={`mt-0.5 h-3.5 w-3.5 shrink-0 ${warn ? 'text-cmd-warn' : 'text-cmd-gold/70'}`} />
                     <p className="text-sm text-cmd-muted">
-                      <span className={warn ? 'text-amber-200' : 'text-cmd-offwhite'}>{b.label}</span>
+                      <span className={warn ? 'text-cmd-warn' : 'text-cmd-offwhite'}>{b.label}</span>
                       {' — '}{b.detail}
                     </p>
                   </div>

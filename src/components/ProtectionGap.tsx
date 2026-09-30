@@ -57,7 +57,7 @@ export function ProtectionGap({ members, profile, policies, mortgage }: Props) {
         </div>
         <div className="text-right">
           <p className="text-sm text-cmd-muted">{short ? 'Short by' : 'Covered, with headroom of'}</p>
-          <p className={`text-3xl font-semibold ${short ? 'text-amber-300' : 'text-emerald-300'}`}>
+          <p className={`text-3xl font-semibold ${short ? 'text-cmd-warn' : 'text-cmd-good'}`}>
             {money(Math.abs(result.gap ?? 0))}
           </p>
           <p className="mt-1 text-xs text-cmd-muted">
@@ -68,7 +68,7 @@ export function ProtectionGap({ members, profile, policies, mortgage }: Props) {
 
       {short && result.coverage === 0 && (
         <div className="mt-5 flex gap-3 rounded-2xl border border-red-500/25 bg-red-500/5 px-4 py-3">
-          <ShieldAlert className="h-4 w-4 shrink-0 text-red-300" />
+          <ShieldAlert className="h-4 w-4 shrink-0 text-cmd-bad" />
           <p className="text-sm text-cmd-muted">
             No life policies are on file at all. Cover through an employer is the piece most often
             forgotten — and it usually ends when the job does, which is exactly when it would be needed.
@@ -98,7 +98,7 @@ export function ProtectionGap({ members, profile, policies, mortgage }: Props) {
                   </div>
                   <p className="mt-0.5 text-[11px] text-cmd-muted">
                     {component.basis}
-                    {component.assumed && <span className="text-amber-300/80"> · assumption</span>}
+                    {component.assumed && <span className="text-cmd-warn/80"> · assumption</span>}
                   </p>
                 </div>
               ))}
@@ -120,7 +120,7 @@ export function ProtectionGap({ members, profile, policies, mortgage }: Props) {
                   </div>
                   <p className="mt-0.5 text-[11px] text-cmd-muted">
                     {component.basis}
-                    {component.assumed && <span className="text-amber-300/80"> · assumption</span>}
+                    {component.assumed && <span className="text-cmd-warn/80"> · assumption</span>}
                   </p>
                 </div>
               ))}

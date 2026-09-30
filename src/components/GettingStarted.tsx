@@ -98,7 +98,7 @@ export function GettingStarted({ steps, userName, onOpen, summaryAt }: Props) {
                 <p className="mt-3 text-sm text-cmd-muted">
                   <span className="text-cmd-offwhite/80">You would need:</span> {step.primary.label}
                   {step.noDocumentNeeded && (
-                    <span className="ml-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-200">
+                    <span className="ml-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-2 py-0.5 text-xs text-cmd-good">
                       no document needed
                     </span>
                   )}
@@ -120,7 +120,7 @@ export function GettingStarted({ steps, userName, onOpen, summaryAt }: Props) {
                   onClick={() => onOpen(step.section)}
                   className="inline-flex items-center gap-1.5 rounded-full border border-cmd-border bg-cmd-black/50 px-3 py-1 text-xs text-cmd-muted transition hover:text-cmd-offwhite"
                 >
-                  <Check className="h-3 w-3 text-emerald-300" />
+                  <Check className="h-3 w-3 text-cmd-good" />
                   {step.section.charAt(0).toUpperCase() + step.section.slice(1)}
                 </button>
               ))}

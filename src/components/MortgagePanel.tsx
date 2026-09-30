@@ -144,7 +144,7 @@ export function MortgagePanel({ householdId, mortgage, profile, onChanged }: Pro
             </div>
           </div>
           {error && (
-            <div className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 text-sm text-red-200">{error}</div>
+            <div className="mt-4 rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 text-sm text-cmd-bad">{error}</div>
           )}
           <div className="mt-5 flex flex-wrap gap-2">
             <button type="button" disabled={busy} onClick={save}
@@ -161,7 +161,7 @@ export function MortgagePanel({ householdId, mortgage, profile, onChanged }: Pro
         <>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
             <div className="rounded-2xl border border-cmd-border bg-cmd-black/40 p-5">
-              <div className="flex items-center gap-2 text-emerald-300">
+              <div className="flex items-center gap-2 text-cmd-good">
                 <TrendingUp className="h-4 w-4" />
                 <p className="text-[11px] uppercase tracking-[0.16em] text-cmd-muted">Equity</p>
               </div>

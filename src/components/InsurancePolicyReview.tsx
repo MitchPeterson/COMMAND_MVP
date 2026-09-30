@@ -28,8 +28,8 @@ export const titleCase = (value: string) => value.replace(/_/g, ' ').replace(/\b
 export function ValueTypeTag({ type }: { type: ExtractionValueType }) {
   if (type === 'explicit') return null;
   const styles: Record<string, string> = {
-    calculated: 'border-sky-500/25 bg-sky-500/10 text-sky-200',
-    inferred: 'border-amber-500/25 bg-amber-500/10 text-amber-200',
+    calculated: 'border-sky-500/25 bg-sky-500/10 text-cmd-muted',
+    inferred: 'border-amber-500/25 bg-amber-500/10 text-cmd-warn',
     unknown: 'border-cmd-border bg-cmd-black/60 text-cmd-muted',
   };
   return <span className={`rounded-full border px-2 py-0.5 text-[11px] ${styles[type]}`}>{type}</span>;
@@ -38,7 +38,7 @@ export function ValueTypeTag({ type }: { type: ExtractionValueType }) {
 function Confidence({ value }: { value: number | null }) {
   if (value === null || value === undefined) return null;
   const pct = Math.round(value * 100);
-  const tone = pct >= 90 ? 'text-emerald-300' : pct >= 70 ? 'text-amber-300' : 'text-red-300';
+  const tone = pct >= 90 ? 'text-cmd-good' : pct >= 70 ? 'text-cmd-warn' : 'text-cmd-bad';
   return <span className={`text-[11px] ${tone}`}>{pct}%</span>;
 }
 
@@ -157,7 +157,7 @@ export function InsurancePolicyReview({ extractions, onChange }: Props) {
                 nobody reads a dec page as a complete picture of coverage. */}
             {extraction.declarations_only && (
               <div className="mt-5 flex gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3">
-                <FileWarning className="mt-0.5 h-4 w-4 shrink-0 text-amber-300" />
+                <FileWarning className="mt-0.5 h-4 w-4 shrink-0 text-cmd-warn" />
                 <div className="text-sm text-amber-100/90">
                   <p className="font-semibold">Declarations page only</p>
                   <p className="mt-1 text-amber-100/70">
@@ -217,7 +217,7 @@ export function InsurancePolicyReview({ extractions, onChange }: Props) {
                       </p>
                       {/* Calculated exposure shown beside the stated percentage, never instead of it. */}
                       {d.calculated_amount !== null && (
-                        <p className="mt-1 text-xs text-sky-200">
+                        <p className="mt-1 text-xs text-cmd-muted">
                           ≈ {currency(d.calculated_amount)} on {d.calculation_basis}
                           <span className="text-cmd-muted"> (calculated)</span>
                         </p>
@@ -235,9 +235,9 @@ export function InsurancePolicyReview({ extractions, onChange }: Props) {
                   {severeExclusions.map((e) => (
                     <div key={e.id} className="rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3">
                       <div className="flex items-center gap-2">
-                        <AlertTriangle className="h-4 w-4 text-red-300" />
+                        <AlertTriangle className="h-4 w-4 text-cmd-bad" />
                         <span className="text-sm font-semibold text-cmd-offwhite">{titleCase(e.category)}</span>
-                        <span className="rounded-full border border-red-500/25 px-2 py-0.5 text-[11px] text-red-200">
+                        <span className="rounded-full border border-red-500/25 px-2 py-0.5 text-[11px] text-cmd-bad">
                           {e.severity}
                         </span>
                       </div>
@@ -271,7 +271,7 @@ export function InsurancePolicyReview({ extractions, onChange }: Props) {
             )}
 
             {error && (
-              <div className="mt-6 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+              <div className="mt-6 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-cmd-bad">
                 {error}
               </div>
             )}
@@ -290,7 +290,7 @@ export function InsurancePolicyReview({ extractions, onChange }: Props) {
                 type="button"
                 disabled={busy === extraction.id}
                 onClick={() => act(extraction.id, () => discardInsuranceExtraction(extraction.id))}
-                className="inline-flex items-center gap-2 rounded-xl border border-cmd-border px-5 py-2.5 text-sm font-medium text-cmd-muted transition hover:border-red-500/40 hover:text-red-200 disabled:opacity-40"
+                className="inline-flex items-center gap-2 rounded-xl border border-cmd-border px-5 py-2.5 text-sm font-medium text-cmd-muted transition hover:border-red-500/40 hover:text-cmd-bad disabled:opacity-40"
               >
                 <X className="h-4 w-4" /> Discard
               </button>

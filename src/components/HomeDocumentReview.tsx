@@ -73,7 +73,7 @@ export function HomeDocumentReview({ mortgageStatements, applianceExtractions, s
       </p>
 
       {error && (
-        <p className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-200">{error}</p>
+        <p className="mt-4 rounded-2xl border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-cmd-bad">{error}</p>
       )}
 
       <div className="mt-5 space-y-4">
@@ -118,7 +118,7 @@ export function HomeDocumentReview({ mortgageStatements, applianceExtractions, s
                 type="button"
                 disabled={busy === statement.id}
                 onClick={() => run(statement.id, () => discardMortgageStatement(statement.id))}
-                className={`${btn} border border-cmd-border text-cmd-muted hover:border-red-500/40 hover:text-red-200`}
+                className={`${btn} border border-cmd-border text-cmd-muted hover:border-red-500/40 hover:text-cmd-bad`}
               >
                 <X className="h-4 w-4" /> Discard
               </button>
@@ -225,7 +225,7 @@ export function HomeDocumentReview({ mortgageStatements, applianceExtractions, s
                   type="button"
                   disabled={busy === extraction.id}
                   onClick={() => run(extraction.id, () => discardApplianceExtraction(extraction.id))}
-                  className={`${btn} border border-cmd-border text-cmd-muted hover:border-red-500/40 hover:text-red-200`}
+                  className={`${btn} border border-cmd-border text-cmd-muted hover:border-red-500/40 hover:text-cmd-bad`}
                 >
                   <X className="h-4 w-4" /> Discard
                 </button>

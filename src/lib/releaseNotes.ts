@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '1.3.0',
+    date: '2026-09-30',
+    title: 'What renews, and what it really costs',
+    items: [
+      'A yearly premium was reporting twelve times its cost and a quarterly bill three times — the old arithmetic assumed everything was monthly. Cadence is now read from the gaps between charges.',
+      'Grouped by purpose with subtotals, so a mortgage and a streaming subscription stop being treated as the same kind of thing.',
+      'Keep or cut each one. Command\'s own reading says only what the transactions support — a price rise, a charge that stopped, or a bill that cannot be cancelled — and never claims something is unused, because it cannot know that.',
+    ],
+  },
+  {
     version: '1.2.1',
     date: '2026-09-30',
     title: 'Status colors that work on both themes',

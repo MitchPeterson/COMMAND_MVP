@@ -7,11 +7,11 @@ import { UnfiledDocuments } from '../components/UnfiledDocuments';
 import { FinancesHealth } from '../components/FinancesHealth';
 import { LoanList } from '../components/LoanList';
 import { OwnedThings } from '../components/OwnedThings';
-import { RecurringCharges } from '../components/RecurringCharges';
 import { TransactionImportPanel } from '../components/TransactionImportPanel';
 import { PeriodView } from '../components/PeriodView';
 import { ReviewQueue } from '../components/ReviewQueue';
 import { UploadsPanel } from '../components/UploadsPanel';
+import { RecurringPanel } from '../components/RecurringPanel';
 import { computeCoverage, type SourceRef } from '../lib/transactions/coverage';
 import { UNTRACKED_SECTION } from '../lib/supabase';
 import { availableCategories } from '../lib/transactions/taxonomy';
@@ -355,10 +355,14 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
             onChanged={refresh}
           />
           <SpendingInsights cashflow={cashflow} recurring={recurring} />
-          <RecurringCharges
-            transactions={transactions}
-            statements={data?.creditStatements ?? []}
-          />
+          {data?.household?.id && (
+            <RecurringPanel
+              householdId={data.household.id}
+              recurring={recurring}
+              rules={data?.counterpartyRules ?? []}
+              onChanged={refresh}
+            />
+          )}
           {data?.household?.id && (
             <UploadsPanel
               householdId={data.household.id}

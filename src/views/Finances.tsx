@@ -7,10 +7,9 @@ import { UnfiledDocuments } from '../components/UnfiledDocuments';
 import { FinancesHealth } from '../components/FinancesHealth';
 import { LoanList } from '../components/LoanList';
 import { OwnedThings } from '../components/OwnedThings';
-import { MonthlySpending } from '../components/MonthlySpending';
 import { RecurringCharges } from '../components/RecurringCharges';
 import { TransactionImportPanel } from '../components/TransactionImportPanel';
-import { CashflowOverview } from '../components/CashflowOverview';
+import { PeriodView } from '../components/PeriodView';
 import { SpendingInsights } from '../components/SpendingInsights';
 import { computeCashflow } from '../lib/cashflow';
 import { findRecurringCharges } from '../lib/recurring';
@@ -249,19 +248,19 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
 
       {tab === 'spending' && (
         <>
-          {/* The shape of the money first, then what it means, then the
-              detail. Someone who reads only the top of this tab should still
-              come away with the two figures that matter. */}
-          <CashflowOverview cashflow={cashflow} />
-          <SpendingInsights cashflow={cashflow} recurring={recurring} />
-          <MonthlySpending
+          {/* One period, and everything on the page about that period.
+              PeriodView replaces the cashflow card and the category breakdown,
+              which between them showed the same month twice with two framings
+              and no way to move between them. Insights and recurring stay
+              until their own rebuilds land -- removing them first would take
+              away something that works. */}
+          <PeriodView
+            cashflow={cashflow}
             transactions={transactions}
+            accounts={accounts}
             cards={data?.creditCards ?? []}
-            statements={data?.creditStatements ?? []}
-            budget={data?.budgetSummary ?? null}
           />
-          {/* Moved out of Credit Cards. A household has one set of spending,
-              not card spending and account spending. */}
+          <SpendingInsights cashflow={cashflow} recurring={recurring} />
           <RecurringCharges
             transactions={transactions}
             statements={data?.creditStatements ?? []}

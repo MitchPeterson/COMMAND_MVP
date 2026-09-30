@@ -26,6 +26,7 @@ import {
   addFinanceAccount, addCreditCardShell, applyTransferPairing, rulesToMaps,
   type CreditCard, type CounterpartyRuleRow, type FinanceAccount, type TransactionImportRow,
 } from '../lib/supabase';
+import { dateRangeFromFileName } from '../lib/transactions/coverage';
 import { SECURITY_ONE_LINER } from '../lib/securityPosture';
 
 interface Props {
@@ -377,6 +378,9 @@ export function TransactionImportPanel({
             adapter: view.adapter?.id ?? null,
           },
           adapterId: view.adapter?.id ?? null,
+          // What the export was meant to cover, which is what a gap is
+          // measured against. The row dates only say what happened to be in it.
+          filenamePeriod: dateRangeFromFileName(entry.file.name),
           rowCount: view.totalRows,
           skippedCount: view.skipped.length,
         },

@@ -12,6 +12,7 @@
 // useful than a confident pie chart of the third.
 
 import type { CreditCard, CreditStatement, CreditTransaction } from './supabase';
+import { categoryFromLabel } from './transactions/taxonomy';
 
 export interface CategorySpend {
   category: string;
@@ -45,34 +46,6 @@ export interface SpendingCoverage {
   inferredShare: number;
 }
 
-// Issuer categories, model categories and hand entry all arrive with different
-// spellings for the same thing. Matched on substrings rather than mapped
-// exactly, because the list of issuer category names is long and changes.
-const GROUPS: Array<{ code: string; label: string; match: string[] }> = [
-  { code: 'groceries', label: 'Groceries', match: ['grocer', 'supermarket', 'food & drink'] },
-  { code: 'dining', label: 'Dining and takeout', match: ['dining', 'restaurant', 'bar', 'coffee'] },
-  { code: 'travel', label: 'Travel', match: ['travel', 'airline', 'hotel', 'lodging', 'air '] },
-  { code: 'gas', label: 'Fuel', match: ['gas', 'fuel', 'service station'] },
-  { code: 'transport', label: 'Transport', match: ['transit', 'parking', 'rideshare', 'toll', 'auto'] },
-  { code: 'utilities', label: 'Utilities', match: ['utilit', 'electric', 'internet', 'phone', 'cable'] },
-  { code: 'health', label: 'Health and medical', match: ['health', 'medical', 'pharmac', 'dental', 'vision'] },
-  { code: 'shopping', label: 'Shopping', match: ['shop', 'retail', 'merchandise', 'department', 'amazon'] },
-  // Before the 'home' group, so a home loan is a loan rather than a trip to
-  // the hardware store. Without these the mortgage was the single largest
-  // thing in "Everything else", which made that bucket 46% of the chart and
-  // the category breakdown useless.
-  { code: 'housing', label: 'Housing and loans', match: ['mortgage', 'loan', 'rent', 'heloc', 'lease'] },
-  { code: 'taxes', label: 'Taxes', match: ['tax'] },
-  { code: 'home', label: 'Home and improvement', match: ['home', 'hardware', 'furnish', 'garden', 'improvement'] },
-  { code: 'home_services', label: 'Home services', match: ['home_services', 'contractor', 'repair', 'lawn'] },
-  { code: 'education', label: 'Education and childcare', match: ['education', 'school', 'tuition', 'childcare', 'camp'] },
-  { code: 'entertainment', label: 'Entertainment', match: ['entertain', 'streaming', 'subscription', 'recreation'] },
-  { code: 'charitable', label: 'Charitable giving', match: ['charit', 'donation', 'nonprofit'] },
-  { code: 'insurance', label: 'Insurance', match: ['insur'] },
-  { code: 'fees', label: 'Fees and interest', match: ['fee', 'interest', 'finance charge'] },
-  { code: 'cash', label: 'Cash advances', match: ['cash advance', 'atm'] },
-];
-
 /**
  * Whether a transaction is something the household has accepted as true.
  *
@@ -93,13 +66,6 @@ export function isAcceptedTransaction(
 ): boolean {
   if (t.statement_id == null) return true;
   return !acceptedStatementIds || acceptedStatementIds.has(t.statement_id);
-}
-
-export function categoryGroup(raw: string | null | undefined): { code: string; label: string } {
-  const value = (raw ?? '').toLowerCase().trim();
-  if (!value) return { code: 'uncategorized', label: 'Not categorized' };
-  const hit = GROUPS.find((g) => g.match.some((m) => value.includes(m)));
-  return hit ? { code: hit.code, label: hit.label } : { code: 'other', label: 'Everything else' };
 }
 
 /**
@@ -177,7 +143,7 @@ export function monthlySpending(
         if (signed < 0) refunds += amount;
         total += signed;
 
-        const group = categoryGroup(t.category);
+        const group = categoryFromLabel(t.category);
         const held = buckets.get(group.code) ?? {
           category: group.code, label: group.label, amount: 0, share: 0, count: 0, inferred: false,
         };

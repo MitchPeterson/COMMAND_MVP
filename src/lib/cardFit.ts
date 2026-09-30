@@ -21,7 +21,7 @@
 // it for that reason.
 
 import type { CreditCard, CreditTransaction } from './supabase';
-import { categoryGroup } from './spending';
+import { categoryFromLabel } from './transactions/taxonomy';
 
 export const CATALOG_AS_OF = '2026-08';
 
@@ -205,7 +205,7 @@ export function analyzeStatementFit(
   const totals: CategoryTotals = {};
   for (const t of transactions) {
     if (t.direction !== 'charge' || t.amount == null) continue;
-    const group = categoryGroup(t.category);
+    const group = categoryFromLabel(t.category);
     // Fees, interest and cash advances are not purchases and earn nothing.
     if (['fees', 'cash'].includes(group.code)) continue;
     totals[group.code] = (totals[group.code] ?? 0) + Number(t.amount);
@@ -237,7 +237,7 @@ export function analyzeStatementFit(
       if (bestHeldCard && bestHeldRate > usedRate) {
         misallocation.push({
           category,
-          label: categoryGroup(category).label,
+          label: categoryFromLabel(category).label,
           amount,
           usedRate,
           bestHeldRate,
@@ -319,7 +319,7 @@ export interface CardAssessment {
   feeExceedsBonusValue: boolean;
 }
 
-const labelFor = (code: string) => categoryGroup(code).label;
+const labelFor = (code: string) => categoryFromLabel(code).label;
 
 export function assessCard(profile: EarnProfile, totals: CategoryTotals): CardAssessment {
   const monthly = earnOn(profile, totals, 1);

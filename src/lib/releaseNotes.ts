@@ -25,6 +25,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.61.0',
+    date: '2026-09-30',
+    title: 'One category list instead of four',
+    items: [
+      'Command had four category lists that only agreed by coincidence — one for grouping, one for importing, one for deciding what counts as a bill, one for deciding what can be cancelled. They are one list now, and a category carries its own answers.',
+      'Categories have a kind: income, expense, savings or transfer.',
+      'Home services was unreachable for its whole existence, shadowed by Home. It works now.',
+      'Merchants paid through Square, Toast or PayPal were mis-grouped — the processor name was kept and the merchant\'s own name thrown away. Fixed.',
+    ],
+  },
+  {
     version: '0.60.4',
     date: '2026-09-30',
     title: 'Groundwork for categories you can change',

@@ -202,7 +202,11 @@ describe('categorize', () => {
     ['NETFLIX.COM 866-579-7172', 'Entertainment'],
     ['XCEL ENERGY AUTOPAY', 'Utilities'],
     ['HOME DEPOT #2841', 'Home and improvement'],
-    ['MORTGAGE PAYMENT WELLS FARGO', 'Loan payments'],
+    // DELIBERATE CHANGE: was 'Loan payments'. The rule label and the group
+    // label used to be two different names for one thing -- 'Loan payments'
+    // for the importer, 'Housing and loans' for the chart. There is one
+    // category now, so there is one name. The grouping is unchanged.
+    ['MORTGAGE PAYMENT WELLS FARGO', 'Housing and loans'],
   ])('puts %s in %s', (description, expected) => {
     expect(categorize(description)).toBe(expected);
   });

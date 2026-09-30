@@ -1,46 +1,16 @@
 // What the category normalizer and the monthly roll-up do today.
 //
-// `categoryGroup` is a read-time normalizer over free text: the importer
-// writes a label chosen so that this function's substring list happens to
-// match it. That coupling is the thing a later phase replaces, so it is
-// pinned here first.
+// The category normalizer that used to live here is gone: it is
+// transactions/taxonomy.ts now, and the coupling it had with the importer's
+// label list -- a comment, not a type -- went with it.
 
 import { describe, expect, it } from 'vitest';
-import { categoryGroup, isAcceptedTransaction, monthlySpending, coverageAgainstBudget } from './spending';
+import { isAcceptedTransaction, monthlySpending, coverageAgainstBudget } from './spending';
 import { statement, txn } from './testFactory';
 
-describe('categoryGroup', () => {
-  it.each([
-    ['Groceries', 'groceries'],
-    ['Dining and takeout', 'dining'],
-    ['Merchandise & Supplies-Groceries', 'groceries'],  // an issuer's own wording
-    ['Travel-Airline', 'travel'],
-    ['Loan payments', 'housing'],
-    ['Fees and interest', 'fees'],
-  ])('puts %j in %j', (input, code) => {
-    expect(categoryGroup(input).code).toBe(code);
-  });
-
-  it('separates "not categorized" from "everything else"', () => {
-    // Load-bearing: nothing-was-read and read-but-unrecognised are different
-    // states, and the UI says so.
-    expect(categoryGroup('').code).toBe('uncategorized');
-    expect(categoryGroup(null).code).toBe('uncategorized');
-    expect(categoryGroup('ZZQQ').code).toBe('other');
-  });
-
-  it('matches housing before home, so a mortgage is not a hardware run', () => {
-    expect(categoryGroup('mortgage').code).toBe('housing');
-  });
-
-  it('KNOWN DEFECT: home_services is unreachable, shadowed by home', () => {
-    // 'home_services' contains 'home', and the home group is tested first, so
-    // the home_services group can never be reached. Pinned deliberately: the
-    // taxonomy phase has to fix this on purpose rather than by accident.
-    expect(categoryGroup('home_services').code).toBe('home');
-    expect(categoryGroup('contractor').code).toBe('home_services');
-  });
-});
+// The categoryGroup tests moved to transactions/taxonomy.test.ts along with
+// the function itself. The KNOWN DEFECT one went with them and is now a FIXED
+// one: home_services is reachable at last.
 
 describe('isAcceptedTransaction', () => {
   it('always accepts an imported row, which has no statement to confirm', () => {

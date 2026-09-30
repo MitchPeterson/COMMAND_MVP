@@ -19,6 +19,7 @@
 // printed above the preview.
 
 import type { SheetGrid } from './transactionFile';
+import { categoryFromDescription } from './transactions/taxonomy';
 
 export type ColumnRole =
   | 'date' | 'posted_date' | 'description' | 'amount' | 'debit' | 'credit'
@@ -444,41 +445,16 @@ export function classifyFlow(description: string, amount: number, sourceKind: 'b
  * category_source 'rule_matched': the household should be able to see that
  * "Groceries" against SUPERVALU was a keyword and not a judgement.
  */
-/*
- * Each pattern ends `(?:'?s)?\b` rather than plain `\b`.
+/**
+ * The category a merchant description names.
  *
- * A trailing word boundary cannot match a plural or a possessive, so
- * `\btrader joe\b` does not match TRADER JOES -- and the store went into
- * "Everything else" along with MCDONALDS, WENDYS and KROGERS. The optional
- * possessive still refuses a real prefix collision: `\bgas(?:'?s)?\b` does
- * not match GASKET.
+ * Was CATEGORY_RULES, eighteen label/regex pairs whose labels were chosen so
+ * that spending.ts's separate substring list would happen to catch them. The
+ * patterns live on the categories themselves now, so there is no second list
+ * to keep in step and no label to get wrong.
  */
-const CATEGORY_RULES: Array<[string, RegExp]> = [
-  ['Groceries', /\b(grocer|supermarket|safeway|kroger|publix|aldi|lidl|trader joe|whole foods|wegmans|heb\b|meijer|hy-vee|hyvee|food lion|giant eagle|sprouts|costco|sam'?s club|bj'?s wholesale|cub foods|albertsons|winco|fresh market|market basket)(?:'?s)?\b/i],
-  ['Dining and takeout', /\b(restaurant|cafe|café|coffee|starbucks|dunkin|peet'?s|mcdonald|burger|pizza|taco|chipotle|subway|panera|chick-?fil-?a|wendy|kfc|popeyes|doordash|ubereats|uber eats|grubhub|postmates|seamless|deli|bistro|grill|diner|brewery|tavern|pub\b|bar &|sushi|thai|ramen|bakery|ice cream|smoothie|juice)(?:'?s)?\b/i],
-  ['Travel', /\b(airlines?|delta air|united air|american air|southwest|jetblue|alaska air|spirit air|frontier air|hotel|marriott|hilton|hyatt|ihg|airbnb|vrbo|booking\.com|expedia|priceline|kayak|travelocity|cruise|amtrak|rental car|hertz|avis|enterprise rent|budget rent|national car|tsa pre|global entry|resort|lodge|inn\b)(?:'?s)?\b/i],
-  ['Fuel', /\b(shell|exxon|mobil|chevron|bp\b|texaco|sunoco|citgo|marathon|speedway|circle k|wawa|sheetz|quiktrip|racetrac|pilot travel|loves travel|holiday stationstore|kwik trip|fuel|gas station|gasoline)(?:'?s)?\b/i],
-  ['Transport', /\b(uber|lyft|taxi|cab\b|transit|metro card|metrocard|subway fare|parking|park ?mobile|spothero|toll|ez ?pass|fastrak|bike share|scooter|dmv|registration fee|car wash|jiffy lube|valvoline|midas|firestone|discount tire|auto ?zone|advance auto|o'?reilly auto|napa auto|mechanic|body shop)(?:'?s)?\b/i],
-  ['Utilities', /\b(electric|energy|power co|gas company|water|sewer|utility|utilities|xcel|comed|duke energy|pg&e|pge\b|con ?ed|national grid|centerpoint|dominion|waste management|republic services|trash|recycling|comcast|xfinity|spectrum|cox communications|at&?t|verizon|t-?mobile|sprint|centurylink|frontier comm|internet|broadband|wireless)(?:'?s)?\b/i],
-  ['Health and medical', /\b(pharmacy|cvs|walgreens|rite aid|medical|clinic|hospital|health|dental|dentist|orthodont|optometr|vision center|lenscrafters|warby|physician|doctor|urgent care|labcorp|quest diagnostic|therapy|therapist|chiroprac|dermatolog|pediatric|radiology|surgery|copay|prescription)(?:'?s)?\b/i],
-  ['Insurance', /\b(insurance|insur|geico|state farm|progressive|allstate|usaa|farmers ins|nationwide|liberty mutual|travelers|aflac|metlife|prudential|policy premium|premium payment)(?:'?s)?\b/i],
-  ['Education and childcare', /\b(school|tuition|university|college|campus|bookstore|childcare|child care|daycare|day care|preschool|montessori|kindercare|bright horizons|tutor|kumon|summer camp|student loan|scholarship|pta\b|529\b)(?:'?s)?\b/i],
-  ['Entertainment', /\b(netflix|hulu|disney\+?|disneyplus|hbo|max\.com|paramount\+|peacock|apple tv|spotify|pandora|youtube|twitch|steam ?games|playstation|xbox|nintendo|epic games|cinema|movie|theat(er|re)|amc \d|regal cinemas|concert|ticketmaster|stubhub|live nation|museum|zoo\b|golf|gym|fitness|planet fitness|24 hour fitness|lifetime fitness|peloton|yoga|club membership|recreation)(?:'?s)?\b/i],
-  ['Shopping', /\b(amazon|amzn|walmart|target|best buy|home ?goods|tj ?maxx|marshalls|ross stores|kohl'?s|macy'?s|nordstrom|old navy|gap\b|h&m|zara|uniqlo|lululemon|nike|adidas|rei\b|dick'?s sporting|bass pro|etsy|ebay|wayfair|overstock|shein|temu|apple\.com|apple store|microsoft store|google store|department store|boutique|retail)(?:'?s)?\b/i],
-  ['Home and improvement', /\b(home depot|lowe'?s|menards|ace hardware|true value|hardware|ikea|furniture|mattress|wayfair|sherwin|benjamin moore|paint|garden|nursery|landscap|lawn|tree service|pest control|terminix|orkin|plumb|electrician|hvac|roofing|contractor|handyman|cleaning service|maid|hoa\b|homeowners assoc|storage unit|public storage)(?:'?s)?\b/i],
-  ['Charitable giving', /\b(donation|donate|charity|charitable|foundation|red cross|united way|goodwill|salvation army|church|synagogue|mosque|temple|ministry|nonprofit|npo\b|gofundme|tithe)(?:'?s)?\b/i],
-  ['Fees and interest', /\b(interest charge|finance charge|annual fee|late fee|overdraft fee|nsf fee|service charge|maintenance fee|atm fee|foreign transaction|wire fee|monthly fee|account fee|returned item|penalty)(?:'?s)?\b/i],
-  ['Cash advances', /\b(atm|cash advance|cash withdrawal|withdrawal atm)(?:'?s)?\b/i],
-  ['Taxes', /\b(irs\b|internal revenue|dept of revenue|department of revenue|tax payment|estimated tax|property tax|franchise tax)(?:'?s)?\b/i],
-  ['Loan payments', /\b(mortgage|loan payment|auto loan|car payment|student loan|lending|heloc|line of credit|principal and interest)(?:'?s)?\b/i],
-  ['Subscriptions', /\b(subscription|renewal|membership|monthly plan|annual plan|prime membership|icloud|dropbox|adobe|microsoft 365|office 365|notion|slack|zoom\.us|chatgpt|openai|anthropic|claude)(?:'?s)?\b/i],
-];
-
 export function categorize(description: string): string | null {
-  for (const [label, pattern] of CATEGORY_RULES) {
-    if (pattern.test(description)) return label;
-  }
-  return null;
+  return categoryFromDescription(description)?.label ?? null;
 }
 
 // ============================================================

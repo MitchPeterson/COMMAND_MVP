@@ -6,7 +6,7 @@
 // payment was the largest "recurring charge" a household had.
 
 import { describe, expect, it } from 'vitest';
-import { findRecurringCharges, merchantKey } from './recurring';
+import { findRecurringCharges } from './recurring';
 import { txn } from './testFactory';
 
 /** The same merchant charged on the 6th of each listed month. */
@@ -20,16 +20,11 @@ const monthly = (merchant: string, amounts: Array<[string, number]>, over = {}) 
     ...over,
   }));
 
-describe('merchantKey', () => {
-  it('strips store numbers, cities and reference codes', () => {
-    expect(merchantKey('STARBUCKS STORE 08812')).toBe('starbucks store');
-    expect(merchantKey('AMAZON.COM*RT4R21')).toBe('amazon com');
-  });
-
-  it('gives two months of the same charge the same key', () => {
-    expect(merchantKey('NETFLIX.COM 866-579-7172')).toBe(merchantKey('NETFLIX.COM 800-111-2222'));
-  });
-});
+// merchantKey moved to transactions/counterparty.ts and is tested there. It
+// also got better on the way: STARBUCKS STORE 08812 now keys as "starbucks"
+// rather than "starbucks store", so it matches STARBUCKS #4821 -- and the
+// processor-prefix bug that turned TST* HANNAH BISTRO into "tst bistro" is
+// gone.
 
 describe('recurrence tests', () => {
   it('finds a charge that is the same amount every month', () => {

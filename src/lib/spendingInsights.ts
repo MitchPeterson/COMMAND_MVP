@@ -19,6 +19,7 @@
 import type { Cashflow } from './cashflow';
 import { overdraftCharges } from './cashflow';
 import type { RecurringSummary } from './recurring';
+import { categoryFromLabel } from './transactions/taxonomy';
 import type { FinanceFinding } from './financesHealth';
 
 export interface SpendingInsights {
@@ -52,19 +53,13 @@ const pct = (value: number) => `${Math.round(value)}%`;
 /**
  * Whether a recurring cost is one the household could stop paying next month.
  *
- * A mortgage, an insurance premium and the electricity bill recur exactly as
- * reliably as a streaming subscription, and nothing that can be said about one
- * applies to the other. Matched on substrings because the category can arrive
- * from the issuer, from a keyword rule or from the user, and all three spell
- * it differently.
+ * Was COMMITTED, a thirteen-entry substring list. A property of the category
+ * now, for the same reason: a mortgage, an insurance premium and the
+ * electricity bill recur exactly as reliably as a streaming subscription, and
+ * nothing that can be said about one applies to the other.
  */
-const COMMITTED = [
-  'housing', 'loan', 'mortgage', 'rent', 'insur', 'utilit', 'tax',
-  'health', 'medical', 'education', 'childcare', 'tuition', 'fee',
-];
-
 const isCommitted = (category: string | null | undefined) =>
-  COMMITTED.some((c) => (category ?? '').toLowerCase().includes(c));
+  categoryFromLabel(category).committed === true;
 
 export function computeSpendingInsights(
   cashflow: Cashflow,

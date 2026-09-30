@@ -16,6 +16,11 @@
 
 import type { CreditStatement, CreditTransaction } from './supabase';
 import { isAcceptedTransaction } from './spending';
+import { categoryFromLabel } from './transactions/taxonomy';
+import { merchantKey } from './transactions/counterparty';
+
+// Re-exported for the callers that have always imported it from here.
+export { merchantKey };
 
 export interface RecurringCharge {
   merchant: string;
@@ -98,41 +103,18 @@ export interface RecurringSummary {
 const AUTOPAY_MARKERS = /\b(autopay|auto pay|auto-pay|recurring|automatic payment|subscription)\b/i;
 
 /**
- * Categories where a charge that repeats for a different amount each month is a
- * bill rather than a coincidence.
+ * Whether a varying repeat in this category is a bill or a coincidence.
  *
- * Without this, two flights bought in different months read as a subscription:
- * the demo statement has Delta in June and again in July, and the first version
- * called that a recurring charge costing $10,234 a year. Travel, dining and
- * retail repeat because people shop, not because anything renews.
+ * Was BILL_CATEGORIES, a fourteen-entry substring list matched against the
+ * category string. It is a property of the category now, so it cannot drift
+ * out of step with the category list beside it.
+ *
+ * The reason it exists is unchanged: without it two flights in two months read
+ * as a subscription. The demo statement had Delta in June and again in July,
+ * and the first version called that a recurring charge costing $10,234 a year.
  */
-const BILL_CATEGORIES = [
-  'utilit', 'insur', 'subscription', 'phone', 'internet', 'cable', 'telecom',
-  'streaming', 'membership', 'rent', 'mortgage', 'loan', 'tuition', 'childcare',
-];
-
 const looksLikeABill = (category: string | null | undefined) =>
-  BILL_CATEGORIES.some((c) => (category ?? '').toLowerCase().includes(c));
-
-/**
- * Merchant names carry store numbers, cities and reference codes that change
- * between months while the merchant does not. Stripped so two months of the same
- * charge recognise each other.
- */
-export function merchantKey(description: string): string {
-  return description
-    .toLowerCase()
-    .replace(/\b(autopay|auto pay|recurring|payment|purchase)\b/g, ' ')
-    // Trailing reference and store numbers, and the *ABC1234 form.
-    .replace(/[*#]\s*[a-z0-9]{3,}/g, ' ')
-    .replace(/\b\d{3,}\b/g, ' ')
-    .replace(/[^a-z\s]/g, ' ')
-    .split(/\s+/)
-    .filter((w) => w.length > 2)
-    .slice(0, 3)
-    .join(' ')
-    .trim();
-}
+  categoryFromLabel(category).variable === true;
 
 const money = (value: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);

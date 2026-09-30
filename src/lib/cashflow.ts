@@ -23,8 +23,9 @@
 //      savings rate is withheld until income looks like income.
 
 import type { CreditTransaction } from './supabase';
-import { categoryGroup, isAcceptedTransaction } from './spending';
-import { merchantKey } from './recurring';
+import { isAcceptedTransaction } from './spending';
+import { categoryFromLabel } from './transactions/taxonomy';
+import { merchantKey } from './transactions/counterparty';
 import type { CreditStatement } from './supabase';
 
 export interface MonthFlow {
@@ -229,7 +230,7 @@ export function computeCashflow(
     if (flow !== 'expense' && flow !== 'refund') continue;
 
     const signed = flow === 'refund' ? -amount : amount;
-    const group = categoryGroup(t.category);
+    const group = categoryFromLabel(t.category);
     const bucket = categories.get(group.code)
       ?? { code: group.code, label: group.label, amount: 0, share: 0, count: 0 };
     bucket.amount += signed;
@@ -309,7 +310,7 @@ export function computeCashflow(
   if (recent && prior) {
     const sumFor = (month: MonthFlow, code: string) => rows
       .filter((t) => (t.transaction_date ?? '').startsWith(month.month)
-        && flowOf(t) === 'expense' && categoryGroup(t.category).code === code)
+        && flowOf(t) === 'expense' && categoryFromLabel(t.category).code === code)
       .reduce((s, t) => s + Math.abs(Number(t.amount) || 0), 0);
     for (const c of categoryList) {
       const a = sumFor(recent, c.code);

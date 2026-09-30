@@ -4689,6 +4689,8 @@ export interface CounterpartyRuleRow {
   /** Null when the rule only recategorizes. */
   display_name: string | null;
   applied_count: number;
+  /** Keep or cut a recurring charge. Null is undecided, which is not "keep". */
+  recurring_decision?: 'keep' | 'cut' | null;
   created_at: string;
   updated_at: string;
 }
@@ -5099,4 +5101,27 @@ export async function dismissUntrackedSource(
     title: name,
     snoozedUntil: null,
   });
+}
+
+/**
+ * What the household decided about a recurring charge.
+ *
+ * Null clears the decision rather than meaning "keep". The two are different:
+ * one is an answer and the other is a question still open, and the count of
+ * outstanding decisions depends on telling them apart.
+ */
+export async function setRecurringDecision(
+  householdId: string,
+  counterpartyKey: string,
+  decision: 'keep' | 'cut' | null,
+): Promise<void> {
+  const { error } = await supabase
+    .from('counterparty_rules')
+    .upsert({
+      household_id: householdId,
+      counterparty_key: counterpartyKey,
+      recurring_decision: decision,
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'household_id,counterparty_key' });
+  if (error) throw new Error(`Could not save that: ${error.message}`);
 }

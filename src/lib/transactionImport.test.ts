@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { parseDelimited, detectDelimiter, excelSerialToISO } from './transactionFile';
 import {
   findHeaderRow, mapColumns, detectDateOrder, parseDate, parseAmount,
-  classifyFlow, categorize, fingerprintRow, hintFromFileName, readTransactions,
+  categorize, hintFromFileName, readTransactions,
 } from './transactionImport';
 
 const grid = (csv: string) => ({
@@ -165,32 +165,14 @@ describe('header detection', () => {
 
 // ─── Flow ───────────────────────────────────────────────────────────────────
 
-describe('classifyFlow', () => {
-  it('does not treat a credit on a card as income', () => {
-    // The spec case: returns must not inflate income.
-    expect(classifyFlow('SOME MERCHANT', 50, 'card')).toBe('refund');
-    expect(classifyFlow('SOME MERCHANT', 50, 'bank')).toBe('income');
-  });
-
-  it('reads a payroll deposit as income', () => {
-    expect(classifyFlow('ACME CORP DIRECT DEP PPD', 5240, 'bank')).toBe('income');
-  });
-
-  it('reads a payment aimed at a card as a transfer, either direction', () => {
-    expect(classifyFlow('Payment to Chase card ending 4417', -1200, 'bank')).toBe('transfer');
-    expect(classifyFlow('ONLINE PAYMENT - THANK YOU', 1500, 'card')).toBe('transfer');
-  });
-
-  it('does not treat a bare AUTOPAY as a transfer', () => {
-    // An autopaid utility bill is an expense. A looser pattern once removed
-    // every autopaid bill from the household's spending.
-    expect(classifyFlow('XCEL ENERGY AUTOPAY', -188.42, 'bank')).toBe('expense');
-  });
-
-  it('reads a move between the household own accounts as a transfer', () => {
-    expect(classifyFlow('Transfer to Savings 9921', -800, 'bank')).toBe('transfer');
-  });
-});
+// The classifyFlow tests moved to transactions/classify.test.ts with the
+// function. Two of them changed there on purpose and say so:
+//
+//   a credit on a card is 'expense' now, not 'refund' -- direction already
+//   carries the sign, so a fourth flow value only meant "expense, backwards"
+//
+//   money leaving toward savings is 'savings', not 'transfer' -- the arriving
+//   half stays a transfer, which is what stops the same $800 counting twice
 
 // ─── Categories (today's behavior, pre-unification) ─────────────────────────
 
@@ -222,26 +204,9 @@ describe('categorize', () => {
 
 // ─── Fingerprints ───────────────────────────────────────────────────────────
 
-describe('fingerprintRow', () => {
-  it('gives two identical rows on one day different identities', () => {
-    // Two coffees at the same shop for the same price is two transactions.
-    const a = fingerprintRow('Chase checking', '2026-09-14', 'STARBUCKS', -6.85, 1);
-    const b = fingerprintRow('Chase checking', '2026-09-14', 'STARBUCKS', -6.85, 2);
-    expect(a).not.toBe(b);
-  });
-
-  it('is stable across runs, so a re-import recognises what is already on file', () => {
-    const a = fingerprintRow('Chase checking', '2026-09-14', 'STARBUCKS', -6.85, 1);
-    const b = fingerprintRow('Chase checking', '2026-09-14', 'STARBUCKS', -6.85, 1);
-    expect(a).toBe(b);
-  });
-
-  it('separates the same charge on two different accounts', () => {
-    const a = fingerprintRow('Chase checking', '2026-09-14', 'STARBUCKS', -6.85, 1);
-    const b = fingerprintRow('Amex gold', '2026-09-14', 'STARBUCKS', -6.85, 1);
-    expect(a).not.toBe(b);
-  });
-});
+// The fingerprint tests moved to transactions/fingerprint.test.ts along with
+// the function, which also learned to prefer the bank's own row id where the
+// export carries one.
 
 describe('overlapping re-import', () => {
   it('produces identical fingerprints for the rows two exports share', () => {

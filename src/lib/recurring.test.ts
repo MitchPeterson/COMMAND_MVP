@@ -126,3 +126,14 @@ describe('annual cost', () => {
     expect(found.charges[0].annualCost).toBeCloseTo(450, 0); // (75 / 2) * 12
   });
 });
+
+describe('savings is not a subscription', () => {
+  it('leaves a standing order into savings out of the recurring list', () => {
+    // It repeats every month and renews nothing. Listing it as a recurring
+    // charge would put "consider cutting" against the household saving money.
+    const found = findRecurringCharges(monthly('Transfer to Savings 9921', [
+      ['2026-06', 800], ['2026-07', 800], ['2026-08', 800],
+    ], { flow: 'savings' }));
+    expect(found.charges).toHaveLength(0);
+  });
+});

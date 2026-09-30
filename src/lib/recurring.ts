@@ -136,8 +136,10 @@ export function findRecurringCharges(
       && isAcceptedTransaction(t, accepted)
       // A transfer repeats every month and renews nothing. Without this, the
       // monthly card payment out of checking is the largest "subscription"
-      // the household has.
-      && t.flow !== 'transfer' && t.flow !== 'income',
+      // the household has -- and once savings became a kind of its own, a
+      // standing order into a savings account was the second largest. Neither
+      // is a charge, and neither is something to consider cutting.
+      && t.flow !== 'transfer' && t.flow !== 'income' && t.flow !== 'savings',
   );
 
   const groups = new Map<string, CreditTransaction[]>();

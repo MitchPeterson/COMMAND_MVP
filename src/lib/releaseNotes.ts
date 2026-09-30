@@ -25,6 +25,18 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.62.0',
+    date: '2026-09-30',
+    title: 'Command can be taught, and knows the formats',
+    items: [
+      'Correct a merchant once and the correction sticks — a taught rule now outranks even the bank\'s own category, because you already fixed this merchant by hand.',
+      'Known export formats are recognised by their header row, never the file name. That matters most for the sign: a Chase card writes a purchase as negative and an Amex as positive, and nothing in a header says so.',
+      'Where an export carries the bank\'s own transaction id, that is used as the identity — so a charge that gets restated between pending and posted is still one transaction.',
+      'Money moved toward savings counts as saved rather than as a transfer, and the arriving half is left out so the same money is never counted twice.',
+      'Rows Command could not place are flagged with a reason — a check, a payment to a person, or an honest "could not tell" — instead of being filed under Everything else.',
+    ],
+  },
+  {
     version: '0.61.0',
     date: '2026-09-30',
     title: 'One category list instead of four',

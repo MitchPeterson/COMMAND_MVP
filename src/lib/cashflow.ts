@@ -44,7 +44,7 @@ export interface MonthFlow {
    * rows a classifier or a person marked as savings; nothing infers it yet.
    */
   savings: number;
-  /** Income less expenses, refunds included. Transfers never touch this. */
+  /** Income less expenses. Expenses are already net of refunds. */
   net: number;
   transactionCount: number;
   /**
@@ -147,16 +147,31 @@ const daysIn = (month: string) => {
  * flow column, so they are read the way Credit has always read them: a charge
  * is spending, and a credit is a payment to the card or a refund.
  */
-export type ComputedFlow = 'expense' | 'income' | 'savings' | 'transfer' | 'refund';
+export type ComputedFlow = 'expense' | 'income' | 'savings' | 'transfer';
 
+/**
+ * What a transaction did with the money.
+ *
+ * Imported rows say so outright. Rows read off a card statement predate the
+ * flow column, so they are read the way Credit has always read them: a charge
+ * is spending, and a credit is either the bill being paid or a refund.
+ *
+ * A refund resolves to 'expense'. It carries direction 'credit', so the sign
+ * is already right and it nets against the category it came from -- which is
+ * what a refund does. The refunded figure is still reported; it is derived
+ * from direction rather than from a flow value of its own.
+ */
 export function flowOf(t: CreditTransaction): ComputedFlow {
-  if (t.flow) return t.flow;
+  // 'refund' is gone from the schema, but a row written before it went could
+  // still be carrying it in memory.
+  if (t.flow && t.flow !== 'refund') return t.flow;
+  if (t.flow === 'refund') return 'expense';
   if (t.direction === 'charge') return 'expense';
   const merchant = (t.merchant_description ?? '').toLowerCase();
   const category = (t.category ?? '').toLowerCase();
   const isPayment = category.includes('payment')
     || /payment\s*-?\s*thank\s*you|online payment|autopay|electronic payment/.test(merchant);
-  return isPayment ? 'transfer' : 'refund';
+  return isPayment ? 'transfer' : 'expense';
 }
 
 /** Fees and interest, which are worth naming separately from the category they sit in. */
@@ -220,16 +235,23 @@ export function computeCashflow(
         cardPaymentCount += 1;
       }
     }
-    else if (flow === 'refund') { held.refunds += amount; }
-    else { held.expenses += amount; totalExpenses += amount; }
+    else {
+      // Signed by direction: a credit in an expense category is a refund, and
+      // it reduces what was spent in that category rather than sitting in a
+      // total of its own.
+      const signed = t.direction === 'credit' ? -amount : amount;
+      held.expenses += signed;
+      totalExpenses += signed;
+      if (signed < 0) held.refunds += amount;
+    }
     byMonth.set(month, held);
 
     // Only spending is categorized. A paycheck in "Income" and a card payment
     // in "Transfers" would be the two largest categories on the chart and say
     // nothing about where the money went.
-    if (flow !== 'expense' && flow !== 'refund') continue;
+    if (flow !== 'expense') continue;
 
-    const signed = flow === 'refund' ? -amount : amount;
+    const signed = t.direction === 'credit' ? -amount : amount;
     const group = categoryFromLabel(t.category);
     const bucket = categories.get(group.code)
       ?? { code: group.code, label: group.label, amount: 0, share: 0, count: 0 };
@@ -252,7 +274,7 @@ export function computeCashflow(
     merchant.count += 1;
     merchants.set(key, merchant);
 
-    if (flow === 'expense' && FEE_PATTERN.test(name)) {
+    if (signed > 0 && FEE_PATTERN.test(name)) {
       feeTotal += amount;
       feeCount += 1;
       const fee = feeItems.get(key) ?? { merchant: name, amount: 0, count: 0, category: group.label };
@@ -260,11 +282,11 @@ export function computeCashflow(
       fee.count += 1;
       feeItems.set(key, fee);
     }
-    if (flow === 'expense' && group.code === 'cash') { advanceTotal += amount; advanceCount += 1; }
+    if (signed > 0 && group.code === 'cash') { advanceTotal += amount; advanceCount += 1; }
   }
 
   const months = [...byMonth.values()]
-    .map((m) => ({ ...m, net: m.income - m.expenses + m.refunds }))
+    .map((m) => ({ ...m, net: m.income - m.expenses }))
     .sort((a, b) => b.month.localeCompare(a.month));
 
   // Which months are only partly covered. The first and last month of the data

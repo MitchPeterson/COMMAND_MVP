@@ -4432,9 +4432,16 @@ export interface ImportableTransaction {
   description: string;
   /** Signed so that negative is money leaving. */
   amount: number;
-  flow: 'expense' | 'income' | 'transfer' | 'refund';
+  flow: 'expense' | 'income' | 'savings' | 'transfer';
+  /** The taxonomy code. `category` is its label, kept for display. */
+  categoryCode: string;
   category: string;
-  categorySource: 'issuer_provided' | 'rule_matched';
+  categorySource: 'user_set' | 'issuer_provided' | 'rule_matched';
+  counterpartyKey: string;
+  counterpartyName: string;
+  sourceRecordId: string | null;
+  reviewState: 'none' | 'needs_review';
+  reviewReason: string | null;
   fingerprint: string;
 }
 
@@ -4566,7 +4573,13 @@ export async function commitTransactionImport(
     direction: t.amount < 0 ? 'charge' : 'credit',
     flow: t.flow,
     category: t.category,
+    category_code: t.categoryCode,
     category_source: t.categorySource,
+    counterparty_key: t.counterpartyKey,
+    counterparty_name: t.counterpartyName,
+    source_record_id: t.sourceRecordId,
+    review_state: t.reviewState,
+    review_reason: t.reviewReason,
     fingerprint: t.fingerprint,
   }));
 

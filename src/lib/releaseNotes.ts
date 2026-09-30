@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.60.3',
+    date: '2026-09-30',
+    title: 'A test suite, and two components lifted out for reuse',
+    items: [
+      'Command now has unit tests. 106 of them, covering the import reader, the category normalizer, the monthly roll-up and recurring detection — the parts where a wrong number looks exactly like a right one.',
+      'They pin today\'s behavior deliberately, so the category work coming next cannot quietly move a figure.',
+      'StatTile and the period stepper were private to one card each; both are shared components now.',
+    ],
+  },
+  {
     version: '0.60.2',
     date: '2026-09-28',
     title: 'A CSV that imported transactions no longer reads as unused',

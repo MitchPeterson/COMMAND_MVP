@@ -6,9 +6,10 @@
 // tell which they are looking at.
 
 import React, { useMemo, useState } from 'react';
-import { PieChart, ChevronLeft, ChevronRight } from 'lucide-react';
+import { PieChart } from 'lucide-react';
 import type { BudgetSummary, CreditCard, CreditStatement, CreditTransaction } from '../lib/supabase';
 import { monthlySpending, coverageAgainstBudget } from '../lib/spending';
+import { PeriodSelector } from './PeriodSelector';
 
 interface Props {
   transactions: CreditTransaction[];
@@ -71,28 +72,7 @@ export function MonthlySpending({ transactions, cards, statements = [], budget }
             <p className="text-3xl font-semibold text-cmd-offwhite">{money(month!.total)}</p>
             <p className="text-xs text-cmd-muted">on cards Command has read</p>
           </div>
-          {coverage.months.length > 1 && (
-            <div className="flex shrink-0 gap-1">
-              <button
-                type="button"
-                onClick={() => setIndex(Math.min(coverage.months.length - 1, index + 1))}
-                disabled={index >= coverage.months.length - 1}
-                className="rounded-xl border border-cmd-border p-2 text-cmd-muted transition hover:text-cmd-gold disabled:opacity-30"
-                aria-label="Earlier month"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setIndex(Math.max(0, index - 1))}
-                disabled={index === 0}
-                className="rounded-xl border border-cmd-border p-2 text-cmd-muted transition hover:text-cmd-gold disabled:opacity-30"
-                aria-label="Later month"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          )}
+          <PeriodSelector periods={coverage.months} index={index} onChange={setIndex} />
         </div>
       </div>
 

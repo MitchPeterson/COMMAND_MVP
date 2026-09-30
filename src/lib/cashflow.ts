@@ -53,6 +53,17 @@ export interface MonthFlow {
    * half imported" is the kind of wrong nobody catches.
    */
   partial: boolean;
+  /**
+   * Spending by category code, for this period only.
+   *
+   * Carried on the period rather than recomputed per drill-down, because the
+   * period-over-period chart needs every period's figure for one category and
+   * walking the transactions again for each category opened is how a page
+   * that felt instant starts taking a second.
+   */
+  byCategory: Record<string, { amount: number; count: number }>;
+  /** Income and spending by source, for the by-source lists and coverage. */
+  bySource: Record<string, { income: number; expenses: number; count: number }>;
 }
 
 export interface CategoryTotal {
@@ -114,6 +125,12 @@ export interface Cashflow {
   cardPayments: { total: number; count: number };
   /** Whether any transaction on file actually came off a card. */
   hasCardTransactions: boolean;
+  /**
+   * What was left out of the totals, so the exclusion can be shown rather than
+   * silently applied. A household that sees $9,250 of spending vanish deserves
+   * to see where it went.
+   */
+  excluded: Array<{ id: string; date: string; description: string; amount: number; flow: 'transfer' | 'savings'; pairedWith: string | null }>;
   transactionCount: number;
   /** True when nothing imported carried a flow, so this is card data only. */
   fromStatementsOnly: boolean;
@@ -211,6 +228,7 @@ export function computeCashflow(
   let advanceCount = 0;
   let cardPaymentTotal = 0;
   let cardPaymentCount = 0;
+  const excluded: Cashflow['excluded'] = [];
 
   for (const t of rows) {
     const month = (t.transaction_date ?? '').slice(0, 7);
@@ -222,12 +240,30 @@ export function computeCashflow(
     const held = byMonth.get(month) ?? {
       month, label: MONTH_LABEL(month), income: 0, expenses: 0, refunds: 0,
       transfers: 0, savings: 0, net: 0, transactionCount: 0, partial: false,
+      byCategory: {}, bySource: {},
     };
     held.transactionCount += 1;
 
+    const sourceId = t.finance_account_id ?? t.credit_card_id ?? 'unattached';
+    const source = held.bySource[sourceId] ?? { income: 0, expenses: 0, count: 0 };
+    source.count += 1;
+    if (flow === 'income') source.income += amount;
+    if (flow === 'expense') source.expenses += t.direction === 'credit' ? -amount : amount;
+    held.bySource[sourceId] = source;
+
     if (flow === 'income') { held.income += amount; totalIncome += amount; }
-    else if (flow === 'savings') { held.savings += amount; totalSavings += amount; }
-    else if (flow === 'transfer') {
+    else if (flow === 'savings') {
+      held.savings += amount;
+      totalSavings += amount;
+      excluded.push({
+        id: t.id, date: t.transaction_date ?? '', description: t.merchant_description ?? '',
+        amount, flow: 'savings', pairedWith: t.paired_with_id ?? null,
+      });
+    } else if (flow === 'transfer') {
+      excluded.push({
+        id: t.id, date: t.transaction_date ?? '', description: t.merchant_description ?? '',
+        amount, flow: 'transfer', pairedWith: t.paired_with_id ?? null,
+      });
       held.transfers += amount;
       totalTransfers += amount;
       if (t.direction === 'charge' && CARD_PAYMENT_PATTERN.test(t.merchant_description ?? '')) {
@@ -252,7 +288,12 @@ export function computeCashflow(
     if (flow !== 'expense') continue;
 
     const signed = t.direction === 'credit' ? -amount : amount;
-    const group = categoryFromLabel(t.category);
+    const group = categoryFromLabel(t.category_code ?? t.category);
+    const perPeriod = held.byCategory[group.code] ?? { amount: 0, count: 0 };
+    perPeriod.amount += signed;
+    perPeriod.count += 1;
+    held.byCategory[group.code] = perPeriod;
+
     const bucket = categories.get(group.code)
       ?? { code: group.code, label: group.label, amount: 0, share: 0, count: 0 };
     bucket.amount += signed;
@@ -372,6 +413,7 @@ export function computeCashflow(
     },
     cashAdvances: { total: advanceTotal, count: advanceCount },
     cardPayments: { total: cardPaymentTotal, count: cardPaymentCount },
+    excluded,
     hasCardTransactions: rows.some((t) => t.credit_card_id != null || t.statement_id != null),
     transactionCount: rows.length,
     fromStatementsOnly: rows.every((t) => !t.flow),

@@ -25,6 +25,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '1.0.0',
+    date: '2026-09-30',
+    title: 'Spending is one month at a time now',
+    items: [
+      'The Spending tab is rebuilt around a single period. In, out, saved and left over, each against the month before — and where a comparison cannot be made honestly, it says so instead of showing a number.',
+      'Every category opens in place: a month-to-month chart with the average of complete months drawn across it, then the transactions behind the bar.',
+      'Months Command only partly holds are drawn hatched and labelled, never averaged in, and never compared against. The month in progress says "so far".',
+      'Money moving between your own accounts is listed under "Not counted", so you can see what was left out rather than wonder where it went.',
+    ],
+  },
+  {
     version: '0.63.0',
     date: '2026-09-30',
     title: 'Drop every export at once',

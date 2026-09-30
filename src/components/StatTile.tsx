@@ -32,8 +32,12 @@ interface Props {
   icon?: React.ReactNode;
   tone?: TileTone;
   /**
-   * Shown small and right of the label — a period-over-period delta, usually.
-   * Kept separate from `note` so the two never compete for the same line.
+   * A period-over-period change, usually.
+   *
+   * Rendered under the figure rather than beside the label. Beside it, a long
+   * change like "−$3,864 (−53%)" pushed "Left over" out of its own tile and
+   * left it reading "LEFT …" -- the two were competing for one line, and the
+   * label lost.
    */
   delta?: React.ReactNode;
 }
@@ -41,15 +45,17 @@ interface Props {
 export function StatTile({ label, value, note, icon, tone = 'default', delta }: Props) {
   return (
     <div className="rounded-2xl border border-cmd-border bg-cmd-charcoal p-4">
-      <div className="flex items-center justify-between gap-2">
-        <p className="flex min-w-0 items-center gap-1.5 text-[11px] uppercase tracking-[0.16em] text-cmd-muted">
-          {icon}
-          <span className="truncate">{label}</span>
-        </p>
-        {delta != null && <span className="shrink-0 text-[11px] text-cmd-muted">{delta}</span>}
-      </div>
+      <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.16em] text-cmd-muted">
+        {icon}{label}
+      </p>
       <p className={`mt-2 font-mono text-xl ${VALUE_TONE[tone]}`}>{value}</p>
-      {note && <p className="mt-1 text-[11px] leading-4 text-cmd-muted">{note}</p>}
+      {(delta != null || note) && (
+        <p className="mt-1 text-[11px] leading-4 text-cmd-muted">
+          {delta}
+          {delta != null && note ? ' · ' : ''}
+          {note}
+        </p>
+      )}
     </div>
   );
 }

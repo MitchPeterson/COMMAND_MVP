@@ -378,6 +378,8 @@ export interface FinanceAccount {
   /** The vault file this came from, where one exists. ON DELETE SET NULL. */
   source_document_id?: string | null;
   created_at: string;
+  /** False once the household stops asking Command about exports for it. */
+  transactions_tracked?: boolean;
 }
 
 export interface BudgetSummary {
@@ -1148,6 +1150,7 @@ export interface CreditCard {
   rewards_balance?: number | null;
   latest_statement_id?: string | null;
   last_confirmed_at?: string | null;
+  transactions_tracked?: boolean;
 }
 
 /** One reading of one uploaded statement. Raw until confirmed. */
@@ -4424,6 +4427,18 @@ export interface TransactionImportRow {
   sign_convention: 'negative_is_spending' | 'positive_is_spending' | 'debit_credit_columns';
   column_map: Record<string, unknown>;
   created_at: string;
+  /** Which named format read this file, or null for the generic scorer. */
+  adapter_id?: string | null;
+  /**
+   * The range the file's own name claimed.
+   *
+   * Kept apart from period_start/period_end because they answer different
+   * questions: what the export was meant to cover, against what was actually
+   * in it. A file named Aug1-Aug31 holding nothing after the 6th is exactly
+   * the gap this page has to report.
+   */
+  filename_period_start?: string | null;
+  filename_period_end?: string | null;
 }
 
 /** A row ready to be written, in Command's own terms rather than the file's. */
@@ -4459,6 +4474,8 @@ export interface TransactionImportSpec {
   columnMap: Record<string, unknown>;
   /** Which named format read this file, or null for the generic scorer. */
   adapterId?: string | null;
+  /** The range the file's own name claimed, where it claimed one. */
+  filenamePeriod?: { start: string; end: string } | null;
   rowCount: number;
   skippedCount: number;
 }
@@ -4553,6 +4570,8 @@ export async function commitTransactionImport(
       sign_convention: spec.signConvention,
       column_map: spec.columnMap,
       adapter_id: spec.adapterId ?? null,
+      filename_period_start: spec.filenamePeriod?.start ?? null,
+      filename_period_end: spec.filenamePeriod?.end ?? null,
     }])
     .select()
     .single();
@@ -4981,4 +5000,103 @@ export async function getFlaggedTransactions(householdId: string): Promise<Credi
     return [];
   }
   return (data ?? []) as CreditTransaction[];
+}
+
+// ============================================================
+// UPLOAD COVERAGE
+// ============================================================
+
+/**
+ * Record what the household said about one source in one period.
+ *
+ * The only part of coverage that is stored. Everything else is derived from
+ * the imports on file at read time, because a status written down is a status
+ * that goes stale while still looking authoritative -- but "there was no
+ * activity that month" cannot be derived from an absence of rows, which is
+ * exactly what it looks like.
+ */
+export async function setSourcePeriodMark(
+  householdId: string,
+  input: {
+    financeAccountId?: string | null;
+    creditCardId?: string | null;
+    period: string;
+    mark: 'complete' | 'not_needed';
+    note?: string | null;
+  },
+): Promise<void> {
+  const { error } = await supabase
+    .from('source_period_marks')
+    .upsert({
+      household_id: householdId,
+      finance_account_id: input.financeAccountId ?? null,
+      credit_card_id: input.creditCardId ?? null,
+      // Stored as the first of the month, which is what the unique index keys on.
+      period: `${input.period}-01`,
+      mark: input.mark,
+      note: input.note ?? null,
+    }, {
+      onConflict: input.creditCardId
+        ? 'household_id,credit_card_id,period'
+        : 'household_id,finance_account_id,period',
+    });
+  if (error) throw new Error(`Could not save that: ${error.message}`);
+}
+
+/** Take back a mark, so the period returns to whatever the imports say. */
+export async function clearSourcePeriodMark(id: string): Promise<void> {
+  const { error } = await supabase.from('source_period_marks').delete().eq('id', id);
+  if (error) throw new Error(`Could not undo that: ${error.message}`);
+}
+
+/**
+ * Stop, or resume, tracking exports for a source.
+ *
+ * Not a delete. The transactions already loaded stay exactly where they are
+ * and keep counting; the account simply stops being asked about. A household
+ * closing an account should not lose its history to tidy up its uploads page.
+ */
+export async function setSourceTracking(
+  kind: 'bank' | 'card',
+  id: string,
+  tracked: boolean,
+): Promise<void> {
+  const { error } = await supabase
+    .from(kind === 'card' ? 'credit_cards' : 'finance_accounts')
+    .update({ transactions_tracked: tracked })
+    .eq('id', id);
+  if (error) throw new Error(`Could not change that: ${error.message}`);
+}
+
+/** Rename a source, since the name Command guessed from a file is a guess. */
+export async function renameSource(kind: 'bank' | 'card', id: string, name: string): Promise<void> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('Give it a name.');
+  const { error } = await supabase
+    .from(kind === 'card' ? 'credit_cards' : 'finance_accounts')
+    .update(kind === 'card' ? { card_name: trimmed } : { account_name: trimmed })
+    .eq('id', id);
+  if (error) throw new Error(`Could not rename that: ${error.message}`);
+}
+
+/**
+ * "Not needed" against a counterparty Command noticed but cannot account for.
+ *
+ * Stored in dismissed_findings rather than a table of its own. It is the same
+ * shape of fact -- the household saw a suggestion and put it down -- and it
+ * already has the fingerprint, the restore path and the RLS.
+ */
+export const UNTRACKED_SECTION = 'uploads';
+
+export async function dismissUntrackedSource(
+  householdId: string,
+  counterpartyKey: string,
+  name: string,
+): Promise<void> {
+  await dismissFinding(householdId, {
+    section: UNTRACKED_SECTION,
+    fingerprint: `${UNTRACKED_SECTION}:source:${counterpartyKey}`,
+    title: name,
+    snoozedUntil: null,
+  });
 }

@@ -25,6 +25,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '1.2.0',
+    date: '2026-09-30',
+    title: 'Know what you have actually loaded',
+    items: [
+      'Every account gets a status for every month — complete, partial, missing or confirmed — and a partial month names the missing days exactly: "Chase checking is missing August 1 to August 6".',
+      'Each account card ends with the one instruction that matters: what to fill in, and which day the next export should start from.',
+      'A month that genuinely had no activity can be marked so, which is the only part of this Command cannot work out for itself — an absence of rows looks identical either way.',
+      'Transfers naming an account you have not imported are listed, each with a way to say it is not needed.',
+    ],
+  },
+  {
     version: '1.1.0',
     date: '2026-09-30',
     title: 'Correct it once and Command learns',

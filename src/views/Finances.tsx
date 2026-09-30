@@ -11,6 +11,9 @@ import { RecurringCharges } from '../components/RecurringCharges';
 import { TransactionImportPanel } from '../components/TransactionImportPanel';
 import { PeriodView } from '../components/PeriodView';
 import { ReviewQueue } from '../components/ReviewQueue';
+import { UploadsPanel } from '../components/UploadsPanel';
+import { computeCoverage, type SourceRef } from '../lib/transactions/coverage';
+import { UNTRACKED_SECTION } from '../lib/supabase';
 import { availableCategories } from '../lib/transactions/taxonomy';
 import { SpendingInsights } from '../components/SpendingInsights';
 import { computeCashflow } from '../lib/cashflow';
@@ -79,6 +82,60 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
     () => transactions.filter((t) => t.review_state === 'needs_review'),
     [transactions],
   );
+  // ── Coverage ──────────────────────────────────────────────────────────────
+  // Everything here is derived from the imports on file. The only stored part
+  // is what the household asserted about a period, which cannot be derived
+  // from an absence of rows -- an absence looks identical either way.
+  const sources = useMemo<SourceRef[]>(() => [
+    ...accounts.map((a) => ({
+      id: a.id, kind: 'bank' as const, name: a.account_name,
+      tracked: a.transactions_tracked !== false,
+    })),
+    ...(data?.creditCards ?? []).map((c) => ({
+      id: c.id, kind: 'card' as const, name: c.card_name || c.issuer || 'Card',
+      tracked: c.transactions_tracked !== false,
+    })),
+  ], [accounts, data?.creditCards]);
+
+  const loads = useMemo(() => (data?.transactionImports ?? [])
+    .map((imp) => ({
+      sourceId: imp.finance_account_id ?? imp.credit_card_id ?? '',
+      // The range the file's own name claimed, where it had one: it says what
+      // the export was meant to cover, which is what a gap is measured
+      // against. The row dates only say what happened to be in it.
+      start: imp.filename_period_start ?? imp.period_start ?? '',
+      end: imp.filename_period_end ?? imp.period_end ?? '',
+    }))
+    .filter((l) => l.sourceId && l.start && l.end),
+  [data?.transactionImports]);
+
+  const marks = useMemo(() => {
+    const out: Record<string, 'complete' | 'not_needed'> = {};
+    for (const m of data?.sourcePeriodMarks ?? []) {
+      const id = m.finance_account_id ?? m.credit_card_id;
+      if (id) out[`${id}:${m.period.slice(0, 7)}`] = m.mark;
+    }
+    return out;
+  }, [data?.sourcePeriodMarks]);
+
+  // Transfers naming somewhere no account on file accounts for. A paired
+  // transfer has both halves loaded by definition, so it is already accounted.
+  const untrackedTransfers = useMemo(() => transactions
+    .filter((t) => (t.flow === 'transfer' || t.flow === 'savings') && !t.paired_with_id)
+    .map((t) => ({ description: t.counterparty_name || t.merchant_description, counterpartyKey: t.counterparty_key ?? null })),
+  [transactions]);
+
+  const dismissedSourceKeys = useMemo(() => (data?.dismissedFindings ?? [])
+    .filter((d) => d.section === UNTRACKED_SECTION)
+    .map((d) => d.fingerprint.replace(`${UNTRACKED_SECTION}:source:`, '')),
+  [data?.dismissedFindings]);
+
+  const coverageGaps = useMemo(
+    () => computeCoverage({ sources, loads, marks, now: new Date() })
+      .reduce((sum, c) => sum + c.gapCount, 0),
+    [sources, loads, marks],
+  );
+
   const sourceLabel = useMemo(() => {
     const names = new Map<string, string>();
     for (const a of accounts) names.set(a.id, a.account_name);
@@ -133,7 +190,9 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
   const tabs = [
     { id: 'accounts', label: 'Accounts', count: cashAccounts.length + (data?.assets ?? []).length },
     { id: 'debt', label: 'Debt', count: activeLoans.length + cardsWithBalance.length },
-    { id: 'spending', label: 'Spending', count: flagged.length, always: true },
+    // Both halves of "there is work here": rows waiting on a decision, and
+    // months waiting on a file.
+    { id: 'spending', label: 'Spending', count: flagged.length + coverageGaps, always: true },
     { id: 'investments', label: 'Investments', count: investedCount },
     // Accounts always shows, because manual entry lives there and a household
     // with nothing on file still needs somewhere to put the first thing.
@@ -300,6 +359,17 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
             transactions={transactions}
             statements={data?.creditStatements ?? []}
           />
+          {data?.household?.id && (
+            <UploadsPanel
+              householdId={data.household.id}
+              sources={sources}
+              loads={loads}
+              marks={marks}
+              transfers={untrackedTransfers}
+              dismissedKeys={dismissedSourceKeys}
+              onChanged={refresh}
+            />
+          )}
           {data?.household?.id && (
             <TransactionImportPanel
               householdId={data.household.id}

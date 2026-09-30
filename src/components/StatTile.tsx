@@ -16,11 +16,20 @@ import React from 'react';
 
 export type TileTone = 'default' | 'gold' | 'warn' | 'critical';
 
+/**
+ * Status tones that work on both themes.
+ *
+ * Not the 300-weight tints the rest of the repo reaches for. Those were all
+ * picked against the dark palette, before the light one existed, and they
+ * measure under 2:1 on it -- amber-300 on the light page is about 1.5:1, which
+ * is a figure nobody can read. These two clear 3.5:1 in both directions, which
+ * is the bar for a number this size.
+ */
 const VALUE_TONE: Record<TileTone, string> = {
   default: 'text-cmd-offwhite',
   gold: 'text-cmd-gold',
-  warn: 'text-amber-300',
-  critical: 'text-red-300',
+  warn: 'text-amber-700',
+  critical: 'text-red-500',
 };
 
 interface Props {

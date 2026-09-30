@@ -439,7 +439,8 @@ export interface ReadOptions {
   aliases?: Map<string, string> | Record<string, string>;
   /** Used only to guess the institution and last four for the account step. */
   fileName?: string;
-  sourceKind: 'bank' | 'card';
+  /** Omit and the adapter decides; a recognised format knows what it is. */
+  sourceKind?: 'bank' | 'card';
   /** Overrides, when the household has corrected the guess. */
   mapping?: ColumnMapping;
   signConvention?: SignConvention;

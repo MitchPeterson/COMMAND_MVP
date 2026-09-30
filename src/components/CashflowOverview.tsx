@@ -19,6 +19,7 @@
 import React, { useState } from 'react';
 import { ArrowDownLeft, ArrowUpRight, TrendingDown, Wallet } from 'lucide-react';
 import type { Cashflow } from '../lib/cashflow';
+import { StatTile } from './StatTile';
 
 interface Props {
   cashflow: Cashflow;
@@ -47,20 +48,6 @@ const HATCH_GOLD =
   'repeating-linear-gradient(45deg, rgb(var(--cmd-gold)) 0 2px, rgb(var(--cmd-gold) / 0.25) 2px 5px)';
 const HATCH_NEUTRAL =
   'repeating-linear-gradient(45deg, rgb(var(--cmd-series-2)) 0 2px, rgb(var(--cmd-series-2) / 0.25) 2px 5px)';
-
-function StatTile({ label, value, note, icon }: {
-  label: string; value: string; note: string; icon?: React.ReactNode;
-}) {
-  return (
-    <div className="rounded-2xl border border-cmd-border bg-cmd-charcoal p-4">
-      <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.16em] text-cmd-muted">
-        {icon}{label}
-      </p>
-      <p className="mt-2 font-mono text-xl text-cmd-offwhite">{value}</p>
-      <p className="mt-1 text-[11px] leading-4 text-cmd-muted">{note}</p>
-    </div>
-  );
-}
 
 export function CashflowOverview({ cashflow }: Props) {
   const [hovered, setHovered] = useState<string | null>(null);

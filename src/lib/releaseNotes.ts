@@ -25,6 +25,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '1.4.0',
+    date: '2026-10-01',
+    title: 'Recommendations drawn from your own figures',
+    items: [
+      'A button, not something the page does on its own — it costs money each time, and the date it was drawn sits next to it, because advice from August reads as current in November.',
+      'Only totals leave: by month, by category, by source, what renews, and the decisions you have already made. No transaction, merchant or account number is ever sent.',
+      'Command\'s own checks now sit below, visibly apart. They are arithmetic on your records rather than a reading of them, and they recompute whenever a file lands.',
+    ],
+  },
+  {
     version: '1.3.0',
     date: '2026-09-30',
     title: 'What renews, and what it really costs',

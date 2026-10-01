@@ -4328,7 +4328,7 @@ export async function deleteFinanceAccount(id: string): Promise<boolean> {
 const HOUSEHOLD_TABLES = [
   // Pure leaves first. source_period_marks points at finance_accounts and
   // credit_cards, so it has to go before both of them.
-  'source_period_marks', 'counterparty_rules', 'transaction_categories',
+  'source_period_marks', 'counterparty_rules', 'transaction_categories', 'spending_advice',
   'tax_return_fields', 'tax_returns', 'deduction_log', 'tax_documents', 'tax_recommendations',
   // transaction_imports is the parent of the imported half of
   // credit_transactions, so it follows them. It was missing from this list
@@ -5124,4 +5124,69 @@ export async function setRecurringDecision(
       updated_at: new Date().toISOString(),
     }, { onConflict: 'household_id,counterparty_key' });
   if (error) throw new Error(`Could not save that: ${error.message}`);
+}
+
+// ============================================================
+// SPENDING ADVICE
+// ============================================================
+
+export interface SpendingAdviceItem {
+  tag: 'cut' | 'save' | 'review' | 'data';
+  title: string;
+  body: string;
+  /** Dollars per month, positive. Zero when it could not be estimated. */
+  impact: number;
+}
+
+export interface SpendingAdviceRow {
+  id: string;
+  household_id: string;
+  as_of: string;
+  period: string | null;
+  items: SpendingAdviceItem[];
+  total_impact: number;
+  model: string | null;
+  basis: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export async function getSpendingAdvice(householdId: string): Promise<SpendingAdviceRow | null> {
+  const { data, error } = await supabase
+    .from('spending_advice')
+    .select('*')
+    .eq('household_id', householdId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    console.error('Could not load spending advice:', error);
+    return null;
+  }
+  return (data as SpendingAdviceRow) ?? null;
+}
+
+/**
+ * Ask for a fresh reading.
+ *
+ * Costs money every time, which is why it is a button rather than something
+ * the page does on render. The aggregate is assembled by the caller and
+ * rebuilt field by field inside the function, so nothing resembling a
+ * transaction can reach the model however this is called.
+ */
+export async function refreshSpendingAdvice(
+  householdId: string,
+  basis: unknown,
+): Promise<SpendingAdviceRow> {
+  const { data, error } = await supabase.functions.invoke('advise-spending', {
+    body: { household_id: householdId, basis },
+  });
+  if (error) {
+    // The useful detail is in the body, not the status.
+    let detail: string | null = null;
+    try { detail = (await (error as { context?: Response }).context?.json())?.error ?? null; } catch { /* no body */ }
+    throw new Error(detail ?? 'Command could not draw up recommendations just now.');
+  }
+  const parsed = (typeof data === 'string' ? JSON.parse(data) : data) as SpendingAdviceRow & { error?: string };
+  if (parsed?.error) throw new Error(parsed.error);
+  return parsed;
 }

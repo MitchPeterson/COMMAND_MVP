@@ -15,7 +15,11 @@ import { RecurringPanel } from '../components/RecurringPanel';
 import { computeCoverage, type SourceRef } from '../lib/transactions/coverage';
 import { UNTRACKED_SECTION } from '../lib/supabase';
 import { availableCategories } from '../lib/transactions/taxonomy';
-import { SpendingInsights } from '../components/SpendingInsights';
+import { AdvicePanel } from '../components/AdvicePanel';
+import { computeSpendingInsights } from '../lib/spendingInsights';
+import { buildAdviceBasis } from '../lib/transactions/advice';
+import { buildRecurringView } from '../lib/transactions/recurringDetail';
+import { merchantKey } from '../lib/transactions/counterparty';
 import { computeCashflow } from '../lib/cashflow';
 import { findRecurringCharges } from '../lib/recurring';
 import { SegmentedTabs } from '../components/SegmentedTabs';
@@ -135,6 +139,24 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
       .reduce((sum, c) => sum + c.gapCount, 0),
     [sources, loads, marks],
   );
+
+  // Command's own arithmetic, and the aggregate a reading would be drawn from.
+  const insights = useMemo(
+    () => computeSpendingInsights(cashflow, recurring),
+    [cashflow, recurring],
+  );
+  const adviceBasis = useMemo(() => {
+    const decisions: Record<string, 'keep' | 'cut'> = {};
+    for (const rule of data?.counterpartyRules ?? []) {
+      if (rule.recurring_decision) decisions[rule.counterparty_key] = rule.recurring_decision;
+    }
+    return buildAdviceBasis(
+      cashflow,
+      computeCoverage({ sources, loads, marks, now: new Date() }),
+      buildRecurringView(recurring.charges, decisions, (c) => merchantKey(c.merchant)),
+      flagged.length,
+    );
+  }, [cashflow, sources, loads, marks, recurring, data?.counterpartyRules, flagged.length]);
 
   const sourceLabel = useMemo(() => {
     const names = new Map<string, string>();
@@ -354,7 +376,16 @@ export function FinancesView({ focusId = null }: { focusId?: string | null } = {
             categories={categories}
             onChanged={refresh}
           />
-          <SpendingInsights cashflow={cashflow} recurring={recurring} />
+          {data?.household?.id && (
+            <AdvicePanel
+              householdId={data.household.id}
+              advice={data?.spendingAdvice ?? null}
+              basis={adviceBasis}
+              checks={insights.findings}
+              opportunities={insights.opportunities}
+              onChanged={refresh}
+            />
+          )}
           {data?.household?.id && (
             <RecurringPanel
               householdId={data.household.id}

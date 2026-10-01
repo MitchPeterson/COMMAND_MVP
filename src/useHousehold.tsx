@@ -80,6 +80,8 @@ import {
   getCounterpartyRules,
   type SourcePeriodMarkRow,
   getSourcePeriodMarks,
+  type SpendingAdviceRow,
+  getSpendingAdvice,
   type DeductionLogEntry,
 } from './lib/supabase';
 
@@ -129,6 +131,8 @@ export interface HouseholdData {
   counterpartyRules: CounterpartyRuleRow[];
   /** What the household asserted about a source's coverage in a period. */
   sourcePeriodMarks: SourcePeriodMarkRow[];
+  /** The most recent reading. Null until someone asks for one. */
+  spendingAdvice: SpendingAdviceRow | null;
 }
 
 export interface UseHouseholdReturn {
@@ -179,6 +183,7 @@ const EMPTY_DATA: HouseholdData = {
   transactionCategories: [],
   counterpartyRules: [],
   sourcePeriodMarks: [],
+  spendingAdvice: null,
 };
 
 /**
@@ -255,6 +260,7 @@ function useHouseholdState(): UseHouseholdReturn {
         transactionCategories,
         counterpartyRules,
         sourcePeriodMarks,
+        spendingAdvice,
       ] = await Promise.all([
         supabase
           .from('household_profile')
@@ -300,6 +306,7 @@ function useHouseholdState(): UseHouseholdReturn {
         getTransactionCategories(hid),
         getCounterpartyRules(hid),
         getSourcePeriodMarks(hid),
+        getSpendingAdvice(hid),
       ]);
 
       setData({
@@ -342,6 +349,7 @@ function useHouseholdState(): UseHouseholdReturn {
         transactionCategories,
         counterpartyRules,
         sourcePeriodMarks,
+        spendingAdvice,
       });
     } catch (err) {
       console.error('Failed to load household data:', err);
